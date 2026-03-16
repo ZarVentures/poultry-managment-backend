@@ -10,10 +10,9 @@ export class CreateRetailerDto {
   @MaxLength(150)
   ownerName?: string;
 
-  @IsOptional()
   @IsString()
   @MaxLength(50)
-  phone?: string;
+  phone!: string;
 
   @IsOptional()
   @IsEmail()

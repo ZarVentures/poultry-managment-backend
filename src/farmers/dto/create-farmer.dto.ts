@@ -5,10 +5,9 @@ export class CreateFarmerDto {
   @MaxLength(150)
   name!: string;
 
-  @IsOptional()
   @IsString()
   @MaxLength(50)
-  phone?: string;
+  phone!: string;
 
   @IsOptional()
   @IsEmail()
