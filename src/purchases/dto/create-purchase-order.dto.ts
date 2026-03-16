@@ -55,6 +55,42 @@ export class CreatePurchaseOrderDto {
   @IsEnum(['pending', 'received', 'cancelled'])
   status?: PurchaseStatus;
 
+  // Invoice header fields
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  branch?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  unit?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  gstin?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  liftingTime?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  partyCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  prNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  hsnCode?: string;
+
   // Farmer integration
   @IsOptional()
   @IsString()

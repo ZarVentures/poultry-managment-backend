@@ -30,6 +30,28 @@ export class PurchaseOrder {
   })
   status!: PurchaseStatus;
 
+  // Invoice header fields
+  @Column({ name: 'branch', type: 'varchar', length: 100, nullable: true })
+  branch?: string;
+
+  @Column({ name: 'unit', type: 'varchar', length: 100, nullable: true })
+  unit?: string;
+
+  @Column({ name: 'gstin', type: 'varchar', length: 20, nullable: true })
+  gstin?: string;
+
+  @Column({ name: 'lifting_time', type: 'varchar', length: 50, nullable: true })
+  liftingTime?: string;
+
+  @Column({ name: 'party_code', type: 'varchar', length: 50, nullable: true })
+  partyCode?: string;
+
+  @Column({ name: 'pr_number', type: 'varchar', length: 50, nullable: true })
+  prNumber?: string;
+
+  @Column({ name: 'hsn_code', type: 'varchar', length: 20, nullable: true, default: '0105' })
+  hsnCode?: string;
+
   // Farmer integration
   @Column({ name: 'farmer_id', type: 'bigint', nullable: true })
   farmerId?: string;

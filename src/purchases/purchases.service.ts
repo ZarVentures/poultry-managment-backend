@@ -70,6 +70,14 @@ export class PurchasesService {
       dueDate: createPurchaseOrderDto.dueDate,
       status: createPurchaseOrderDto.status || 'pending',
       notes: createPurchaseOrderDto.notes,
+      // Invoice header fields
+      branch: createPurchaseOrderDto.branch,
+      unit: createPurchaseOrderDto.unit,
+      gstin: createPurchaseOrderDto.gstin,
+      liftingTime: createPurchaseOrderDto.liftingTime,
+      partyCode: createPurchaseOrderDto.partyCode,
+      prNumber: createPurchaseOrderDto.prNumber,
+      hsnCode: createPurchaseOrderDto.hsnCode || '0105',
       // Farmer integration
       farmerId: createPurchaseOrderDto.farmerId,
       farmerMobile: createPurchaseOrderDto.farmerMobile,
