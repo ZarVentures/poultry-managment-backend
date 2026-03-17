@@ -172,6 +172,10 @@ export class CreatePurchaseOrderDto {
   totalPaymentMade?: string;
 
   @IsOptional()
+  @IsString()
+  invoiceAttachment?: string;
+
+  @IsOptional()
   @IsArray()
   @IsOptional()
   @IsArray()

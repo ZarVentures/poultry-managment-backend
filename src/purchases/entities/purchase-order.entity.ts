@@ -128,6 +128,9 @@ export class PurchaseOrder {
   @Column({ type: 'text', nullable: true })
   notes?: string;
 
+  @Column({ name: 'invoice_attachment', type: 'varchar', length: 500, nullable: true })
+  invoiceAttachment?: string;
+
   @OneToMany(() => PurchaseOrderItem, (item) => item.purchaseOrder, { cascade: true })
   items!: PurchaseOrderItem[];
 

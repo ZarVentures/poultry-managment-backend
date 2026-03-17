@@ -106,6 +106,7 @@ export class PurchasesService {
       paymentMode: createPurchaseOrderDto.paymentMode,
       totalPaymentMade,
       balanceAmount,
+      invoiceAttachment: createPurchaseOrderDto.invoiceAttachment,
     });
 
     const savedOrder = await this.purchaseOrderRepository.save(purchaseOrder);
@@ -320,6 +321,14 @@ export class PurchasesService {
 
     await this.purchaseOrderRepository.save(purchaseOrder);
 
+    return this.findOne(id);
+  }
+
+  async updateInvoiceAttachment(id: string, fileUrl: string): Promise<PurchaseOrder> {
+    const purchaseOrder = await this.findOne(id);
+    purchaseOrder.invoiceAttachment = fileUrl;
+    purchaseOrder.updatedAt = new Date();
+    await this.purchaseOrderRepository.save(purchaseOrder);
     return this.findOne(id);
   }
 

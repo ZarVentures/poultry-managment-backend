@@ -7,7 +7,13 @@ import {
   Param,
   Delete,
   Query,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
 import { PurchasesService } from './purchases.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
@@ -57,5 +63,32 @@ export class PurchasesController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.purchasesService.remove(id);
+  }
+
+  @Post(':id/upload-invoice')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: join(process.cwd(), 'uploads', 'invoices'),
+        filename: (_req, file, cb) => {
+          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `invoice-${unique}${extname(file.originalname)}`);
+        },
+      }),
+      fileFilter: (_req, file, cb) => {
+        const allowed = ['.pdf', '.jpg', '.jpeg', '.png'];
+        if (allowed.includes(extname(file.originalname).toLowerCase())) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('Only PDF, JPG, PNG files are allowed'), false);
+        }
+      },
+      limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    }),
+  )
+  async uploadInvoice(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    const fileUrl = `/uploads/invoices/${file.filename}`;
+    return this.purchasesService.updateInvoiceAttachment(id, fileUrl);
   }
 }
