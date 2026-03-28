@@ -17,7 +17,7 @@ async function bootstrap() {
   app.setGlobalPrefix(apiPrefix);
 
   app.enableCors({
-    origin: ['http://localhost:3002', 'http://localhost:3000', 'https://chickenfrontendp.onrender.com', '*'],
+    origin: true, // allow all origins
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Authorization',
