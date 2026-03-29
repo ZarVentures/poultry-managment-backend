@@ -32,6 +32,7 @@ export class VehiclesService {
   }
 
   async create(data: CreateVehicleDto): Promise<Vehicle> {
+    const toNum = (v: any) => (v === '' || v === undefined || v === null) ? null : Number(v);
     const entity = this.vehiclesRepository.create({
       vehicleNumber: data.vehicleNumber,
       vehicleType: data.vehicleType,
@@ -39,9 +40,9 @@ export class VehiclesService {
       phone: data.phone,
       ownerName: data.ownerName,
       address: data.address,
-      totalCapacity: data.totalCapacity ? Number(data.totalCapacity) : null,
-      petrolTankCapacity: data.petrolTankCapacity ?? null,
-      mileage: data.mileage ?? null,
+      totalCapacity: toNum(data.totalCapacity),
+      petrolTankCapacity: data.petrolTankCapacity === '' ? null : (data.petrolTankCapacity ?? null),
+      mileage: data.mileage === '' ? null : (data.mileage ?? null),
       joinDate: data.joinDate,
       status: data.status ?? 'active',
       note: data.note,
@@ -52,13 +53,13 @@ export class VehiclesService {
   async update(id: string, data: UpdateVehicleDto): Promise<Vehicle> {
     const existing = await this.findOne(id);
 
-    if (data.totalCapacity !== undefined) {
-      (existing as any).totalCapacity = data.totalCapacity ? Number(data.totalCapacity) : null;
-    }
+    const toNum = (v: any) => (v === '' || v === undefined || v === null) ? null : Number(v);
 
     Object.assign(existing, {
       ...data,
-      totalCapacity: data.totalCapacity !== undefined ? Number(data.totalCapacity) : existing.totalCapacity,
+      totalCapacity: data.totalCapacity !== undefined ? toNum(data.totalCapacity) : existing.totalCapacity,
+      petrolTankCapacity: data.petrolTankCapacity !== undefined ? (data.petrolTankCapacity === '' ? null : data.petrolTankCapacity) : existing.petrolTankCapacity,
+      mileage: data.mileage !== undefined ? (data.mileage === '' ? null : data.mileage) : existing.mileage,
     });
 
     return this.vehiclesRepository.save(existing);
