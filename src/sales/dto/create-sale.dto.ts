@@ -75,4 +75,14 @@ export class CreateSaleDto {
   @IsOptional()
   @IsString()
   retailerId?: string;
+
+  // Extra fields sent by frontend (ignored by service, stored in notes)
+  @IsOptional()
+  totalBirds?: number;
+
+  @IsOptional()
+  totalWeight?: number;
+
+  @IsOptional()
+  customerRows?: any[];
 }
