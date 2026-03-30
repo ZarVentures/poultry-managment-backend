@@ -21,7 +21,7 @@ export class SalesService {
       throw new BadRequestException(`Sale with invoice number ${createSaleDto.invoiceNumber} already exists`);
     }
 
-    const totalAmount = parseFloat(createSaleDto.quantity) * parseFloat(createSaleDto.unitPrice);
+    const totalAmount = parseFloat(createSaleDto.quantity || '0') * parseFloat(createSaleDto.unitPrice || '0');
 
     // Calculate charges
     const transportCharges = parseFloat(createSaleDto.transportCharges || '0');
@@ -44,9 +44,9 @@ export class SalesService {
       saleDate: createSaleDto.saleDate,
       saleMode: createSaleDto.saleMode,
       productType: createSaleDto.productType,
-      quantity: parseFloat(createSaleDto.quantity),
+      quantity: parseFloat(createSaleDto.quantity || '0'),
       unit: createSaleDto.unit,
-      unitPrice: parseFloat(createSaleDto.unitPrice),
+      unitPrice: parseFloat(createSaleDto.unitPrice || '0'),
       totalAmount,
       transportCharges,
       loadingCharges,
