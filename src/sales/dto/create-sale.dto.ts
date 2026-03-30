@@ -19,16 +19,18 @@ export class CreateSaleDto {
   @IsEnum(['eggs', 'meat', 'chicks', 'other'])
   productType!: SaleProductType;
 
+  @IsOptional()
   @IsString()
-  quantity!: string; // Using string to handle decimal input
+  quantity?: string; // Using string to handle decimal input
 
   @IsOptional()
   @IsString()
   @MaxLength(20)
   unit?: string;
 
+  @IsOptional()
   @IsString()
-  unitPrice!: string; // Using string to handle decimal input
+  unitPrice?: string; // Using string to handle decimal input
 
   @IsOptional()
   @IsEnum(['paid', 'pending', 'partial'])
