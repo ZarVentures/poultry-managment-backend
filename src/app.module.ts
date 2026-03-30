@@ -60,7 +60,7 @@ import { Product } from './products/product.entity';
               rejectUnauthorized: false
             },
             entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderCage, Sale, Expense, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownMortality, GodownExpense, RolePermission, UserPermission, Mortality, Product],
-            synchronize: false, // NEVER sync in production
+            synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
             logging: config.get<boolean>('DB_LOGGING', false),
           };
         }
@@ -74,7 +74,7 @@ import { Product } from './products/product.entity';
           password: config.get<string>('DB_PASSWORD', 'postgres'),
           database: config.get<string>('DB_NAME', 'poultry'),
           entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderCage, Sale, Expense, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownMortality, GodownExpense, RolePermission, UserPermission, Mortality, Product],
-          synchronize: false, // NEVER sync in production
+          synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
           logging: config.get<boolean>('DB_LOGGING', false),
         };
       },
