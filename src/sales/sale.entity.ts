@@ -93,6 +93,9 @@ export class Sale {
   @Column({ name: 'retailer_id', type: 'bigint', nullable: true })
   retailerId?: string;
 
+  @Column({ name: 'sale_attachment', type: 'text', nullable: true })
+  saleAttachment?: string;
+
   @ManyToOne(() => Retailer, { nullable: true })
   @JoinColumn({ name: 'retailer_id' })
   retailer?: Retailer;

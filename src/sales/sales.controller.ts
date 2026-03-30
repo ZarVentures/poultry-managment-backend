@@ -7,7 +7,13 @@ import {
   Param,
   Delete,
   Query,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage, FileFilterCallback } from 'multer';
+import { extname, join } from 'path';
 import { SalesService } from './sales.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
@@ -59,5 +65,32 @@ export class SalesController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.salesService.remove(id);
+  }
+
+  @Post(':id/upload-attachment')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: join(process.cwd(), 'uploads', 'sales'),
+        filename: (_req: Express.Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
+          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `sale-${unique}${extname(file.originalname)}`);
+        },
+      }),
+      fileFilter: (_req: Express.Request, file: Express.Multer.File, cb: FileFilterCallback) => {
+        const allowed = ['.pdf', '.jpg', '.jpeg', '.png'];
+        if (allowed.includes(extname(file.originalname).toLowerCase())) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('Only PDF, JPG, PNG files are allowed'));
+        }
+      },
+      limits: { fileSize: 10 * 1024 * 1024 },
+    }),
+  )
+  async uploadAttachment(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    const fileUrl = `/uploads/sales/${file.filename}`;
+    return this.salesService.updateAttachment(id, fileUrl);
   }
 }

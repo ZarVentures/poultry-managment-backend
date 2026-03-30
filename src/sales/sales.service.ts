@@ -211,6 +211,13 @@ export class SalesService {
     await this.saleRepository.remove(sale);
   }
 
+  async updateAttachment(id: string, fileUrl: string): Promise<Sale> {
+    const sale = await this.findOne(id);
+    (sale as any).saleAttachment = fileUrl;
+    sale.updatedAt = new Date();
+    return this.saleRepository.save(sale);
+  }
+
   async updatePaymentStatus(id: string, paymentStatus: 'paid' | 'pending' | 'partial', amountReceived?: number): Promise<Sale> {
     const sale = await this.findOne(id);
     sale.paymentStatus = paymentStatus;
