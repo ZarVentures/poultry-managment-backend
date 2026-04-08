@@ -26,13 +26,22 @@ async function copyTable(table) {
     const { rows } = await prod.query(`SELECT * FROM "${table}"`)
     if (rows.length === 0) { console.log(`  ⊘ ${table}: empty`); return }
 
+    // Get staging columns to avoid inserting unknown columns
+    const { rows: stageCols } = await stage.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = $1 AND table_schema = 'public'`,
+      [table]
+    )
+    const validCols = new Set(stageCols.map(r => r.column_name))
+
     // Clear staging table
     await stage.query(`TRUNCATE TABLE "${table}" CASCADE`)
 
-    // Insert all rows
+    // Insert all rows, only columns that exist in staging
     for (const row of rows) {
-      const cols = Object.keys(row).map(k => `"${k}"`).join(', ')
-      const vals = Object.values(row)
+      const filteredEntries = Object.entries(row).filter(([k]) => validCols.has(k))
+      if (filteredEntries.length === 0) continue
+      const cols = filteredEntries.map(([k]) => `"${k}"`).join(', ')
+      const vals = filteredEntries.map(([, v]) => v)
       const placeholders = vals.map((_, i) => `$${i + 1}`).join(', ')
       await stage.query(`INSERT INTO "${table}" (${cols}) VALUES (${placeholders})`, vals)
     }

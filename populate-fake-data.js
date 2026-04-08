@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 
 // Helper to generate random date within range
 function randomDate(start, end) {
@@ -198,3 +198,4 @@ async function populateFakeData() {
 }
 
 populateFakeData();
+

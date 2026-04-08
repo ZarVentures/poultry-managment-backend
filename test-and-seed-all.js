@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const API_URL = 'https://chickenbackend.onrender.com/api/v1';
+const API_URL = 'process.env.API_URL || 'https://13.234.140.190.nip.io/api/v1'';
 // const API_URL = 'http://localhost:3001/api/v1';
 
 let authToken = '';
@@ -477,3 +477,4 @@ async function runTests() {
 }
 
 runTests().catch(console.error);
+

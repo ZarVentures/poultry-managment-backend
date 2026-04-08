@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 
 async function addFarmhouseNameColumn() {
   console.log('🔧 ADDING FARMHOUSE_NAME COLUMN TO FARMERS TABLE');
@@ -62,3 +62,4 @@ async function addFarmhouseNameColumn() {
 }
 
 addFarmhouseNameColumn();
+

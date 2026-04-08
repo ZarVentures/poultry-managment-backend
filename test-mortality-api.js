@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const API_URL = 'https://chickenbackend.onrender.com/api/v1';
+const API_URL = 'process.env.API_URL || 'https://13.234.140.190.nip.io/api/v1'';
 
 async function testMortalityAPI() {
   console.log('🧪 TESTING MORTALITY API');
@@ -123,3 +123,4 @@ async function testMortalityAPI() {
 }
 
 testMortalityAPI();
+

@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 
 async function checkTables() {
   console.log('🔍 CHECKING TABLES FOR REPORTS');
@@ -39,3 +39,4 @@ async function checkTables() {
 }
 
 checkTables();
+

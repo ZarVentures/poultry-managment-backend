@@ -1,7 +1,7 @@
 const fetch = require('node-fetch');
 
 async function testFarmersAPI() {
-  const API_URL = 'https://chickenbackend.onrender.com/api/v1';
+  const API_URL = 'process.env.API_URL || 'https://13.234.140.190.nip.io/api/v1'';
   
   try {
     console.log('🔍 Testing Farmers API...\n');
@@ -33,3 +33,4 @@ async function testFarmersAPI() {
 }
 
 testFarmersAPI();
+

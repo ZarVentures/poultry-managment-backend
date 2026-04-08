@@ -1,7 +1,7 @@
 const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 
 async function backupAllData() {
   console.log('📦 BACKING UP ALL DATABASE DATA');
@@ -92,3 +92,4 @@ async function backupAllData() {
 }
 
 backupAllData();
+

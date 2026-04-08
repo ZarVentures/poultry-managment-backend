@@ -136,6 +136,13 @@ export class UsersService {
     await this.usersRepository.update(id, { lastLogin: new Date() });
   }
 
+  async updateSessionToken(id: string, sessionToken: string | null): Promise<void> {
+    await this.usersRepository.update(id, {
+      sessionToken,
+      lastLogin: new Date(),
+    });
+  }
+
   async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
     await this.usersRepository.remove(user);

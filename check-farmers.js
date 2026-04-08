@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 
 async function checkFarmers() {
   const client = new Client({
@@ -45,3 +45,4 @@ async function checkFarmers() {
 }
 
 checkFarmers();
+

@@ -44,6 +44,10 @@ export class User {
   @Column({ name: 'last_login', type: 'timestamptz', nullable: true })
   lastLogin?: Date | null;
 
+  // Tracks the current active session token — only the latest login is valid
+  @Column({ name: 'session_token', type: 'text', nullable: true })
+  sessionToken?: string | null;
+
   @Column({ type: 'text', nullable: true })
   notes?: string;
 

@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 
 async function updatePurchaseOrdersSchema() {
   const client = new Client({
@@ -123,3 +123,4 @@ async function updatePurchaseOrdersSchema() {
 }
 
 updatePurchaseOrdersSchema();
+

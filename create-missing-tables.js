@@ -1,4 +1,4 @@
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 const { Client } = require('pg');
 
 async function createMissingTables() {
@@ -95,3 +95,4 @@ async function createMissingTables() {
 }
 
 createMissingTables();
+

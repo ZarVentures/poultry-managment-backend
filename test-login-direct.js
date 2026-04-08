@@ -1,9 +1,9 @@
 const axios = require('axios');
 
 async function testLogin() {
-  console.log('🧪 Testing Login on Render Backend\n');
+  console.log('🧪 Testing Login on AWS EC2 Backend\n');
   
-  const BACKEND_URL = 'https://chickenbackend.onrender.com/api/v1';
+  const BACKEND_URL = process.env.API_URL || 'https://13.234.140.190.nip.io/api/v1';
   
   try {
     // Test 1: Health Check
@@ -65,8 +65,13 @@ async function checkDatabase() {
   const { Client } = require('pg');
   const bcrypt = require('bcrypt');
   
-  const DATABASE_URL = "postgresql://poultry_user:tdgOrBo0kxdJNDIphGaP3m1PBmzE0IpZ@dpg-d6a8cskr85hc738ep8fg-a.oregon-postgres.render.com:5432/poultry_4xcy";
+  require('dotenv').config();
+  const DATABASE_URL = process.env.DATABASE_URL;
   
+  if (!DATABASE_URL) {
+    console.log('❌ DATABASE_URL not set in .env');
+    return;
+  }
   const client = new Client({
     connectionString: DATABASE_URL,
     ssl: { rejectUnauthorized: false }

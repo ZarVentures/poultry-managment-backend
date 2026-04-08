@@ -1,11 +1,11 @@
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 const { Client } = require('pg');
 
 async function checkGodownTables() {
   const databaseUrl = process.env.DATABASE_URL;
   const client = new Client({
     connectionString: databaseUrl,
-    ssl: databaseUrl.includes('render.com') ? { rejectUnauthorized: false } : false
+    ssl: { rejectUnauthorized: false }, // AWS RDS requires SSL
   });
 
   try {
