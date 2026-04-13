@@ -18,6 +18,7 @@ import { PurchaseOrderItem } from './purchases/entities/purchase-order-item.enti
 import { PurchaseOrderCage } from './purchases/entities/purchase-order-cage.entity';
 import { SalesModule } from './sales/sales.module';
 import { Sale } from './sales/sale.entity';
+import { SalePayment } from './sales/sale-payment.entity';
 import { ExpensesModule } from './expenses/expenses.module';
 import { Expense } from './expenses/expense.entity';
 import { ReportsModule } from './reports/reports.module';
@@ -63,7 +64,7 @@ import { Product } from './products/product.entity';
             ssl: {
               rejectUnauthorized: false
             },
-            entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderCage, PurchaseOrderPayment, Sale, Expense, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownMortality, GodownExpense, GodownInwardCage, GodownSaleCage, RolePermission, UserPermission, Mortality, Product],
+            entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderCage, PurchaseOrderPayment, Sale, SalePayment, Expense, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownMortality, GodownExpense, GodownInwardCage, GodownSaleCage, RolePermission, UserPermission, Mortality, Product],
             synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
             logging: config.get<boolean>('DB_LOGGING', false),
           };
@@ -77,7 +78,7 @@ import { Product } from './products/product.entity';
           username: config.get<string>('DB_USERNAME', 'postgres'),
           password: config.get<string>('DB_PASSWORD', 'postgres'),
           database: config.get<string>('DB_NAME', 'poultry'),
-          entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderCage, PurchaseOrderPayment, Sale, Expense, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownMortality, GodownExpense, GodownInwardCage, GodownSaleCage, RolePermission, UserPermission, Mortality, Product],
+          entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderCage, PurchaseOrderPayment, Sale, SalePayment, Expense, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownMortality, GodownExpense, GodownInwardCage, GodownSaleCage, RolePermission, UserPermission, Mortality, Product],
           synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
           logging: config.get<boolean>('DB_LOGGING', false),
         };
