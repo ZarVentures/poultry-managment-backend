@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GodownInwardEntry } from './godown-inward.entity';
+import { GodownInwardCage } from './godown-inward-cage.entity';
 import { GodownSale } from './godown-sale.entity';
+import { GodownSaleCage } from './godown-sale-cage.entity';
 import { GodownMortality } from './godown-mortality.entity';
 import { GodownExpense } from './godown-expense.entity';
 
@@ -11,53 +13,111 @@ export class GodownService {
   constructor(
     @InjectRepository(GodownInwardEntry)
     private inwardRepo: Repository<GodownInwardEntry>,
+    @InjectRepository(GodownInwardCage)
+    private inwardCageRepo: Repository<GodownInwardCage>,
     @InjectRepository(GodownSale)
     private saleRepo: Repository<GodownSale>,
+    @InjectRepository(GodownSaleCage)
+    private saleCageRepo: Repository<GodownSaleCage>,
     @InjectRepository(GodownMortality)
     private mortalityRepo: Repository<GodownMortality>,
     @InjectRepository(GodownExpense)
     private expenseRepo: Repository<GodownExpense>,
   ) {}
 
-  // Inward Entries
-  async createInward(data: Partial<GodownInwardEntry>) {
-    const entry = this.inwardRepo.create(data);
-    return this.inwardRepo.save(entry);
+  // ─── Inward Entries ───────────────────────────────────────────────────────
+
+  async createInward(data: any) {
+    const { cages, ...entryData } = data;
+    const entry = this.inwardRepo.create(entryData);
+    const saved = await this.inwardRepo.save(entry);
+
+    if (cages && cages.length > 0) {
+      const cageEntities = cages.map((c: any) =>
+        this.inwardCageRepo.create({ ...c, godownInwardId: saved.id })
+      );
+      await this.inwardCageRepo.save(cageEntities);
+    }
+
+    return this.findOneInward(saved.id);
   }
 
   async findAllInward() {
-    return this.inwardRepo.find({ order: { entryDate: 'DESC' } });
+    return this.inwardRepo.find({
+      relations: ['cages'],
+      order: { entryDate: 'DESC' },
+    });
   }
 
   async findOneInward(id: string) {
-    return this.inwardRepo.findOne({ where: { id } });
+    return this.inwardRepo.findOne({ where: { id }, relations: ['cages'] });
   }
 
-  async updateInward(id: string, data: Partial<GodownInwardEntry>) {
-    await this.inwardRepo.update(id, data);
+  async updateInward(id: string, data: any) {
+    const { cages, ...entryData } = data;
+    await this.inwardRepo.update(id, entryData);
+
+    if (cages !== undefined) {
+      // Delete existing cages and replace
+      await this.inwardCageRepo.delete({ godownInwardId: id });
+      if (cages.length > 0) {
+        const cageEntities = cages.map((c: any) =>
+          this.inwardCageRepo.create({ ...c, godownInwardId: id })
+        );
+        await this.inwardCageRepo.save(cageEntities);
+      }
+    }
+
     return this.findOneInward(id);
   }
 
   async removeInward(id: string) {
+    // Cages cascade delete via FK
     await this.inwardRepo.delete(id);
   }
 
-  // Sales
-  async createSale(data: Partial<GodownSale>) {
-    const sale = this.saleRepo.create(data);
-    return this.saleRepo.save(sale);
+  // ─── Sales ────────────────────────────────────────────────────────────────
+
+  async createSale(data: any) {
+    const { cages, ...saleData } = data;
+    const sale = this.saleRepo.create(saleData);
+    const saved = await this.saleRepo.save(sale);
+
+    if (cages && cages.length > 0) {
+      const cageEntities = cages.map((c: any) =>
+        this.saleCageRepo.create({ ...c, godownSaleId: saved.id })
+      );
+      await this.saleCageRepo.save(cageEntities);
+    }
+
+    return this.findOneSale(saved.id);
   }
 
   async findAllSales() {
-    return this.saleRepo.find({ order: { saleDate: 'DESC' } });
+    return this.saleRepo.find({
+      relations: ['cages'],
+      order: { saleDate: 'DESC' },
+    });
   }
 
   async findOneSale(id: string) {
-    return this.saleRepo.findOne({ where: { id } });
+    return this.saleRepo.findOne({ where: { id }, relations: ['cages'] });
   }
 
-  async updateSale(id: string, data: Partial<GodownSale>) {
-    await this.saleRepo.update(id, data);
+  async updateSale(id: string, data: any) {
+    const { cages, ...saleData } = data;
+    await this.saleRepo.update(id, saleData);
+
+    if (cages !== undefined) {
+      await this.saleCageRepo.delete({ godownSaleId: id });
+      if (cages.length > 0) {
+        const cageEntities = cages.map((c: any) =>
+          this.saleCageRepo.create({ ...c, godownSaleId: id })
+        );
+        await this.saleCageRepo.save(cageEntities);
+      }
+    }
+
     return this.findOneSale(id);
   }
 
@@ -65,7 +125,8 @@ export class GodownService {
     await this.saleRepo.delete(id);
   }
 
-  // Mortality
+  // ─── Mortality ────────────────────────────────────────────────────────────
+
   async createMortality(data: Partial<GodownMortality>) {
     const mortality = this.mortalityRepo.create(data);
     return this.mortalityRepo.save(mortality);
@@ -88,7 +149,8 @@ export class GodownService {
     await this.mortalityRepo.delete(id);
   }
 
-  // Expenses
+  // ─── Expenses ─────────────────────────────────────────────────────────────
+
   async createExpense(data: Partial<GodownExpense>) {
     const expense = this.expenseRepo.create(data);
     return this.expenseRepo.save(expense);
@@ -111,7 +173,8 @@ export class GodownService {
     await this.expenseRepo.delete(id);
   }
 
-  // Summary
+  // ─── Summary ──────────────────────────────────────────────────────────────
+
   async getSummary() {
     const totalInward = await this.inwardRepo
       .createQueryBuilder('entry')
@@ -128,9 +191,9 @@ export class GodownService {
       .select('SUM(mortality.numberOfBirdsDied)', 'total')
       .getRawOne();
 
-    const currentStock = 
-      (parseInt(totalInward.total) || 0) - 
-      (parseInt(totalSold.total) || 0) - 
+    const currentStock =
+      (parseInt(totalInward.total) || 0) -
+      (parseInt(totalSold.total) || 0) -
       (parseInt(totalMortality.total) || 0);
 
     return {
