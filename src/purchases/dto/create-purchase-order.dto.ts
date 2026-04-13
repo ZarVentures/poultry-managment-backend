@@ -7,14 +7,14 @@ export class CreatePurchaseOrderItemDto {
   description!: string;
 
   @IsString()
-  quantity!: string; // Using string to handle decimal input
+  quantity!: string;
 
   @IsString()
   @MaxLength(20)
   unit!: string;
 
   @IsString()
-  unitCost!: string; // Using string to handle decimal input
+  unitCost!: string;
 }
 
 export class CreatePurchaseOrderCageDto {
@@ -23,16 +23,19 @@ export class CreatePurchaseOrderCageDto {
   @MaxLength(50)
   cageId?: string;
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  birdType?: string;
-
   @IsNumber()
   numberOfBirds!: number;
 
   @IsNumber()
   cageWeight!: number;
+}
+
+export class CreatePurchaseOrderPaymentDto {
+  @IsString()
+  paymentMode!: string;
+
+  @IsString()
+  amount!: string;
 }
 
 export class CreatePurchaseOrderDto {
@@ -55,41 +58,10 @@ export class CreatePurchaseOrderDto {
   @IsEnum(['pending', 'received', 'cancelled'])
   status?: PurchaseStatus;
 
-  // Invoice header fields
   @IsOptional()
   @IsString()
   @MaxLength(100)
   branch?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  unit?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  gstin?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  liftingTime?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  partyCode?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  prNumber?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  hsnCode?: string;
 
   // Farmer integration
   @IsOptional()
@@ -109,11 +81,6 @@ export class CreatePurchaseOrderDto {
   @IsString()
   vehicleId?: string;
 
-  // Bird details
-  @IsOptional()
-  @IsString()
-  birdType?: string;
-
   @IsOptional()
   @IsString()
   totalWeight?: string;
@@ -124,59 +91,24 @@ export class CreatePurchaseOrderDto {
 
   @IsOptional()
   @IsString()
-  notes?: string;
-
-  @IsOptional()
-  @IsString()
   transportCharges?: string;
-
-  @IsOptional()
-  @IsString()
-  loadingCharges?: string;
-
-  @IsOptional()
-  @IsString()
-  commission?: string;
 
   @IsOptional()
   @IsString()
   otherCharges?: string;
 
   @IsOptional()
-  @IsString()
-  weightShortage?: string;
-
-  @IsOptional()
-  @IsString()
-  mortalityDeduction?: string;
-
-  @IsOptional()
-  @IsString()
-  otherDeduction?: string;
-
-  // Payment tracking
-  @IsOptional()
   @IsEnum(['paid', 'pending', 'partial'])
   purchasePaymentStatus?: PurchasePaymentStatus;
 
   @IsOptional()
   @IsString()
-  advancePaid?: string;
-
-  @IsOptional()
-  @IsString()
-  paymentMode?: string;
-
-  @IsOptional()
-  @IsString()
-  totalPaymentMade?: string;
+  notes?: string;
 
   @IsOptional()
   @IsString()
   invoiceAttachment?: string;
 
-  @IsOptional()
-  @IsArray()
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
@@ -188,4 +120,10 @@ export class CreatePurchaseOrderDto {
   @ValidateNested({ each: true })
   @Type(() => CreatePurchaseOrderCageDto)
   cages?: CreatePurchaseOrderCageDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreatePurchaseOrderPaymentDto)
+  payments?: CreatePurchaseOrderPaymentDto[];
 }

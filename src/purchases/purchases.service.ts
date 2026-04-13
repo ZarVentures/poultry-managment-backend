@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { PurchaseOrder } from './entities/purchase-order.entity';
 import { PurchaseOrderItem } from './entities/purchase-order-item.entity';
 import { PurchaseOrderCage } from './entities/purchase-order-cage.entity';
+import { PurchaseOrderPayment } from './entities/purchase-order-payment.entity';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 
@@ -16,333 +17,224 @@ export class PurchasesService {
     private readonly purchaseOrderItemRepository: Repository<PurchaseOrderItem>,
     @InjectRepository(PurchaseOrderCage)
     private readonly purchaseOrderCageRepository: Repository<PurchaseOrderCage>,
+    @InjectRepository(PurchaseOrderPayment)
+    private readonly purchaseOrderPaymentRepository: Repository<PurchaseOrderPayment>,
   ) {}
 
-  async create(createPurchaseOrderDto: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
-    // Check if order number already exists
-    const existingOrder = await this.purchaseOrderRepository.findOne({
-      where: { orderNumber: createPurchaseOrderDto.orderNumber },
-    });
-    if (existingOrder) {
-      throw new BadRequestException(`Purchase order with number ${createPurchaseOrderDto.orderNumber} already exists`);
-    }
+  private calcAmounts(dto: { totalWeight?: string; ratePerKg?: string; transportCharges?: string; otherCharges?: string }) {
+    const totalWeight = parseFloat(dto.totalWeight || '0');
+    const ratePerKg = parseFloat(dto.ratePerKg || '0');
+    const totalAmount = totalWeight * ratePerKg;
+    const transportCharges = parseFloat(dto.transportCharges || '0');
+    const otherCharges = parseFloat(dto.otherCharges || '0');
+    const grossAmount = totalAmount + transportCharges + otherCharges;
+    const netAmount = grossAmount;
+    return { totalWeight, ratePerKg, totalAmount, transportCharges, otherCharges, grossAmount, netAmount };
+  }
 
-    // Calculate total weight and amount from cages if provided
+  async create(dto: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
+    const existing = await this.purchaseOrderRepository.findOne({ where: { orderNumber: dto.orderNumber } });
+    if (existing) throw new BadRequestException(`Purchase order ${dto.orderNumber} already exists`);
+
     let totalWeight = 0;
-    let totalAmount = 0;
-    
-    if (createPurchaseOrderDto.cages && createPurchaseOrderDto.cages.length > 0) {
-      totalWeight = createPurchaseOrderDto.cages.reduce((sum, cage) => sum + cage.cageWeight, 0);
-      const ratePerKg = parseFloat(createPurchaseOrderDto.ratePerKg || '0');
-      totalAmount = totalWeight * ratePerKg;
-    } else if (createPurchaseOrderDto.items && createPurchaseOrderDto.items.length > 0) {
-      // Calculate from items if no cages
-      totalAmount = createPurchaseOrderDto.items.reduce((sum, item) => {
-        return sum + (parseFloat(item.quantity) * parseFloat(item.unitCost));
-      }, 0);
+    if (dto.cages && dto.cages.length > 0) {
+      totalWeight = dto.cages.reduce((sum, c) => sum + c.cageWeight, 0);
+    } else {
+      totalWeight = parseFloat(dto.totalWeight || '0');
     }
 
-    // Calculate charges
-    const transportCharges = parseFloat(createPurchaseOrderDto.transportCharges || '0');
-    const loadingCharges = parseFloat(createPurchaseOrderDto.loadingCharges || '0');
-    const commission = parseFloat(createPurchaseOrderDto.commission || '0');
-    const otherCharges = parseFloat(createPurchaseOrderDto.otherCharges || '0');
+    const amounts = this.calcAmounts({ ...dto, totalWeight: String(totalWeight) });
+    const totalPaymentMade = (dto.payments || []).reduce((s, p) => s + parseFloat(p.amount || '0'), 0);
+    const balanceAmount = amounts.netAmount - totalPaymentMade;
 
-    // Calculate deductions
-    const weightShortage = parseFloat(createPurchaseOrderDto.weightShortage || '0');
-    const mortalityDeduction = parseFloat(createPurchaseOrderDto.mortalityDeduction || '0');
-    const otherDeduction = parseFloat(createPurchaseOrderDto.otherDeduction || '0');
-
-    // Calculate gross and net amounts
-    const grossAmount = totalAmount + transportCharges + loadingCharges + commission + otherCharges;
-    const netAmount = grossAmount - weightShortage - mortalityDeduction - otherDeduction;
-
-    // Calculate payment amounts
-    const advancePaid = parseFloat(createPurchaseOrderDto.advancePaid || '0');
-    const totalPaymentMade = parseFloat(createPurchaseOrderDto.totalPaymentMade || '0');
-    const outstandingPayment = netAmount - advancePaid;
-    const balanceAmount = netAmount - totalPaymentMade;
-
-    const purchaseOrder = this.purchaseOrderRepository.create({
-      orderNumber: createPurchaseOrderDto.orderNumber,
-      supplierName: createPurchaseOrderDto.supplierName,
-      orderDate: createPurchaseOrderDto.orderDate,
-      dueDate: createPurchaseOrderDto.dueDate,
-      status: createPurchaseOrderDto.status || 'pending',
-      notes: createPurchaseOrderDto.notes,
-      // Invoice header fields
-      branch: createPurchaseOrderDto.branch,
-      unit: createPurchaseOrderDto.unit,
-      gstin: createPurchaseOrderDto.gstin,
-      liftingTime: createPurchaseOrderDto.liftingTime,
-      partyCode: createPurchaseOrderDto.partyCode,
-      prNumber: createPurchaseOrderDto.prNumber,
-      hsnCode: createPurchaseOrderDto.hsnCode || '0105',
-      // Farmer integration
-      farmerId: createPurchaseOrderDto.farmerId,
-      farmerMobile: createPurchaseOrderDto.farmerMobile,
-      farmLocation: createPurchaseOrderDto.farmLocation,
-      // Vehicle integration
-      vehicleId: createPurchaseOrderDto.vehicleId,
-      // Bird details
-      birdType: createPurchaseOrderDto.birdType,
-      totalWeight,
-      ratePerKg: parseFloat(createPurchaseOrderDto.ratePerKg || '0'),
-      // Amounts
-      totalAmount,
-      transportCharges,
-      loadingCharges,
-      commission,
-      otherCharges,
-      weightShortage,
-      mortalityDeduction,
-      otherDeduction,
-      grossAmount,
-      netAmount,
-      // Payment tracking
-      purchasePaymentStatus: createPurchaseOrderDto.purchasePaymentStatus || 'pending',
-      advancePaid,
-      outstandingPayment,
-      paymentMode: createPurchaseOrderDto.paymentMode,
+    const order = this.purchaseOrderRepository.create({
+      orderNumber: dto.orderNumber,
+      supplierName: dto.supplierName,
+      orderDate: dto.orderDate,
+      dueDate: dto.dueDate,
+      status: dto.status || 'pending',
+      branch: dto.branch,
+      farmerId: dto.farmerId,
+      farmerMobile: dto.farmerMobile,
+      farmLocation: dto.farmLocation,
+      vehicleId: dto.vehicleId,
+      ...amounts,
+      purchasePaymentStatus: dto.purchasePaymentStatus || 'pending',
       totalPaymentMade,
       balanceAmount,
-      invoiceAttachment: createPurchaseOrderDto.invoiceAttachment,
+      notes: dto.notes,
+      invoiceAttachment: dto.invoiceAttachment,
     });
 
-    const savedOrder = await this.purchaseOrderRepository.save(purchaseOrder);
+    const saved = await this.purchaseOrderRepository.save(order);
+    const savedId: string = (saved as any).id ?? (saved as any)[0]?.id;
 
-    // Create items if provided
-    if (createPurchaseOrderDto.items && createPurchaseOrderDto.items.length > 0) {
-      const items = createPurchaseOrderDto.items.map(item => 
+    if (dto.items && dto.items.length > 0) {
+      const items = dto.items.map(item =>
         this.purchaseOrderItemRepository.create({
           description: item.description,
           quantity: parseFloat(item.quantity),
           unit: item.unit,
           unitCost: parseFloat(item.unitCost),
           lineTotal: parseFloat(item.quantity) * parseFloat(item.unitCost),
-          purchaseOrderId: savedOrder.id,
+          purchaseOrderId: savedId,
         })
       );
-
       await this.purchaseOrderItemRepository.save(items);
     }
 
-    // Create cages if provided
-    if (createPurchaseOrderDto.cages && createPurchaseOrderDto.cages.length > 0) {
-      const cages = createPurchaseOrderDto.cages.map(cage =>
+    if (dto.cages && dto.cages.length > 0) {
+      const cages = dto.cages.map(cage =>
         this.purchaseOrderCageRepository.create({
           cageId: cage.cageId,
-          birdType: cage.birdType,
           numberOfBirds: cage.numberOfBirds,
           cageWeight: cage.cageWeight,
-          purchaseOrderId: savedOrder.id,
+          purchaseOrderId: savedId,
         })
       );
-
       await this.purchaseOrderCageRepository.save(cages);
     }
 
-    return this.findOne(savedOrder.id);
+    if (dto.payments && dto.payments.length > 0) {
+      const payments = dto.payments.map(p =>
+        this.purchaseOrderPaymentRepository.create({
+          paymentMode: p.paymentMode as any,
+          amount: parseFloat(p.amount),
+          purchaseOrderId: savedId,
+        })
+      );
+      await this.purchaseOrderPaymentRepository.save(payments);
+    }
+
+    return this.findOne(savedId);
   }
 
-  async findAll(
-    startDate?: string,
-    endDate?: string,
-    supplier?: string,
-    status?: string,
-  ): Promise<PurchaseOrder[]> {
+  async findAll(startDate?: string, endDate?: string, supplier?: string, status?: string): Promise<PurchaseOrder[]> {
     const query = this.purchaseOrderRepository.createQueryBuilder('po')
       .leftJoinAndSelect('po.items', 'items')
       .leftJoinAndSelect('po.cages', 'cages')
+      .leftJoinAndSelect('po.payments', 'payments')
       .orderBy('po.orderDate', 'DESC');
 
-    if (startDate && endDate) {
-      query.andWhere('po.orderDate BETWEEN :startDate AND :endDate', {
-        startDate,
-        endDate,
-      });
-    }
-
-    if (supplier) {
-      query.andWhere('po.supplierName ILIKE :supplier', {
-        supplier: `%${supplier}%`,
-      });
-    }
-
-    if (status) {
-      query.andWhere('po.status = :status', { status });
-    }
+    if (startDate && endDate) query.andWhere('po.orderDate BETWEEN :startDate AND :endDate', { startDate, endDate });
+    if (supplier) query.andWhere('po.supplierName ILIKE :supplier', { supplier: `%${supplier}%` });
+    if (status) query.andWhere('po.status = :status', { status });
 
     return query.getMany();
   }
 
   async findOne(id: string): Promise<PurchaseOrder> {
-    const purchaseOrder = await this.purchaseOrderRepository.findOne({
+    const order = await this.purchaseOrderRepository.findOne({
       where: { id },
-      relations: ['items', 'cages'],
+      relations: ['items', 'cages', 'payments'],
     });
-    if (!purchaseOrder) {
-      throw new NotFoundException(`Purchase order with ID ${id} not found`);
-    }
-    return purchaseOrder;
+    if (!order) throw new NotFoundException(`Purchase order ${id} not found`);
+    return order;
   }
 
-  async update(id: string, updatePurchaseOrderDto: UpdatePurchaseOrderDto): Promise<PurchaseOrder> {
-    const purchaseOrder = await this.findOne(id);
+  async update(id: string, dto: UpdatePurchaseOrderDto): Promise<PurchaseOrder> {
+    const order = await this.findOne(id);
 
-    // If order number is being updated, check for duplicates
-    if (updatePurchaseOrderDto.orderNumber && updatePurchaseOrderDto.orderNumber !== purchaseOrder.orderNumber) {
-      const existingOrder = await this.purchaseOrderRepository.findOne({
-        where: { orderNumber: updatePurchaseOrderDto.orderNumber },
-      });
-      if (existingOrder) {
-        throw new BadRequestException(`Purchase order with number ${updatePurchaseOrderDto.orderNumber} already exists`);
+    if (dto.orderNumber && dto.orderNumber !== order.orderNumber) {
+      const existing = await this.purchaseOrderRepository.findOne({ where: { orderNumber: dto.orderNumber } });
+      if (existing) throw new BadRequestException(`Purchase order ${dto.orderNumber} already exists`);
+    }
+
+    // Recalculate weight from cages if provided
+    let totalWeight = typeof order.totalWeight === 'string' ? parseFloat(order.totalWeight) : order.totalWeight;
+    if (dto.cages !== undefined) {
+      if (dto.cages.length > 0) {
+        totalWeight = dto.cages.reduce((s, c) => s + c.cageWeight, 0);
+      } else {
+        totalWeight = parseFloat(dto.totalWeight || '0');
       }
-    }
-
-    // If items are being updated, recalculate total
-    let totalAmount = typeof purchaseOrder.totalAmount === 'string' 
-      ? parseFloat(purchaseOrder.totalAmount) 
-      : purchaseOrder.totalAmount;
-    if (updatePurchaseOrderDto.items && updatePurchaseOrderDto.items.length > 0) {
-      totalAmount = updatePurchaseOrderDto.items.reduce((sum, item) => {
-        return sum + (parseFloat(item.quantity) * parseFloat(item.unitCost));
-      }, 0);
-
-      // Delete existing items
-      await this.purchaseOrderItemRepository.delete({ purchaseOrderId: id });
-
-      // Create new items
-      const items = updatePurchaseOrderDto.items.map(item => 
-        this.purchaseOrderItemRepository.create({
-          description: item.description,
-          quantity: parseFloat(item.quantity),
-          unit: item.unit,
-          unitCost: parseFloat(item.unitCost),
-          lineTotal: parseFloat(item.quantity) * parseFloat(item.unitCost),
-          purchaseOrderId: id,
-        })
-      );
-
-      await this.purchaseOrderItemRepository.save(items);
-    }
-
-    // Handle cages if provided
-    if (updatePurchaseOrderDto.cages !== undefined) {
-      // Delete existing cages
       await this.purchaseOrderCageRepository.delete({ purchaseOrderId: id });
-
-      // Create new cages if array is not empty
-      if (updatePurchaseOrderDto.cages.length > 0) {
-        const cages = updatePurchaseOrderDto.cages.map(cage =>
-          this.purchaseOrderCageRepository.create({
-            cageId: cage.cageId,
-            birdType: cage.birdType,
-            numberOfBirds: cage.numberOfBirds,
-            cageWeight: cage.cageWeight,
-            purchaseOrderId: id,
-          })
+      if (dto.cages.length > 0) {
+        const cages = dto.cages.map(c =>
+          this.purchaseOrderCageRepository.create({ cageId: c.cageId, numberOfBirds: c.numberOfBirds, cageWeight: c.cageWeight, purchaseOrderId: id })
         );
-
         await this.purchaseOrderCageRepository.save(cages);
       }
     }
 
-    // Calculate charges (use existing values if not provided, handle string types)
-    const transportCharges = updatePurchaseOrderDto.transportCharges !== undefined
-      ? parseFloat(updatePurchaseOrderDto.transportCharges) 
-      : (typeof purchaseOrder.transportCharges === 'string' ? parseFloat(purchaseOrder.transportCharges) : purchaseOrder.transportCharges);
-    const loadingCharges = updatePurchaseOrderDto.loadingCharges !== undefined
-      ? parseFloat(updatePurchaseOrderDto.loadingCharges) 
-      : (typeof purchaseOrder.loadingCharges === 'string' ? parseFloat(purchaseOrder.loadingCharges) : purchaseOrder.loadingCharges);
-    const commission = updatePurchaseOrderDto.commission !== undefined
-      ? parseFloat(updatePurchaseOrderDto.commission) 
-      : (typeof purchaseOrder.commission === 'string' ? parseFloat(purchaseOrder.commission) : purchaseOrder.commission);
-    const otherCharges = updatePurchaseOrderDto.otherCharges !== undefined
-      ? parseFloat(updatePurchaseOrderDto.otherCharges) 
-      : (typeof purchaseOrder.otherCharges === 'string' ? parseFloat(purchaseOrder.otherCharges) : purchaseOrder.otherCharges);
-
-    // Calculate deductions (use existing values if not provided, handle string types)
-    const weightShortage = updatePurchaseOrderDto.weightShortage !== undefined
-      ? parseFloat(updatePurchaseOrderDto.weightShortage) 
-      : (typeof purchaseOrder.weightShortage === 'string' ? parseFloat(purchaseOrder.weightShortage) : purchaseOrder.weightShortage);
-    const mortalityDeduction = updatePurchaseOrderDto.mortalityDeduction !== undefined
-      ? parseFloat(updatePurchaseOrderDto.mortalityDeduction) 
-      : (typeof purchaseOrder.mortalityDeduction === 'string' ? parseFloat(purchaseOrder.mortalityDeduction) : purchaseOrder.mortalityDeduction);
-    const otherDeduction = updatePurchaseOrderDto.otherDeduction !== undefined
-      ? parseFloat(updatePurchaseOrderDto.otherDeduction) 
-      : (typeof purchaseOrder.otherDeduction === 'string' ? parseFloat(purchaseOrder.otherDeduction) : purchaseOrder.otherDeduction);
-
-    // Calculate gross and net amounts
-    const grossAmount = totalAmount + transportCharges + loadingCharges + commission + otherCharges;
-    const netAmount = grossAmount - weightShortage - mortalityDeduction - otherDeduction;
-
-    // Update the purchase order
-    Object.assign(purchaseOrder, updatePurchaseOrderDto);
-    
-    // Set calculated values
-    purchaseOrder.totalAmount = totalAmount;
-    purchaseOrder.transportCharges = transportCharges;
-    purchaseOrder.loadingCharges = loadingCharges;
-    purchaseOrder.commission = commission;
-    purchaseOrder.otherCharges = otherCharges;
-    purchaseOrder.weightShortage = weightShortage;
-    purchaseOrder.mortalityDeduction = mortalityDeduction;
-    purchaseOrder.otherDeduction = otherDeduction;
-    purchaseOrder.grossAmount = grossAmount;
-    purchaseOrder.netAmount = netAmount;
-    purchaseOrder.updatedAt = new Date();
-
-    // Convert string values to numbers for numeric fields
-    if (updatePurchaseOrderDto.totalWeight) {
-      purchaseOrder.totalWeight = parseFloat(updatePurchaseOrderDto.totalWeight);
-    }
-    if (updatePurchaseOrderDto.ratePerKg) {
-      purchaseOrder.ratePerKg = parseFloat(updatePurchaseOrderDto.ratePerKg);
-    }
-    if (updatePurchaseOrderDto.advancePaid) {
-      purchaseOrder.advancePaid = parseFloat(updatePurchaseOrderDto.advancePaid);
-    }
-    if (updatePurchaseOrderDto.totalPaymentMade) {
-      purchaseOrder.totalPaymentMade = parseFloat(updatePurchaseOrderDto.totalPaymentMade);
+    if (dto.items !== undefined) {
+      await this.purchaseOrderItemRepository.delete({ purchaseOrderId: id });
+      if (dto.items.length > 0) {
+        const items = dto.items.map(item =>
+          this.purchaseOrderItemRepository.create({
+            description: item.description, quantity: parseFloat(item.quantity),
+            unit: item.unit, unitCost: parseFloat(item.unitCost),
+            lineTotal: parseFloat(item.quantity) * parseFloat(item.unitCost),
+            purchaseOrderId: id,
+          })
+        );
+        await this.purchaseOrderItemRepository.save(items);
+      }
     }
 
-    // Ensure numeric values for calculations (handle both string and number types)
-    const totalPaymentMade = typeof purchaseOrder.totalPaymentMade === 'string' 
-      ? parseFloat(purchaseOrder.totalPaymentMade) 
-      : purchaseOrder.totalPaymentMade;
-    const advancePaid = typeof purchaseOrder.advancePaid === 'string'
-      ? parseFloat(purchaseOrder.advancePaid)
-      : purchaseOrder.advancePaid;
+    if (dto.payments !== undefined) {
+      await this.purchaseOrderPaymentRepository.delete({ purchaseOrderId: id });
+      if (dto.payments.length > 0) {
+        const payments = dto.payments.map(p =>
+          this.purchaseOrderPaymentRepository.create({ paymentMode: p.paymentMode as any, amount: parseFloat(p.amount), purchaseOrderId: id })
+        );
+        await this.purchaseOrderPaymentRepository.save(payments);
+      }
+    }
 
-    // Calculate balance amount
-    purchaseOrder.balanceAmount = netAmount - totalPaymentMade;
-    purchaseOrder.outstandingPayment = netAmount - advancePaid;
+    const ratePerKg = dto.ratePerKg !== undefined ? parseFloat(dto.ratePerKg) : (typeof order.ratePerKg === 'string' ? parseFloat(order.ratePerKg) : order.ratePerKg);
+    const totalAmount = totalWeight * ratePerKg;
+    const transportCharges = dto.transportCharges !== undefined ? parseFloat(dto.transportCharges) : (typeof order.transportCharges === 'string' ? parseFloat(order.transportCharges) : order.transportCharges);
+    const otherCharges = dto.otherCharges !== undefined ? parseFloat(dto.otherCharges) : (typeof order.otherCharges === 'string' ? parseFloat(order.otherCharges) : order.otherCharges);
+    const grossAmount = totalAmount + transportCharges + otherCharges;
+    const netAmount = grossAmount;
 
-    await this.purchaseOrderRepository.save(purchaseOrder);
+    // Recalculate total payment from payments table
+    const allPayments = dto.payments !== undefined ? dto.payments : (order.payments || []).map(p => ({ amount: String(p.amount) }));
+    const totalPaymentMade = allPayments.reduce((s, p) => s + parseFloat((p as any).amount || '0'), 0);
+    const balanceAmount = netAmount - totalPaymentMade;
 
+    Object.assign(order, {
+      orderNumber: dto.orderNumber ?? order.orderNumber,
+      supplierName: dto.supplierName ?? order.supplierName,
+      orderDate: dto.orderDate ?? order.orderDate,
+      dueDate: dto.dueDate ?? order.dueDate,
+      status: dto.status ?? order.status,
+      branch: dto.branch ?? order.branch,
+      farmerId: dto.farmerId ?? order.farmerId,
+      farmerMobile: dto.farmerMobile ?? order.farmerMobile,
+      farmLocation: dto.farmLocation ?? order.farmLocation,
+      vehicleId: dto.vehicleId ?? order.vehicleId,
+      totalWeight, ratePerKg, totalAmount, transportCharges, otherCharges, grossAmount, netAmount,
+      purchasePaymentStatus: dto.purchasePaymentStatus ?? order.purchasePaymentStatus,
+      totalPaymentMade, balanceAmount,
+      notes: dto.notes ?? order.notes,
+      updatedAt: new Date(),
+    });
+
+    await this.purchaseOrderRepository.save(order);
     return this.findOne(id);
   }
 
   async updateInvoiceAttachment(id: string, fileUrl: string): Promise<PurchaseOrder> {
-    const purchaseOrder = await this.findOne(id);
-    purchaseOrder.invoiceAttachment = fileUrl;
-    purchaseOrder.updatedAt = new Date();
-    await this.purchaseOrderRepository.save(purchaseOrder);
+    const order = await this.findOne(id);
+    order.invoiceAttachment = fileUrl;
+    order.updatedAt = new Date();
+    await this.purchaseOrderRepository.save(order);
     return this.findOne(id);
   }
 
   async remove(id: string): Promise<void> {
-    const purchaseOrder = await this.findOne(id);
-    await this.purchaseOrderRepository.remove(purchaseOrder);
+    const order = await this.findOne(id);
+    await this.purchaseOrderRepository.remove(order);
   }
 
   async updateStatus(id: string, status: 'pending' | 'received' | 'cancelled'): Promise<PurchaseOrder> {
-    const purchaseOrder = await this.findOne(id);
-    purchaseOrder.status = status;
-    purchaseOrder.updatedAt = new Date();
-    await this.purchaseOrderRepository.save(purchaseOrder);
-    return purchaseOrder;
+    const order = await this.findOne(id);
+    order.status = status;
+    order.updatedAt = new Date();
+    await this.purchaseOrderRepository.save(order);
+    return order;
   }
 
   async getInvoiceList(): Promise<Array<{ id: string; orderNumber: string; orderDate: string; supplierName: string }>> {
@@ -351,13 +243,6 @@ export class PurchasesService {
       .select(['po.id', 'po.orderNumber', 'po.orderDate', 'po.supplierName'])
       .orderBy('po.orderDate', 'DESC')
       .getMany();
-
-    return orders.map(order => ({
-      id: order.id,
-      orderNumber: order.orderNumber,
-      orderDate: order.orderDate,
-      supplierName: order.supplierName,
-    }));
+    return orders.map(o => ({ id: o.id, orderNumber: o.orderNumber, orderDate: o.orderDate, supplierName: o.supplierName }));
   }
-
 }
