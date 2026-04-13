@@ -82,19 +82,13 @@ export class ReportsService {
     const purchases = await this.purchaseRepository
       .createQueryBuilder('purchase')
       .where(whereClause)
-      .andWhere('purchase.mortalityDeduction > 0')
       .orderBy('purchase.orderDate', 'DESC')
       .getMany();
 
     const summary = {
       totalOrders: purchases.length,
-      totalMortalityDeduction: purchases.reduce(
-        (sum, p) => sum + parseFloat(p.mortalityDeduction as any || '0'), 
-        0
-      ),
-      averageMortalityPerOrder: purchases.length > 0 
-        ? purchases.reduce((sum, p) => sum + parseFloat(p.mortalityDeduction as any || '0'), 0) / purchases.length
-        : 0,
+      totalMortalityDeduction: 0,
+      averageMortalityPerOrder: 0,
     };
 
     return {
@@ -104,7 +98,7 @@ export class ReportsService {
         orderDate: p.orderDate,
         supplierName: p.supplierName,
         totalWeight: p.totalWeight,
-        mortalityDeduction: p.mortalityDeduction,
+        mortalityDeduction: 0,
         netAmount: p.netAmount,
       })),
       dateRange: { startDate, endDate },
