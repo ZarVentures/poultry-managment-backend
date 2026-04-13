@@ -30,16 +30,17 @@ export class GodownService {
   async createInward(data: any) {
     const { cages, ...entryData } = data;
     const entry = this.inwardRepo.create(entryData);
-    const saved = await this.inwardRepo.save(entry) as GodownInwardEntry;
+    const savedResult = await this.inwardRepo.save(entry);
+    const savedId: string = (savedResult as any).id ?? (savedResult as any)[0]?.id;
 
     if (cages && cages.length > 0) {
       const cageEntities = cages.map((c: any) =>
-        this.inwardCageRepo.create({ ...c, godownInwardId: saved.id })
+        this.inwardCageRepo.create({ ...c, godownInwardId: savedId })
       );
       await this.inwardCageRepo.save(cageEntities);
     }
 
-    return this.findOneInward(saved.id);
+    return this.findOneInward(savedId);
   }
 
   async findAllInward() {
@@ -81,16 +82,17 @@ export class GodownService {
   async createSale(data: any) {
     const { cages, ...saleData } = data;
     const sale = this.saleRepo.create(saleData);
-    const saved = await this.saleRepo.save(sale) as GodownSale;
+    const savedResult = await this.saleRepo.save(sale);
+    const savedId: string = (savedResult as any).id ?? (savedResult as any)[0]?.id;
 
     if (cages && cages.length > 0) {
       const cageEntities = cages.map((c: any) =>
-        this.saleCageRepo.create({ ...c, godownSaleId: saved.id })
+        this.saleCageRepo.create({ ...c, godownSaleId: savedId })
       );
       await this.saleCageRepo.save(cageEntities);
     }
 
-    return this.findOneSale(saved.id);
+    return this.findOneSale(savedId);
   }
 
   async findAllSales() {
