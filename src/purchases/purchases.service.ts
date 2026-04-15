@@ -259,25 +259,67 @@ export class PurchasesService {
     return query.orderBy('cage.cageId', 'ASC').getMany();
   }
 
-  // Mark specific cage IDs as sold
-  async markCagesSold(cageIds: string[]): Promise<void> {
+  // Mark specific cage IDs as sold (optionally record sale weight)
+  async markCagesSold(cageIds: string[], saleWeight?: number): Promise<void> {
     if (cageIds.length === 0) return;
+    const updateData: any = { status: 'sold' };
+    if (saleWeight !== undefined) updateData.saleWeight = saleWeight;
     await this.purchaseOrderCageRepository
       .createQueryBuilder()
       .update()
-      .set({ status: 'sold' })
+      .set(updateData)
       .whereInIds(cageIds)
       .execute();
   }
 
-  // Mark specific cage IDs as in_godown
-  async markCagesInGodown(cageIds: string[]): Promise<void> {
+  // Mark specific cage IDs as in_godown (optionally record godown inward weight)
+  async markCagesInGodown(cageIds: string[], godownInwardWeight?: number): Promise<void> {
     if (cageIds.length === 0) return;
+    const updateData: any = { status: 'in_godown' };
+    if (godownInwardWeight !== undefined) updateData.godownInwardWeight = godownInwardWeight;
     await this.purchaseOrderCageRepository
       .createQueryBuilder()
       .update()
-      .set({ status: 'in_godown' })
+      .set(updateData)
       .whereInIds(cageIds)
       .execute();
+  }
+
+  // Get full cage journey for a purchase bill (weight loss tracking)
+  async getCageJourney(orderNumber: string): Promise<any[]> {
+    const order = await this.purchaseOrderRepository.findOne({ where: { orderNumber } });
+    if (!order) throw new NotFoundException(`Purchase order ${orderNumber} not found`);
+
+    const cages = await this.purchaseOrderCageRepository.find({
+      where: { purchaseOrderId: order.id },
+      order: { cageId: 'ASC' },
+    });
+
+    return cages.map(cage => {
+      const purchaseWt = Number(cage.cageWeight) || 0;
+      const saleWt = cage.saleWeight !== null && cage.saleWeight !== undefined ? Number(cage.saleWeight) : null;
+      const godownInWt = cage.godownInwardWeight !== null && cage.godownInwardWeight !== undefined ? Number(cage.godownInwardWeight) : null;
+      const godownSaleWt = cage.godownSaleWeight !== null && cage.godownSaleWeight !== undefined ? Number(cage.godownSaleWeight) : null;
+
+      const lossPurchaseToSale = saleWt !== null ? purchaseWt - saleWt : null;
+      const lossSaleToGodown = saleWt !== null && godownInWt !== null ? saleWt - godownInWt : null;
+      const lossGodownToSale = godownInWt !== null && godownSaleWt !== null ? godownInWt - godownSaleWt : null;
+      const totalLoss = godownSaleWt !== null ? purchaseWt - godownSaleWt : (saleWt !== null ? purchaseWt - saleWt : null);
+
+      return {
+        id: cage.id,
+        cageId: cage.cageId,
+        numberOfBirds: cage.numberOfBirds,
+        status: cage.status,
+        purchaseWeight: purchaseWt,
+        saleWeight: saleWt,
+        godownInwardWeight: godownInWt,
+        godownSaleWeight: godownSaleWt,
+        lossPurchaseToSale,
+        lossSaleToGodown,
+        lossGodownToSale,
+        totalLoss,
+      };
+    });
   }
 }

@@ -24,13 +24,18 @@ export class PurchaseOrderCage {
   cageWeight!: number;
 
   // Status tracks cage lifecycle: pending → sold (via Sale) or in_godown (via Godown Inward)
-  @Column({
-    name: 'status',
-    type: 'varchar',
-    length: 20,
-    default: 'pending',
-  })
+  @Column({ name: 'status', type: 'varchar', length: 20, default: 'pending' })
   status!: CageStatus;
+
+  // Weight recorded at each stage for loss tracking
+  @Column({ name: 'sale_weight', type: 'numeric', precision: 10, scale: 2, nullable: true })
+  saleWeight?: number;
+
+  @Column({ name: 'godown_inward_weight', type: 'numeric', precision: 10, scale: 2, nullable: true })
+  godownInwardWeight?: number;
+
+  @Column({ name: 'godown_sale_weight', type: 'numeric', precision: 10, scale: 2, nullable: true })
+  godownSaleWeight?: number;
 
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'NOW()' })
   createdAt!: Date;

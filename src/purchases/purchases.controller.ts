@@ -51,13 +51,18 @@ export class PurchasesController {
   }
 
   @Patch('cages/mark-sold')
-  markCagesSold(@Body('cageIds') cageIds: string[]) {
-    return this.purchasesService.markCagesSold(cageIds);
+  markCagesSold(@Body('cageIds') cageIds: string[], @Body('saleWeight') saleWeight?: number) {
+    return this.purchasesService.markCagesSold(cageIds, saleWeight);
   }
 
   @Patch('cages/mark-in-godown')
-  markCagesInGodown(@Body('cageIds') cageIds: string[]) {
-    return this.purchasesService.markCagesInGodown(cageIds);
+  markCagesInGodown(@Body('cageIds') cageIds: string[], @Body('godownInwardWeight') godownInwardWeight?: number) {
+    return this.purchasesService.markCagesInGodown(cageIds, godownInwardWeight);
+  }
+
+  @Get('cage-journey/:orderNumber')
+  getCageJourney(@Param('orderNumber') orderNumber: string) {
+    return this.purchasesService.getCageJourney(orderNumber);
   }
 
   @Get(':id')
