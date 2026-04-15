@@ -1,0 +1,150 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Cage, CageStatus } from './cage.entity';
+
+@Injectable()
+export class CagesService {
+  constructor(
+    @InjectRepository(Cage)
+    private readonly cageRepo: Repository<Cage>,
+  ) {}
+
+  // Create cages from a purchase order
+  async createFromPurchase(purchaseOrderId: string, cageData: Array<{
+    cageId?: string;
+    numberOfBirds: number;
+    purchaseWeight: number;
+  }>): Promise<Cage[]> {
+    const cages = cageData.map(c =>
+      this.cageRepo.create({
+        purchaseOrderId,
+        cageId: c.cageId,
+        numberOfBirds: c.numberOfBirds,
+        purchaseWeight: c.purchaseWeight,
+        status: 'pending',
+      })
+    );
+    return this.cageRepo.save(cages);
+  }
+
+  // Get cages by purchase order number, optionally filtered by status
+  async getByPurchaseOrderNumber(orderNumber: string, status?: CageStatus): Promise<Cage[]> {
+    const query = this.cageRepo.createQueryBuilder('cage')
+      .innerJoin('cage.purchaseOrder', 'po')
+      .where('po.orderNumber = :orderNumber', { orderNumber });
+
+    if (status) query.andWhere('cage.status = :status', { status });
+
+    return query.orderBy('cage.cageId', 'ASC').getMany();
+  }
+
+  // Get cages by purchase order ID
+  async getByPurchaseOrderId(purchaseOrderId: string, status?: CageStatus): Promise<Cage[]> {
+    const where: any = { purchaseOrderId };
+    if (status) where.status = status;
+    return this.cageRepo.find({ where, order: { cageId: 'ASC' } });
+  }
+
+  // Mark cages as on_vehicle (loaded for sale)
+  async markOnVehicle(cageIds: string[], vehicleId: string): Promise<void> {
+    if (!cageIds.length) return;
+    await this.cageRepo.createQueryBuilder()
+      .update()
+      .set({ status: 'on_vehicle', vehicleId, updatedAt: new Date() })
+      .whereInIds(cageIds)
+      .execute();
+  }
+
+  // Mark cages as sold (from vehicle to retailer)
+  async markSold(cageIds: string[], saleId: string, saleWeight?: number): Promise<void> {
+    if (!cageIds.length) return;
+    const updateData: any = { status: 'sold', saleId, updatedAt: new Date() };
+    if (saleWeight !== undefined) updateData.saleWeight = saleWeight;
+    await this.cageRepo.createQueryBuilder()
+      .update()
+      .set(updateData)
+      .whereInIds(cageIds)
+      .execute();
+  }
+
+  // Mark cages as in_godown
+  async markInGodown(cageIds: string[], godownInwardId: string, godownInwardWeight?: number): Promise<void> {
+    if (!cageIds.length) return;
+    const updateData: any = { status: 'in_godown', godownInwardId, vehicleId: null, updatedAt: new Date() };
+    if (godownInwardWeight !== undefined) updateData.godownInwardWeight = godownInwardWeight;
+    await this.cageRepo.createQueryBuilder()
+      .update()
+      .set(updateData)
+      .whereInIds(cageIds)
+      .execute();
+  }
+
+  // Mark cages as godown_sold
+  async markGodownSold(cageIds: string[], godownSaleId: string, godownSaleWeight?: number): Promise<void> {
+    if (!cageIds.length) return;
+    const updateData: any = { status: 'godown_sold', godownSaleId, updatedAt: new Date() };
+    if (godownSaleWeight !== undefined) updateData.godownSaleWeight = godownSaleWeight;
+    await this.cageRepo.createQueryBuilder()
+      .update()
+      .set(updateData)
+      .whereInIds(cageIds)
+      .execute();
+  }
+
+  // Get full cage journey for a purchase bill (weight loss tracking)
+  async getCageJourney(orderNumber: string): Promise<any[]> {
+    const cages = await this.getByPurchaseOrderNumber(orderNumber);
+
+    return cages.map(cage => {
+      const pw = Number(cage.purchaseWeight) || 0;
+      const sw = cage.saleWeight != null ? Number(cage.saleWeight) : null;
+      const giw = cage.godownInwardWeight != null ? Number(cage.godownInwardWeight) : null;
+      const gsw = cage.godownSaleWeight != null ? Number(cage.godownSaleWeight) : null;
+
+      const lossPurchaseToSale = sw !== null ? pw - sw : null;
+      const lossSaleToGodown = sw !== null && giw !== null ? sw - giw : null;
+      const lossGodownToSale = giw !== null && gsw !== null ? giw - gsw : null;
+      const totalLoss = gsw !== null ? pw - gsw : sw !== null ? pw - sw : null;
+
+      return {
+        id: cage.id,
+        cageId: cage.cageId,
+        numberOfBirds: cage.numberOfBirds,
+        status: cage.status,
+        vehicleId: cage.vehicleId,
+        purchaseWeight: pw,
+        saleWeight: sw,
+        godownInwardWeight: giw,
+        godownSaleWeight: gsw,
+        lossPurchaseToSale,
+        lossSaleToGodown,
+        lossGodownToSale,
+        totalLoss,
+      };
+    });
+  }
+
+  // Get all cages currently on a vehicle
+  async getCagesByVehicle(vehicleId: string): Promise<Cage[]> {
+    return this.cageRepo.find({
+      where: { vehicleId, status: 'on_vehicle' },
+      order: { cageId: 'ASC' },
+    });
+  }
+
+  // Delete cages for a purchase order (used when purchase is deleted)
+  async deleteByPurchaseOrderId(purchaseOrderId: string): Promise<void> {
+    await this.cageRepo.delete({ purchaseOrderId });
+  }
+
+  // Replace cages for a purchase order (used on update)
+  async replaceForPurchaseOrder(purchaseOrderId: string, cageData: Array<{
+    cageId?: string;
+    numberOfBirds: number;
+    purchaseWeight: number;
+  }>): Promise<Cage[]> {
+    await this.deleteByPurchaseOrderId(purchaseOrderId);
+    return this.createFromPurchase(purchaseOrderId, cageData);
+  }
+}

@@ -3,8 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PurchaseOrder } from './entities/purchase-order.entity';
 import { PurchaseOrderItem } from './entities/purchase-order-item.entity';
-import { PurchaseOrderCage } from './entities/purchase-order-cage.entity';
 import { PurchaseOrderPayment } from './entities/purchase-order-payment.entity';
+import { CagesService } from '../cages/cages.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 
@@ -15,10 +15,9 @@ export class PurchasesService {
     private readonly purchaseOrderRepository: Repository<PurchaseOrder>,
     @InjectRepository(PurchaseOrderItem)
     private readonly purchaseOrderItemRepository: Repository<PurchaseOrderItem>,
-    @InjectRepository(PurchaseOrderCage)
-    private readonly purchaseOrderCageRepository: Repository<PurchaseOrderCage>,
     @InjectRepository(PurchaseOrderPayment)
     private readonly purchaseOrderPaymentRepository: Repository<PurchaseOrderPayment>,
+    private readonly cagesService: CagesService,
   ) {}
 
   private calcAmounts(dto: { totalWeight?: string; ratePerKg?: string; transportCharges?: string; otherCharges?: string }) {
@@ -84,15 +83,11 @@ export class PurchasesService {
     }
 
     if (dto.cages && dto.cages.length > 0) {
-      const cages = dto.cages.map(cage =>
-        this.purchaseOrderCageRepository.create({
-          cageId: cage.cageId,
-          numberOfBirds: cage.numberOfBirds,
-          cageWeight: cage.cageWeight,
-          purchaseOrderId: savedId,
-        })
-      );
-      await this.purchaseOrderCageRepository.save(cages);
+      await this.cagesService.createFromPurchase(savedId, dto.cages.map(c => ({
+        cageId: c.cageId,
+        numberOfBirds: c.numberOfBirds,
+        purchaseWeight: c.cageWeight,
+      })));
     }
 
     if (dto.payments && dto.payments.length > 0) {
@@ -112,7 +107,6 @@ export class PurchasesService {
   async findAll(startDate?: string, endDate?: string, supplier?: string, status?: string): Promise<PurchaseOrder[]> {
     const query = this.purchaseOrderRepository.createQueryBuilder('po')
       .leftJoinAndSelect('po.items', 'items')
-      .leftJoinAndSelect('po.cages', 'cages')
       .leftJoinAndSelect('po.payments', 'payments')
       .orderBy('po.orderDate', 'DESC');
 
@@ -126,7 +120,7 @@ export class PurchasesService {
   async findOne(id: string): Promise<PurchaseOrder> {
     const order = await this.purchaseOrderRepository.findOne({
       where: { id },
-      relations: ['items', 'cages', 'payments'],
+      relations: ['items', 'payments'],
     });
     if (!order) throw new NotFoundException(`Purchase order ${id} not found`);
     return order;
@@ -140,21 +134,15 @@ export class PurchasesService {
       if (existing) throw new BadRequestException(`Purchase order ${dto.orderNumber} already exists`);
     }
 
-    // Recalculate weight from cages if provided
     let totalWeight = typeof order.totalWeight === 'string' ? parseFloat(order.totalWeight) : order.totalWeight;
+
     if (dto.cages !== undefined) {
-      if (dto.cages.length > 0) {
-        totalWeight = dto.cages.reduce((s, c) => s + c.cageWeight, 0);
-      } else {
-        totalWeight = parseFloat(dto.totalWeight || '0');
-      }
-      await this.purchaseOrderCageRepository.delete({ purchaseOrderId: id });
-      if (dto.cages.length > 0) {
-        const cages = dto.cages.map(c =>
-          this.purchaseOrderCageRepository.create({ cageId: c.cageId, numberOfBirds: c.numberOfBirds, cageWeight: c.cageWeight, purchaseOrderId: id })
-        );
-        await this.purchaseOrderCageRepository.save(cages);
-      }
+      await this.cagesService.replaceForPurchaseOrder(id, dto.cages.map(c => ({
+        cageId: c.cageId,
+        numberOfBirds: c.numberOfBirds,
+        purchaseWeight: c.cageWeight,
+      })));
+      totalWeight = dto.cages.reduce((s, c) => s + c.cageWeight, 0);
     }
 
     if (dto.items !== undefined) {
@@ -246,80 +234,23 @@ export class PurchasesService {
     return orders.map(o => ({ id: o.id, orderNumber: o.orderNumber, orderDate: o.orderDate, supplierName: o.supplierName }));
   }
 
-  // Get cages for a purchase order, optionally filtered by status
-  async getCagesByOrderNumber(orderNumber: string, status?: string): Promise<PurchaseOrderCage[]> {
-    const order = await this.purchaseOrderRepository.findOne({ where: { orderNumber } });
-    if (!order) throw new NotFoundException(`Purchase order ${orderNumber} not found`);
-
-    const query = this.purchaseOrderCageRepository.createQueryBuilder('cage')
-      .where('cage.purchaseOrderId = :id', { id: order.id });
-
-    if (status) query.andWhere('cage.status = :status', { status });
-
-    return query.orderBy('cage.cageId', 'ASC').getMany();
+  // Get cages for a purchase order — delegates to CagesService
+  async getCagesByOrderNumber(orderNumber: string, status?: string): Promise<any[]> {
+    return this.cagesService.getByPurchaseOrderNumber(orderNumber, status as any);
   }
 
-  // Mark specific cage IDs as sold (optionally record sale weight)
+  // Mark cages sold — delegates to CagesService
   async markCagesSold(cageIds: string[], saleWeight?: number): Promise<void> {
-    if (cageIds.length === 0) return;
-    const updateData: any = { status: 'sold' };
-    if (saleWeight !== undefined) updateData.saleWeight = saleWeight;
-    await this.purchaseOrderCageRepository
-      .createQueryBuilder()
-      .update()
-      .set(updateData)
-      .whereInIds(cageIds)
-      .execute();
+    return this.cagesService.markSold(cageIds, '', saleWeight);
   }
 
-  // Mark specific cage IDs as in_godown (optionally record godown inward weight)
+  // Mark cages in godown — delegates to CagesService
   async markCagesInGodown(cageIds: string[], godownInwardWeight?: number): Promise<void> {
-    if (cageIds.length === 0) return;
-    const updateData: any = { status: 'in_godown' };
-    if (godownInwardWeight !== undefined) updateData.godownInwardWeight = godownInwardWeight;
-    await this.purchaseOrderCageRepository
-      .createQueryBuilder()
-      .update()
-      .set(updateData)
-      .whereInIds(cageIds)
-      .execute();
+    return this.cagesService.markInGodown(cageIds, '', godownInwardWeight);
   }
 
-  // Get full cage journey for a purchase bill (weight loss tracking)
+  // Get cage journey — delegates to CagesService
   async getCageJourney(orderNumber: string): Promise<any[]> {
-    const order = await this.purchaseOrderRepository.findOne({ where: { orderNumber } });
-    if (!order) throw new NotFoundException(`Purchase order ${orderNumber} not found`);
-
-    const cages = await this.purchaseOrderCageRepository.find({
-      where: { purchaseOrderId: order.id },
-      order: { cageId: 'ASC' },
-    });
-
-    return cages.map(cage => {
-      const purchaseWt = Number(cage.cageWeight) || 0;
-      const saleWt = cage.saleWeight !== null && cage.saleWeight !== undefined ? Number(cage.saleWeight) : null;
-      const godownInWt = cage.godownInwardWeight !== null && cage.godownInwardWeight !== undefined ? Number(cage.godownInwardWeight) : null;
-      const godownSaleWt = cage.godownSaleWeight !== null && cage.godownSaleWeight !== undefined ? Number(cage.godownSaleWeight) : null;
-
-      const lossPurchaseToSale = saleWt !== null ? purchaseWt - saleWt : null;
-      const lossSaleToGodown = saleWt !== null && godownInWt !== null ? saleWt - godownInWt : null;
-      const lossGodownToSale = godownInWt !== null && godownSaleWt !== null ? godownInWt - godownSaleWt : null;
-      const totalLoss = godownSaleWt !== null ? purchaseWt - godownSaleWt : (saleWt !== null ? purchaseWt - saleWt : null);
-
-      return {
-        id: cage.id,
-        cageId: cage.cageId,
-        numberOfBirds: cage.numberOfBirds,
-        status: cage.status,
-        purchaseWeight: purchaseWt,
-        saleWeight: saleWt,
-        godownInwardWeight: godownInWt,
-        godownSaleWeight: godownSaleWt,
-        lossPurchaseToSale,
-        lossSaleToGodown,
-        lossGodownToSale,
-        totalLoss,
-      };
-    });
+    return this.cagesService.getCageJourney(orderNumber);
   }
 }

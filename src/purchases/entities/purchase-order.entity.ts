@@ -1,6 +1,5 @@
 import { Column, Entity, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
 import { PurchaseOrderItem } from './purchase-order-item.entity';
-import { PurchaseOrderCage } from './purchase-order-cage.entity';
 import { PurchaseOrderPayment } from './purchase-order-payment.entity';
 
 export type PurchaseStatus = 'pending' | 'received' | 'cancelled';
@@ -90,9 +89,6 @@ export class PurchaseOrder {
 
   @OneToMany(() => PurchaseOrderItem, (item) => item.purchaseOrder, { cascade: true })
   items!: PurchaseOrderItem[];
-
-  @OneToMany(() => PurchaseOrderCage, (cage) => cage.purchaseOrder, { cascade: true })
-  cages!: PurchaseOrderCage[];
 
   @OneToMany(() => PurchaseOrderPayment, (payment) => payment.purchaseOrder, { cascade: true })
   payments!: PurchaseOrderPayment[];

@@ -1,5 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
-import { GodownSaleCage } from './godown-sale-cage.entity';
+import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
 @Entity('godown_sales')
 export class GodownSale {
@@ -44,9 +43,6 @@ export class GodownSale {
 
   @Column({ type: 'text', nullable: true })
   notes?: string;
-
-  @OneToMany(() => GodownSaleCage, (cage) => cage.godownSale, { cascade: true, eager: true })
-  cages!: GodownSaleCage[];
 
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'NOW()' })
   createdAt!: Date;

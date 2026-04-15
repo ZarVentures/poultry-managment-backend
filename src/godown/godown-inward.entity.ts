@@ -1,5 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
-import { GodownInwardCage } from './godown-inward-cage.entity';
+import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
 @Entity('godown_inward_entries')
 export class GodownInwardEntry {
@@ -35,9 +34,6 @@ export class GodownInwardEntry {
 
   @Column({ type: 'text', nullable: true })
   notes?: string;
-
-  @OneToMany(() => GodownInwardCage, (cage) => cage.godownInward, { cascade: true, eager: true })
-  cages!: GodownInwardCage[];
 
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'NOW()' })
   createdAt!: Date;
