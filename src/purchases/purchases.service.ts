@@ -200,7 +200,31 @@ export class PurchasesService {
       updatedAt: new Date(),
     });
 
-    await this.purchaseOrderRepository.save(order);
+    // Use update() instead of save() to avoid cascade issues with payments
+    await this.purchaseOrderRepository.update(id, {
+      orderNumber: order.orderNumber,
+      supplierName: order.supplierName,
+      orderDate: order.orderDate,
+      dueDate: order.dueDate,
+      status: order.status,
+      branch: order.branch,
+      farmerId: order.farmerId,
+      farmerMobile: order.farmerMobile,
+      farmLocation: order.farmLocation,
+      vehicleId: order.vehicleId,
+      totalWeight: order.totalWeight,
+      ratePerKg: order.ratePerKg,
+      totalAmount: order.totalAmount,
+      transportCharges: order.transportCharges,
+      otherCharges: order.otherCharges,
+      grossAmount: order.grossAmount,
+      netAmount: order.netAmount,
+      purchasePaymentStatus: order.purchasePaymentStatus,
+      totalPaymentMade: order.totalPaymentMade,
+      balanceAmount: order.balanceAmount,
+      notes: order.notes,
+      updatedAt: order.updatedAt,
+    });
     return this.findOne(id);
   }
 
