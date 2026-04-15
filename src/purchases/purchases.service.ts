@@ -245,4 +245,39 @@ export class PurchasesService {
       .getMany();
     return orders.map(o => ({ id: o.id, orderNumber: o.orderNumber, orderDate: o.orderDate, supplierName: o.supplierName }));
   }
+
+  // Get cages for a purchase order, optionally filtered by status
+  async getCagesByOrderNumber(orderNumber: string, status?: string): Promise<PurchaseOrderCage[]> {
+    const order = await this.purchaseOrderRepository.findOne({ where: { orderNumber } });
+    if (!order) throw new NotFoundException(`Purchase order ${orderNumber} not found`);
+
+    const query = this.purchaseOrderCageRepository.createQueryBuilder('cage')
+      .where('cage.purchaseOrderId = :id', { id: order.id });
+
+    if (status) query.andWhere('cage.status = :status', { status });
+
+    return query.orderBy('cage.cageId', 'ASC').getMany();
+  }
+
+  // Mark specific cage IDs as sold
+  async markCagesSold(cageIds: string[]): Promise<void> {
+    if (cageIds.length === 0) return;
+    await this.purchaseOrderCageRepository
+      .createQueryBuilder()
+      .update()
+      .set({ status: 'sold' })
+      .whereInIds(cageIds)
+      .execute();
+  }
+
+  // Mark specific cage IDs as in_godown
+  async markCagesInGodown(cageIds: string[]): Promise<void> {
+    if (cageIds.length === 0) return;
+    await this.purchaseOrderCageRepository
+      .createQueryBuilder()
+      .update()
+      .set({ status: 'in_godown' })
+      .whereInIds(cageIds)
+      .execute();
+  }
 }

@@ -42,6 +42,24 @@ export class PurchasesController {
     return this.purchasesService.getInvoiceList();
   }
 
+  @Get('by-number/:orderNumber/cages')
+  getCagesByOrderNumber(
+    @Param('orderNumber') orderNumber: string,
+    @Query('status') status?: string,
+  ) {
+    return this.purchasesService.getCagesByOrderNumber(orderNumber, status);
+  }
+
+  @Patch('cages/mark-sold')
+  markCagesSold(@Body('cageIds') cageIds: string[]) {
+    return this.purchasesService.markCagesSold(cageIds);
+  }
+
+  @Patch('cages/mark-in-godown')
+  markCagesInGodown(@Body('cageIds') cageIds: string[]) {
+    return this.purchasesService.markCagesInGodown(cageIds);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.purchasesService.findOne(id);
