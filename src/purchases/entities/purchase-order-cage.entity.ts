@@ -1,6 +1,8 @@
 import { Column, Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { PurchaseOrder } from './purchase-order.entity';
 
+export type CageStatus = 'pending' | 'sold' | 'in_godown';
+
 @Entity({ name: 'purchase_order_cages' })
 export class PurchaseOrderCage {
   @PrimaryGeneratedColumn('increment', { type: 'bigint' })
@@ -20,6 +22,15 @@ export class PurchaseOrderCage {
 
   @Column({ name: 'cage_weight', type: 'numeric', precision: 10, scale: 2 })
   cageWeight!: number;
+
+  // Status tracks cage lifecycle: pending → sold (via Sale) or in_godown (via Godown Inward)
+  @Column({
+    name: 'status',
+    type: 'varchar',
+    length: 20,
+    default: 'pending',
+  })
+  status!: CageStatus;
 
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'NOW()' })
   createdAt!: Date;
