@@ -1,6 +1,7 @@
 import { Column, Entity, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
 import { PurchaseOrderItem } from './purchase-order-item.entity';
 import { PurchaseOrderPayment } from './purchase-order-payment.entity';
+import { Cage } from '../../cages/cage.entity';
 
 export type PurchaseStatus = 'pending' | 'received' | 'cancelled';
 export type PurchasePaymentStatus = 'paid' | 'pending' | 'partial';
@@ -92,6 +93,9 @@ export class PurchaseOrder {
 
   @OneToMany(() => PurchaseOrderPayment, (payment) => payment.purchaseOrder, { cascade: true })
   payments!: PurchaseOrderPayment[];
+
+  @OneToMany(() => Cage, (cage) => cage.purchaseOrder)
+  cages!: Cage[];
 
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'NOW()' })
   createdAt!: Date;
