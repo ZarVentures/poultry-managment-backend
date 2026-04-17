@@ -108,6 +108,7 @@ export class PurchasesService {
     const query = this.purchaseOrderRepository.createQueryBuilder('po')
       .leftJoinAndSelect('po.items', 'items')
       .leftJoinAndSelect('po.payments', 'payments')
+      .leftJoinAndSelect('po.cages', 'cages')
       .orderBy('po.orderDate', 'DESC');
 
     if (startDate && endDate) query.andWhere('po.orderDate BETWEEN :startDate AND :endDate', { startDate, endDate });
@@ -120,7 +121,7 @@ export class PurchasesService {
   async findOne(id: string): Promise<PurchaseOrder> {
     const order = await this.purchaseOrderRepository.findOne({
       where: { id },
-      relations: ['items', 'payments'],
+      relations: ['items', 'payments', 'cages'],
     });
     if (!order) throw new NotFoundException(`Purchase order ${id} not found`);
     return order;
