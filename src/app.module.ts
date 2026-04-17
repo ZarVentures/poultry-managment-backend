@@ -18,6 +18,11 @@ import { PurchaseOrderItem } from './purchases/entities/purchase-order-item.enti
 import { SalesModule } from './sales/sales.module';
 import { Sale } from './sales/sale.entity';
 import { SalePayment } from './sales/sale-payment.entity';
+import { BillingModule } from './billing/billing.module';
+import { BillingParty } from './billing/entities/billing-party.entity';
+import { BillingSale } from './billing/entities/billing-sale.entity';
+import { BillingPayment } from './billing/entities/billing-payment.entity';
+import { BillingLedger } from './billing/entities/billing-ledger.entity';
 import { CagesModule } from './cages/cages.module';
 import { Cage } from './cages/cage.entity';
 import { ExpensesModule } from './expenses/expenses.module';
@@ -63,7 +68,7 @@ import { Product } from './products/product.entity';
             ssl: {
               rejectUnauthorized: false
             },
-            entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment, Sale, SalePayment, Expense, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownMortality, GodownExpense, Cage, RolePermission, UserPermission, Mortality, Product],
+            entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment, Sale, SalePayment, Expense, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownMortality, GodownExpense, Cage, RolePermission, UserPermission, Mortality, Product, BillingParty, BillingSale, BillingPayment, BillingLedger],
             synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
             logging: config.get<boolean>('DB_LOGGING', false),
           };
@@ -77,7 +82,7 @@ import { Product } from './products/product.entity';
           username: config.get<string>('DB_USERNAME', 'postgres'),
           password: config.get<string>('DB_PASSWORD', 'postgres'),
           database: config.get<string>('DB_NAME', 'poultry'),
-          entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment, Sale, SalePayment, Expense, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownMortality, GodownExpense, Cage, RolePermission, UserPermission, Mortality, Product],
+          entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment, Sale, SalePayment, Expense, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownMortality, GodownExpense, Cage, RolePermission, UserPermission, Mortality, Product, BillingParty, BillingSale, BillingPayment, BillingLedger],
           synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
           logging: config.get<boolean>('DB_LOGGING', false),
         };
@@ -100,6 +105,7 @@ import { Product } from './products/product.entity';
     GodownModule,
     PermissionsModule,
     CagesModule,
+    BillingModule,
     MortalityModule,
     ProductsModule,
   ],
