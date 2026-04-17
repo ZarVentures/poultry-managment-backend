@@ -108,7 +108,6 @@ export class PurchasesService {
     const query = this.purchaseOrderRepository.createQueryBuilder('po')
       .leftJoinAndSelect('po.items', 'items')
       .leftJoinAndSelect('po.payments', 'payments')
-      .leftJoinAndSelect('po.cages', 'cages')
       .orderBy('po.orderDate', 'DESC');
 
     if (startDate && endDate) query.andWhere('po.orderDate BETWEEN :startDate AND :endDate', { startDate, endDate });
