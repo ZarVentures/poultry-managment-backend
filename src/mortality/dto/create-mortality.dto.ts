@@ -26,6 +26,9 @@ export class CreateMortalityDto {
   @Min(1)
   numberOfBirdsDied!: number;
 
+  @IsOptional()
+  weightOfDeadBirds?: number;
+
   @IsString()
   cause!: string;
 
