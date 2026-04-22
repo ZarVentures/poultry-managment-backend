@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Request, UseGuards, Param, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -62,6 +62,17 @@ export class AuthController {
   async get2FAStatus(@Request() req: any) {
     const user = await this.authService['usersService'].findOne(req.user.userId);
     return { isTwoFactorEnabled: user.isTwoFactorEnabled };
+  }
+
+  /** Admin: Reset 2FA for any user (use when user loses phone + recovery codes) */
+  @Post('2fa/admin-reset/:userId')
+  @UseGuards(JwtAuthGuard)
+  async adminReset2FA(@Request() req: any, @Param('userId') userId: string) {
+    if (req.user.role !== 'admin') {
+      throw new UnauthorizedException('Admin access required');
+    }
+    await this.authService['usersService'].disableTwoFactor(userId);
+    return { message: `2FA has been reset for user ${userId}. They can now log in with email/password only.` };
   }
 }
 
