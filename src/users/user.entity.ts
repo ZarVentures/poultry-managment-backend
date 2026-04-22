@@ -48,6 +48,13 @@ export class User {
   @Column({ name: 'session_token', type: 'text', nullable: true })
   sessionToken?: string | null;
 
+  // Two-Factor Authentication
+  @Column({ name: 'two_factor_secret', type: 'text', nullable: true })
+  twoFactorSecret?: string | null;
+
+  @Column({ name: 'is_two_factor_enabled', type: 'boolean', default: false })
+  isTwoFactorEnabled!: boolean;
+
   @Column({ type: 'text', nullable: true })
   notes?: string;
 

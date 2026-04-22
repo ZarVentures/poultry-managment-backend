@@ -1,7 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import { authenticator } from 'otplib';
+import * as QRCode from 'qrcode';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/user.entity';
 
@@ -31,39 +33,29 @@ export class AuthService {
   }
 
   async login(user: User) {
-    // Generate a unique session token for this login
-    const sessionToken = crypto.randomBytes(32).toString('hex');
+    // If 2FA is enabled, return a temp token instead of full access
+    if (user.isTwoFactorEnabled) {
+      const tempPayload = { sub: user.id, email: user.email, twoFactorPending: true };
+      const tempToken = await this.jwtService.signAsync(tempPayload, { expiresIn: '5m' });
+      return { status: '2FA_REQUIRED', tempToken };
+    }
 
-    // Store it on the user — this invalidates any previous session
+    return this.issueFullToken(user);
+  }
+
+  async issueFullToken(user: User) {
+    const sessionToken = crypto.randomBytes(32).toString('hex');
     await this.usersService.updateSessionToken(user.id, sessionToken);
 
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      // Embed session token in JWT so we can validate it on each request
-      sessionToken,
-    };
-
+    const payload = { sub: user.id, email: user.email, role: user.role, sessionToken };
     const accessToken = await this.jwtService.signAsync(payload);
 
     return {
       accessToken,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
     };
   }
 
-  /**
-   * Called by JwtStrategy.validate() on every authenticated request.
-   * Checks that the session token in the JWT matches the one stored in DB.
-   * If someone else logged in with the same account, their token replaced
-   * this one and this request will be rejected.
-   */
   async validateSession(userId: string, sessionToken: string): Promise<User> {
     const user = await this.usersService.findOne(userId);
 
@@ -78,5 +70,69 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  // ── 2FA ──────────────────────────────────────────────────────────────────
+
+  async generate2FASecret(userId: string): Promise<{ otpauthUrl: string; qrCodeDataUrl: string; secret: string }> {
+    const user = await this.usersService.findOne(userId);
+    const secret = authenticator.generateSecret();
+    const appName = 'Aziz Poultry';
+    const otpauthUrl = authenticator.keyuri(user.email, appName, secret);
+
+    // Store secret (not yet enabled — user must verify first)
+    await this.usersService.setTwoFactorSecret(userId, secret);
+
+    const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
+    return { otpauthUrl, qrCodeDataUrl, secret };
+  }
+
+  async turnOn2FA(userId: string, code: string): Promise<void> {
+    const user = await this.usersService.findOne(userId);
+    if (!user.twoFactorSecret) {
+      throw new BadRequestException('2FA secret not generated. Call /auth/2fa/generate first.');
+    }
+    const isValid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid 2FA code');
+    }
+    await this.usersService.enableTwoFactor(userId);
+  }
+
+  async authenticate2FA(tempToken: string, code: string) {
+    let payload: any;
+    try {
+      payload = await this.jwtService.verifyAsync(tempToken);
+    } catch {
+      throw new UnauthorizedException('Invalid or expired temp token');
+    }
+
+    if (!payload.twoFactorPending) {
+      throw new UnauthorizedException('Token is not a 2FA pending token');
+    }
+
+    const user = await this.usersService.findOne(payload.sub);
+    if (!user.twoFactorSecret || !user.isTwoFactorEnabled) {
+      throw new UnauthorizedException('2FA not enabled for this user');
+    }
+
+    const isValid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid 2FA code');
+    }
+
+    return this.issueFullToken(user);
+  }
+
+  async turnOff2FA(userId: string, code: string): Promise<void> {
+    const user = await this.usersService.findOne(userId);
+    if (!user.twoFactorSecret || !user.isTwoFactorEnabled) {
+      throw new BadRequestException('2FA is not enabled');
+    }
+    const isValid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid 2FA code');
+    }
+    await this.usersService.disableTwoFactor(userId);
   }
 }

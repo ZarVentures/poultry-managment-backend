@@ -143,6 +143,21 @@ export class UsersService {
     });
   }
 
+  async setTwoFactorSecret(id: string, secret: string | null): Promise<void> {
+    await this.usersRepository.update(id, { twoFactorSecret: secret });
+  }
+
+  async enableTwoFactor(id: string): Promise<void> {
+    await this.usersRepository.update(id, { isTwoFactorEnabled: true });
+  }
+
+  async disableTwoFactor(id: string): Promise<void> {
+    await this.usersRepository.update(id, {
+      isTwoFactorEnabled: false,
+      twoFactorSecret: null,
+    });
+  }
+
   async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
     await this.usersRepository.remove(user);
