@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
-import { generateSecret, generate, verify } from 'otplib';
+import { generateSecret, verify } from 'otplib';
 import * as QRCode from 'qrcode';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/user.entity';
@@ -99,7 +99,7 @@ export class AuthService {
     if (!user.twoFactorSecret) {
       throw new BadRequestException('2FA secret not generated. Call /auth/2fa/generate first.');
     }
-    const isValid = verify({ token: code, secret: user.twoFactorSecret });
+    const isValid = await verify({ token: code, secret: user.twoFactorSecret });
     if (!isValid) {
       throw new UnauthorizedException('Invalid 2FA code');
     }
@@ -127,7 +127,7 @@ export class AuthService {
     }
 
     // Try TOTP code first
-    const isValidTotp = verify({ token: code, secret: user.twoFactorSecret });
+    const isValidTotp = await verify({ token: code, secret: user.twoFactorSecret });
     if (isValidTotp) {
       return this.issueFullToken(user);
     }
@@ -146,7 +146,7 @@ export class AuthService {
     if (!user.twoFactorSecret || !user.isTwoFactorEnabled) {
       throw new BadRequestException('2FA is not enabled');
     }
-    const isValid = verify({ token: code, secret: user.twoFactorSecret });
+    const isValid = await verify({ token: code, secret: user.twoFactorSecret });
     if (!isValid) {
       throw new UnauthorizedException('Invalid 2FA code');
     }
