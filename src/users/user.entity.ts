@@ -55,6 +55,9 @@ export class User {
   @Column({ name: 'is_two_factor_enabled', type: 'boolean', default: false })
   isTwoFactorEnabled!: boolean;
 
+  @Column({ name: 'two_factor_backup_codes', type: 'text', nullable: true })
+  twoFactorBackupCodes?: string | null;
+
   @Column({ type: 'text', nullable: true })
   notes?: string;
 

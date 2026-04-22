@@ -32,12 +32,11 @@ export class AuthController {
     return this.authService.generate2FASecret(req.user.userId);
   }
 
-  /** Step 2: Verify first code and enable 2FA */
+  /** Step 2: Verify first code and enable 2FA — returns backup codes (shown ONCE) */
   @Post('2fa/turn-on')
   @UseGuards(JwtAuthGuard)
   async turnOn2FA(@Request() req: any, @Body('code') code: string) {
-    await this.authService.turnOn2FA(req.user.userId, code);
-    return { message: '2FA enabled successfully' };
+    return this.authService.turnOn2FA(req.user.userId, code);
   }
 
   /** Step 3: Called during login when 2FA is required */

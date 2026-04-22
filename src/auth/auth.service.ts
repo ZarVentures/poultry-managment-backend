@@ -86,7 +86,15 @@ export class AuthService {
     return { otpauthUrl, qrCodeDataUrl, secret };
   }
 
-  async turnOn2FA(userId: string, code: string): Promise<void> {
+  private generateBackupCodes(): string[] {
+    // Generate 8 recovery codes in XXXX-XXXX-XXXX-XXXX format
+    return Array.from({ length: 8 }, () => {
+      const hex = crypto.randomBytes(8).toString('hex').toUpperCase();
+      return `${hex.slice(0,4)}-${hex.slice(4,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}`;
+    });
+  }
+
+  async turnOn2FA(userId: string, code: string): Promise<{ backupCodes: string[] }> {
     const user = await this.usersService.findOne(userId);
     if (!user.twoFactorSecret) {
       throw new BadRequestException('2FA secret not generated. Call /auth/2fa/generate first.');
@@ -95,7 +103,10 @@ export class AuthService {
     if (!isValid) {
       throw new UnauthorizedException('Invalid 2FA code');
     }
-    await this.usersService.enableTwoFactor(userId);
+    const backupCodes = this.generateBackupCodes();
+    await this.usersService.enableTwoFactor(userId, backupCodes);
+    // Return plain codes — shown ONCE, never again
+    return { backupCodes };
   }
 
   async authenticate2FA(tempToken: string, code: string) {
@@ -115,12 +126,19 @@ export class AuthService {
       throw new UnauthorizedException('2FA not enabled for this user');
     }
 
-    const isValid = verify({ token: code, secret: user.twoFactorSecret });
-    if (!isValid) {
-      throw new UnauthorizedException('Invalid 2FA code');
+    // Try TOTP code first
+    const isValidTotp = verify({ token: code, secret: user.twoFactorSecret });
+    if (isValidTotp) {
+      return this.issueFullToken(user);
     }
 
-    return this.issueFullToken(user);
+    // Try backup code (strip dashes for comparison)
+    const usedBackup = await this.usersService.consumeBackupCode(user.id, code.replace(/-/g, ''));
+    if (usedBackup) {
+      return this.issueFullToken(user);
+    }
+
+    throw new UnauthorizedException('Invalid 2FA code');
   }
 
   async turnOff2FA(userId: string, code: string): Promise<void> {
