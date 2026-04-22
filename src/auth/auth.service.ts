@@ -99,7 +99,7 @@ export class AuthService {
     if (!user.twoFactorSecret) {
       throw new BadRequestException('2FA secret not generated. Call /auth/2fa/generate first.');
     }
-    const isValid = await verify({ token: code, secret: user.twoFactorSecret });
+    const isValid = (await verify({ token: code, secret: user.twoFactorSecret })).valid;
     if (!isValid) {
       throw new UnauthorizedException('Invalid 2FA code');
     }
@@ -127,7 +127,7 @@ export class AuthService {
     }
 
     // Try TOTP code first
-    const isValidTotp = await verify({ token: code, secret: user.twoFactorSecret });
+    const isValidTotp = (await verify({ token: code, secret: user.twoFactorSecret })).valid;
     if (isValidTotp) {
       return this.issueFullToken(user);
     }
@@ -146,7 +146,7 @@ export class AuthService {
     if (!user.twoFactorSecret || !user.isTwoFactorEnabled) {
       throw new BadRequestException('2FA is not enabled');
     }
-    const isValid = await verify({ token: code, secret: user.twoFactorSecret });
+    const isValid = (await verify({ token: code, secret: user.twoFactorSecret })).valid;
     if (!isValid) {
       throw new UnauthorizedException('Invalid 2FA code');
     }
