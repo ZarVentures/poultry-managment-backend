@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
-import { authenticator } from 'otplib/core';
+import { generateSecret, generate, verify } from 'otplib';
 import * as QRCode from 'qrcode';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/user.entity';
@@ -76,11 +76,10 @@ export class AuthService {
 
   async generate2FASecret(userId: string): Promise<{ otpauthUrl: string; qrCodeDataUrl: string; secret: string }> {
     const user = await this.usersService.findOne(userId);
-    const secret = authenticator.generateSecret();
+    const secret = generateSecret();
     const appName = 'Aziz Poultry';
-    const otpauthUrl = authenticator.keyuri(user.email, appName, secret);
+    const otpauthUrl = `otpauth://totp/${encodeURIComponent(appName)}:${encodeURIComponent(user.email)}?secret=${secret}&issuer=${encodeURIComponent(appName)}`;
 
-    // Store secret (not yet enabled — user must verify first)
     await this.usersService.setTwoFactorSecret(userId, secret);
 
     const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
@@ -92,7 +91,7 @@ export class AuthService {
     if (!user.twoFactorSecret) {
       throw new BadRequestException('2FA secret not generated. Call /auth/2fa/generate first.');
     }
-    const isValid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
+    const isValid = verify({ token: code, secret: user.twoFactorSecret });
     if (!isValid) {
       throw new UnauthorizedException('Invalid 2FA code');
     }
@@ -116,7 +115,7 @@ export class AuthService {
       throw new UnauthorizedException('2FA not enabled for this user');
     }
 
-    const isValid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
+    const isValid = verify({ token: code, secret: user.twoFactorSecret });
     if (!isValid) {
       throw new UnauthorizedException('Invalid 2FA code');
     }
@@ -129,7 +128,7 @@ export class AuthService {
     if (!user.twoFactorSecret || !user.isTwoFactorEnabled) {
       throw new BadRequestException('2FA is not enabled');
     }
-    const isValid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
+    const isValid = verify({ token: code, secret: user.twoFactorSecret });
     if (!isValid) {
       throw new UnauthorizedException('Invalid 2FA code');
     }
