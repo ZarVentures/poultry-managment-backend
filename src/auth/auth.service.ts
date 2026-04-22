@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
-import { authenticator } from 'otplib';
+import { authenticator } from 'otplib/core';
 import * as QRCode from 'qrcode';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/user.entity';
