@@ -95,11 +95,14 @@ export class GodownService {
   }
 
   async findAllMortality() {
-    return this.mortalityRepo.find({ order: { mortalityDate: 'DESC' } });
+    return this.mortalityRepo.find({
+      order: { mortalityDate: 'DESC' },
+      relations: ['godownInward'],
+    });
   }
 
   async findOneMortality(id: string) {
-    return this.mortalityRepo.findOne({ where: { id } });
+    return this.mortalityRepo.findOne({ where: { id }, relations: ['godownInward'] });
   }
 
   async updateMortality(id: string, data: Partial<GodownMortality>) {
