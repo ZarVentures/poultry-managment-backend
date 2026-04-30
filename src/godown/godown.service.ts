@@ -5,6 +5,7 @@ import { GodownInwardEntry } from './godown-inward.entity';
 import { GodownSale } from './godown-sale.entity';
 import { GodownMortality } from './godown-mortality.entity';
 import { GodownExpense } from './godown-expense.entity';
+import { CagesService } from '../cages/cages.service';
 
 @Injectable()
 export class GodownService {
@@ -17,12 +18,23 @@ export class GodownService {
     private mortalityRepo: Repository<GodownMortality>,
     @InjectRepository(GodownExpense)
     private expenseRepo: Repository<GodownExpense>,
+    private readonly cagesService: CagesService,
   ) {}
 
-  // Inward Entries
-  async createInward(data: Partial<GodownInwardEntry>) {
-    const entry = this.inwardRepo.create(data);
-    return this.inwardRepo.save(entry);
+  // ─── Inward Entries ───────────────────────────────────────────────────────
+
+  async createInward(data: any) {
+    const { cageIds, godownInwardWeight, ...entryData } = data;
+    const entry = this.inwardRepo.create(entryData);
+    const savedResult = await this.inwardRepo.save(entry);
+    const savedId: string = (savedResult as any).id ?? (savedResult as any)[0]?.id;
+
+    // Mark selected cages as in_godown in master cages table
+    if (cageIds && cageIds.length > 0) {
+      await this.cagesService.markInGodown(cageIds, savedId, godownInwardWeight);
+    }
+
+    return this.findOneInward(savedId);
   }
 
   async findAllInward() {
@@ -33,7 +45,7 @@ export class GodownService {
     return this.inwardRepo.findOne({ where: { id } });
   }
 
-  async updateInward(id: string, data: Partial<GodownInwardEntry>) {
+  async updateInward(id: string, data: any) {
     await this.inwardRepo.update(id, data);
     return this.findOneInward(id);
   }
@@ -42,10 +54,20 @@ export class GodownService {
     await this.inwardRepo.delete(id);
   }
 
-  // Sales
-  async createSale(data: Partial<GodownSale>) {
-    const sale = this.saleRepo.create(data);
-    return this.saleRepo.save(sale);
+  // ─── Sales ────────────────────────────────────────────────────────────────
+
+  async createSale(data: any) {
+    const { cageIds, godownSaleWeight, ...saleData } = data;
+    const sale = this.saleRepo.create(saleData);
+    const savedResult = await this.saleRepo.save(sale);
+    const savedId: string = (savedResult as any).id ?? (savedResult as any)[0]?.id;
+
+    // Mark selected cages as godown_sold in master cages table
+    if (cageIds && cageIds.length > 0) {
+      await this.cagesService.markGodownSold(cageIds, savedId, godownSaleWeight);
+    }
+
+    return this.findOneSale(savedId);
   }
 
   async findAllSales() {
@@ -56,7 +78,7 @@ export class GodownService {
     return this.saleRepo.findOne({ where: { id } });
   }
 
-  async updateSale(id: string, data: Partial<GodownSale>) {
+  async updateSale(id: string, data: any) {
     await this.saleRepo.update(id, data);
     return this.findOneSale(id);
   }
@@ -65,7 +87,8 @@ export class GodownService {
     await this.saleRepo.delete(id);
   }
 
-  // Mortality
+  // ─── Mortality ────────────────────────────────────────────────────────────
+
   async createMortality(data: Partial<GodownMortality>) {
     const mortality = this.mortalityRepo.create(data);
     return this.mortalityRepo.save(mortality);
@@ -88,7 +111,8 @@ export class GodownService {
     await this.mortalityRepo.delete(id);
   }
 
-  // Expenses
+  // ─── Expenses ─────────────────────────────────────────────────────────────
+
   async createExpense(data: Partial<GodownExpense>) {
     const expense = this.expenseRepo.create(data);
     return this.expenseRepo.save(expense);
@@ -111,7 +135,8 @@ export class GodownService {
     await this.expenseRepo.delete(id);
   }
 
-  // Summary
+  // ─── Summary ──────────────────────────────────────────────────────────────
+
   async getSummary() {
     const totalInward = await this.inwardRepo
       .createQueryBuilder('entry')
@@ -128,9 +153,9 @@ export class GodownService {
       .select('SUM(mortality.numberOfBirdsDied)', 'total')
       .getRawOne();
 
-    const currentStock = 
-      (parseInt(totalInward.total) || 0) - 
-      (parseInt(totalSold.total) || 0) - 
+    const currentStock =
+      (parseInt(totalInward.total) || 0) -
+      (parseInt(totalSold.total) || 0) -
       (parseInt(totalMortality.total) || 0);
 
     return {

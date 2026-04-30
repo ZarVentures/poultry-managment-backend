@@ -1,7 +1,7 @@
 const axios = require('axios');
 const { execSync } = require('child_process');
 
-const API_URL = 'https://chickenbackend.onrender.com/api/v1';
+const API_URL = 'process.env.API_URL || 'https://13.234.140.190.nip.io/api/v1'';
 
 console.log('🔍 COMPREHENSIVE SYSTEM DIAGNOSIS');
 console.log('='.repeat(80));
@@ -33,7 +33,7 @@ async function runDiagnosis() {
   console.log('-'.repeat(80));
   try {
     const { Client } = require('pg');
-    require('dotenv').config({ path: '.env.render' });
+    require('dotenv').config();
     
     const client = new Client({
       connectionString: process.env.DATABASE_URL,
@@ -240,3 +240,5 @@ async function runDiagnosis() {
 }
 
 runDiagnosis().catch(console.error);
+
+

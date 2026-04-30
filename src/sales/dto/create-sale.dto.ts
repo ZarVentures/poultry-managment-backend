@@ -1,10 +1,34 @@
-import { IsString, IsOptional, IsDateString, IsEnum, MaxLength } from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsEnum, MaxLength, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { SaleProductType, PaymentStatusType, SaleModeType } from '../sale.entity';
+
+export class CreateSalePaymentDto {
+  @IsString()
+  paymentMode!: string;
+
+  @IsString()
+  amount!: string;
+}
 
 export class CreateSaleDto {
   @IsString()
   @MaxLength(50)
   invoiceNumber!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  saleNo?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  purchaseBillNo?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  cageNo?: string;
 
   @IsString()
   @MaxLength(150)
@@ -21,7 +45,7 @@ export class CreateSaleDto {
 
   @IsOptional()
   @IsString()
-  quantity?: string; // Using string to handle decimal input
+  quantity?: string;
 
   @IsOptional()
   @IsString()
@@ -30,7 +54,7 @@ export class CreateSaleDto {
 
   @IsOptional()
   @IsString()
-  unitPrice?: string; // Using string to handle decimal input
+  unitPrice?: string;
 
   @IsOptional()
   @IsEnum(['paid', 'pending', 'partial'])
@@ -38,7 +62,7 @@ export class CreateSaleDto {
 
   @IsOptional()
   @IsString()
-  amountReceived?: string; // Using string to handle decimal input
+  amountReceived?: string;
 
   @IsOptional()
   @IsString()
@@ -76,7 +100,13 @@ export class CreateSaleDto {
   @IsString()
   retailerId?: string;
 
-  // Extra fields sent by frontend (ignored by service, stored in notes)
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateSalePaymentDto)
+  payments?: CreateSalePaymentDto[];
+
+  // Extra fields from frontend (not stored directly)
   @IsOptional()
   totalBirds?: number;
 

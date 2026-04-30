@@ -8,7 +8,7 @@ const https = require('https')
 const fs = require('fs')
 const path = require('path')
 
-const BASE_URL = 'https://chickenbackend.onrender.com/api/v1'
+const BASE_URL = process.env.API_URL || 'https://13.234.140.190.nip.io/api/v1'
 const LOGIN_EMAIL = 'admin@azizpoultry.com'
 const LOGIN_PASSWORD = 'admin123'
 

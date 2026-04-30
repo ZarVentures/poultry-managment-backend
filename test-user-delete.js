@@ -1,7 +1,7 @@
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 
 async function testUserDelete() {
-  const API_URL = 'https://chickenbackend.onrender.com/api/v1';
+  const API_URL = 'process.env.API_URL || 'https://13.234.140.190.nip.io/api/v1'';
   
   // Login
   console.log('🔐 Logging in...');
@@ -40,3 +40,5 @@ async function testUserDelete() {
 }
 
 testUserDelete().catch(console.error);
+
+

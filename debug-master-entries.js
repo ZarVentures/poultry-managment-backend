@@ -1,7 +1,7 @@
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 
 async function debugMasterEntries() {
-  const API_URL = 'https://chickenbackend.onrender.com/api/v1';
+  const API_URL = 'process.env.API_URL || 'https://13.234.140.190.nip.io/api/v1'';
 
   // Login
   const loginResponse = await fetch(`${API_URL}/auth/login`, {
@@ -56,3 +56,5 @@ async function debugMasterEntries() {
 }
 
 debugMasterEntries().catch(console.error);
+
+

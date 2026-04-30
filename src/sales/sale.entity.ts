@@ -1,5 +1,6 @@
-import { Column, Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { Retailer } from '../retailers/retailer.entity';
+import { SalePayment } from './sale-payment.entity';
 
 export type SaleProductType = 'eggs' | 'meat' | 'chicks' | 'other';
 export type PaymentStatusType = 'paid' | 'pending' | 'partial';
@@ -12,6 +13,16 @@ export class Sale {
 
   @Column({ name: 'invoice_number', type: 'varchar', length: 50, unique: true })
   invoiceNumber!: string;
+
+  // New: Sale No (e.g. SL-001), Purchase Bill No reference, Cage No
+  @Column({ name: 'sale_no', type: 'varchar', length: 50, nullable: true })
+  saleNo?: string;
+
+  @Column({ name: 'purchase_bill_no', type: 'varchar', length: 50, nullable: true })
+  purchaseBillNo?: string;
+
+  @Column({ name: 'cage_no', type: 'varchar', length: 100, nullable: true })
+  cageNo?: string;
 
   @Column({ name: 'customer_name', type: 'varchar', length: 150 })
   customerName!: string;
@@ -99,6 +110,9 @@ export class Sale {
   @ManyToOne(() => Retailer, { nullable: true })
   @JoinColumn({ name: 'retailer_id' })
   retailer?: Retailer;
+
+  @OneToMany(() => SalePayment, (p) => p.sale, { cascade: true })
+  payments!: SalePayment[];
 
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'NOW()' })
   createdAt!: Date;

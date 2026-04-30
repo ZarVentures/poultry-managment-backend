@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Load environment variables
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 
 async function backupDatabase() {
   const client = new Client({
@@ -135,3 +135,4 @@ SET standard_conforming_strings = on;
 
 // Run backup
 backupDatabase().catch(console.error);
+

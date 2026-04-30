@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 
 async function forceFix() {
   const client = new Client({
@@ -50,3 +50,4 @@ async function forceFix() {
 }
 
 forceFix();
+

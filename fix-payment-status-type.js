@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 
 async function fixPaymentStatusType() {
   const client = new Client({
@@ -49,3 +49,4 @@ async function fixPaymentStatusType() {
 }
 
 fixPaymentStatusType();
+

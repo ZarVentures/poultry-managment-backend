@@ -2,7 +2,7 @@
 // Run this locally against the database to see the actual error
 
 const { DataSource } = require('typeorm');
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 
 async function testUpdate() {
   console.log('🔍 TESTING UPDATE WITH DETAILED LOGGING');
@@ -60,3 +60,4 @@ async function testUpdate() {
 }
 
 testUpdate();
+

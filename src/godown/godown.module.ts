@@ -6,6 +6,7 @@ import { GodownInwardEntry } from './godown-inward.entity';
 import { GodownSale } from './godown-sale.entity';
 import { GodownMortality } from './godown-mortality.entity';
 import { GodownExpense } from './godown-expense.entity';
+import { CagesModule } from '../cages/cages.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { GodownExpense } from './godown-expense.entity';
       GodownMortality,
       GodownExpense,
     ]),
+    CagesModule,
   ],
   controllers: [GodownController],
   providers: [GodownService],

@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 
 async function verifyDatabaseStatus() {
   console.log('🔍 VERIFYING DATABASE STATUS');
@@ -107,3 +107,4 @@ async function verifyDatabaseStatus() {
 }
 
 verifyDatabaseStatus();
+

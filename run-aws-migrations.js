@@ -269,7 +269,7 @@ const migrations = [
 ]
 
 async function run() {
-  const ssl = DB_URL.includes('rds.amazonaws.com') || DB_URL.includes('render.com')
+  const ssl = DB_URL.includes('rds.amazonaws.com')
     ? { rejectUnauthorized: false }
     : false
 

@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { LoggingMiddleware } from './common/logging.middleware';
 import { VehiclesModule } from './vehicles/vehicles.module';
 import { Vehicle } from './vehicles/vehicle.entity';
 import { HealthModule } from './health/health.module';
@@ -14,9 +15,11 @@ import { Retailer } from './retailers/retailer.entity';
 import { PurchasesModule } from './purchases/purchases.module';
 import { PurchaseOrder } from './purchases/entities/purchase-order.entity';
 import { PurchaseOrderItem } from './purchases/entities/purchase-order-item.entity';
-import { PurchaseOrderCage } from './purchases/entities/purchase-order-cage.entity';
 import { SalesModule } from './sales/sales.module';
 import { Sale } from './sales/sale.entity';
+import { SalePayment } from './sales/sale-payment.entity';
+import { CagesModule } from './cages/cages.module';
+import { Cage } from './cages/cage.entity';
 import { ExpensesModule } from './expenses/expenses.module';
 import { Expense } from './expenses/expense.entity';
 import { ReportsModule } from './reports/reports.module';
@@ -32,6 +35,7 @@ import { GodownInwardEntry } from './godown/godown-inward.entity';
 import { GodownSale } from './godown/godown-sale.entity';
 import { GodownMortality } from './godown/godown-mortality.entity';
 import { GodownExpense } from './godown/godown-expense.entity';
+import { PurchaseOrderPayment } from './purchases/entities/purchase-order-payment.entity';
 import { PermissionsModule } from './permissions/permissions.module';
 import { RolePermission } from './permissions/entities/role-permission.entity';
 import { UserPermission } from './permissions/entities/user-permission.entity';
@@ -59,7 +63,7 @@ import { Product } from './products/product.entity';
             ssl: {
               rejectUnauthorized: false
             },
-            entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderCage, Sale, Expense, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownMortality, GodownExpense, RolePermission, UserPermission, Mortality, Product],
+            entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment, Sale, SalePayment, Expense, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownMortality, GodownExpense, Cage, RolePermission, UserPermission, Mortality, Product],
             synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
             logging: config.get<boolean>('DB_LOGGING', false),
           };
@@ -73,7 +77,7 @@ import { Product } from './products/product.entity';
           username: config.get<string>('DB_USERNAME', 'postgres'),
           password: config.get<string>('DB_PASSWORD', 'postgres'),
           database: config.get<string>('DB_NAME', 'poultry'),
-          entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderCage, Sale, Expense, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownMortality, GodownExpense, RolePermission, UserPermission, Mortality, Product],
+          entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment, Sale, SalePayment, Expense, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownMortality, GodownExpense, Cage, RolePermission, UserPermission, Mortality, Product],
           synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
           logging: config.get<boolean>('DB_LOGGING', false),
         };
@@ -95,9 +99,14 @@ import { Product } from './products/product.entity';
     AuditModule,
     GodownModule,
     PermissionsModule,
+    CagesModule,
     MortalityModule,
     ProductsModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(LoggingMiddleware).forRoutes('*');
+  }
+}
 

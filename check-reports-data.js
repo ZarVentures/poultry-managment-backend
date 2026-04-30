@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 
 async function checkReportsData() {
   console.log('🔍 CHECKING DATA AVAILABILITY FOR REPORTS');
@@ -135,3 +135,4 @@ async function checkReportsData() {
 }
 
 checkReportsData();
+

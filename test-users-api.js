@@ -1,7 +1,7 @@
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 const axios = require('axios');
 
-const API_URL = process.env.DATABASE_URL ? 'https://chickenbackend.onrender.com/api/v1' : 'http://localhost:3000/api/v1';
+const API_URL = process.env.DATABASE_URL ? 'process.env.API_URL || 'https://13.234.140.190.nip.io/api/v1'' : 'http://localhost:3000/api/v1';
 
 let authToken = '';
 let testUserId = '';
@@ -316,3 +316,5 @@ async function runAllTests() {
 }
 
 runAllTests().catch(console.error);
+
+

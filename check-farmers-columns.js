@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 
 async function checkColumns() {
   const client = new Client({
@@ -34,3 +34,4 @@ async function checkColumns() {
 }
 
 checkColumns();
+

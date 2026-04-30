@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-require('dotenv').config({ path: '.env.render' });
+require('dotenv').config();
 
 async function createMortalitiesTable() {
   console.log('🔧 CREATING MORTALITIES TABLE');
@@ -62,3 +62,4 @@ async function createMortalitiesTable() {
 }
 
 createMortalitiesTable();
+
