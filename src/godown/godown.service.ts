@@ -46,7 +46,9 @@ export class GodownService {
   }
 
   async updateInward(id: string, data: any) {
-    await this.inwardRepo.update(id, data);
+    // Strip fields that are not columns on the entity (e.g. cages, cageIds)
+    const { cages, cageIds, godownInwardWeight, ...updateData } = data;
+    await this.inwardRepo.update(id, updateData);
     return this.findOneInward(id);
   }
 
