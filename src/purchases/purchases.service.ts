@@ -95,6 +95,7 @@ export class PurchasesService {
         this.purchaseOrderPaymentRepository.create({
           paymentMode: p.paymentMode as any,
           amount: parseFloat(p.amount),
+          isAdvance: p.isAdvance ?? false,
           purchaseOrderId: savedId,
         })
       );
@@ -165,7 +166,7 @@ export class PurchasesService {
       await this.purchaseOrderPaymentRepository.delete({ purchaseOrderId: id });
       if (dto.payments.length > 0) {
         const payments = dto.payments.map(p =>
-          this.purchaseOrderPaymentRepository.create({ paymentMode: p.paymentMode as any, amount: parseFloat(p.amount), purchaseOrderId: id })
+          this.purchaseOrderPaymentRepository.create({ paymentMode: p.paymentMode as any, amount: parseFloat(p.amount), isAdvance: p.isAdvance ?? false, purchaseOrderId: id })
         );
         await this.purchaseOrderPaymentRepository.save(payments);
       }

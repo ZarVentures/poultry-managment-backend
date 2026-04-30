@@ -36,6 +36,9 @@ export class CreatePurchaseOrderPaymentDto {
 
   @IsString()
   amount!: string;
+
+  @IsOptional()
+  isAdvance?: boolean;
 }
 
 export class CreatePurchaseOrderDto {

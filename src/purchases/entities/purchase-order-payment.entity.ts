@@ -17,6 +17,9 @@ export class PurchaseOrderPayment {
   @Column({ name: 'amount', type: 'numeric', precision: 14, scale: 2 })
   amount!: number;
 
+  @Column({ name: 'is_advance', type: 'boolean', default: false })
+  isAdvance!: boolean;
+
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'NOW()' })
   createdAt!: Date;
 
