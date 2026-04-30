@@ -37,6 +37,9 @@ export class Mortality {
   @Column({ name: 'number_of_birds_died', type: 'integer' })
   numberOfBirdsDied!: number;
 
+  @Column({ name: 'weight_of_dead_birds', type: 'numeric', precision: 10, scale: 2, nullable: true })
+  weightOfDeadBirds?: number;
+
   @Column({ name: 'cause', type: 'text' })
   cause!: string;
 

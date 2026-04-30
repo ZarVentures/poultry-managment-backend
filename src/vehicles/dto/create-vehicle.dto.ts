@@ -39,6 +39,10 @@ export class CreateVehicleDto {
 
   @IsOptional()
   @IsString()
+  fuelType?: string;
+
+  @IsOptional()
+  @IsString()
   mileage?: string;
 
   @IsDateString()

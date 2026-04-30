@@ -29,6 +29,9 @@ export class Vehicle {
   @Column({ name: 'petrol_tank_capacity', type: 'numeric', precision: 10, scale: 2, nullable: true })
   petrolTankCapacity?: string | null;
 
+  @Column({ name: 'fuel_type', type: 'varchar', length: 20, nullable: true })
+  fuelType?: string;
+
   @Column({ name: 'mileage', type: 'numeric', precision: 10, scale: 2, nullable: true })
   mileage?: string | null;
 

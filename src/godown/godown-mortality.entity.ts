@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { GodownInwardEntry } from './godown-inward.entity';
 
 @Entity('godown_mortality')
 export class GodownMortality {
@@ -8,8 +9,18 @@ export class GodownMortality {
   @Column({ name: 'mortality_date', type: 'date' })
   mortalityDate!: string;
 
+  @Column({ name: 'godown_inward_id', type: 'bigint', nullable: true })
+  godownInwardId?: string;
+
+  @ManyToOne(() => GodownInwardEntry, { nullable: true })
+  @JoinColumn({ name: 'godown_inward_id' })
+  godownInward?: GodownInwardEntry;
+
   @Column({ name: 'number_of_birds_died', type: 'integer' })
   numberOfBirdsDied!: number;
+
+  @Column({ name: 'weight_of_dead_birds', type: 'numeric', precision: 10, scale: 2, nullable: true })
+  weightOfDeadBirds?: number;
 
   @Column({ type: 'text', nullable: true })
   reason?: string;

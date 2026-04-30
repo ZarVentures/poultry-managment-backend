@@ -143,6 +143,43 @@ export class UsersService {
     });
   }
 
+  async setTwoFactorSecret(id: string, secret: string | null): Promise<void> {
+    await this.usersRepository.update(id, { twoFactorSecret: secret });
+  }
+
+  async enableTwoFactor(id: string, backupCodes: string[]): Promise<void> {
+    // Store backup codes as JSON array of hashed codes
+    const hashedCodes = await Promise.all(backupCodes.map(c => bcrypt.hash(c, 10)));
+    await this.usersRepository.update(id, {
+      isTwoFactorEnabled: true,
+      twoFactorBackupCodes: JSON.stringify(hashedCodes),
+    });
+  }
+
+  async disableTwoFactor(id: string): Promise<void> {
+    await this.usersRepository.update(id, {
+      isTwoFactorEnabled: false,
+      twoFactorSecret: null,
+      twoFactorBackupCodes: null,
+    });
+  }
+
+  async consumeBackupCode(id: string, code: string): Promise<boolean> {
+    const user = await this.findOne(id);
+    if (!user.twoFactorBackupCodes) return false;
+    const hashed: string[] = JSON.parse(user.twoFactorBackupCodes);
+    for (let i = 0; i < hashed.length; i++) {
+      const match = await bcrypt.compare(code.replace(/-/g, ''), hashed[i]);
+      if (match) {
+        // Remove used code
+        hashed.splice(i, 1);
+        await this.usersRepository.update(id, { twoFactorBackupCodes: JSON.stringify(hashed) });
+        return true;
+      }
+    }
+    return false;
+  }
+
   async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
     await this.usersRepository.remove(user);
