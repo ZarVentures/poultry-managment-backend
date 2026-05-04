@@ -22,15 +22,26 @@ export class DashboardService {
     private readonly inventoryRepository: Repository<InventoryItem>,
   ) {}
 
-  async getDashboardKPIs(startDate?: string, endDate?: string) {
-    // Set default date range to current month if not provided
+  // UTC-safe date helpers
+  private currentMonthStart(): string {
     const now = new Date();
-    const defaultStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const defaultEndDate = now.toISOString().split('T')[0];
-    
+    return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`;
+  }
+  private today(): string {
+    return new Date().toISOString().split('T')[0];
+  }
+  private monthStart(year: number, month: number): string {
+    return `${year}-${String(month + 1).padStart(2, '0')}-01`;
+  }
+  private monthEnd(year: number, month: number): string {
+    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    return `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  }
+
+  async getDashboardKPIs(startDate?: string, endDate?: string) {
     const dateFilter = {
-      startDate: startDate || defaultStartDate,
-      endDate: endDate || defaultEndDate
+      startDate: startDate || this.currentMonthStart(),
+      endDate: endDate || this.today(),
     };
 
     // Total Revenue MTD (use netAmount — the actual amount after deductions)
@@ -75,14 +86,9 @@ export class DashboardService {
   }
 
   async getRevenueByProductType(startDate?: string, endDate?: string) {
-    // Set default date range to current month if not provided
-    const now = new Date();
-    const defaultStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const defaultEndDate = now.toISOString().split('T')[0];
-    
     const dateFilter = {
-      startDate: startDate || defaultStartDate,
-      endDate: endDate || defaultEndDate
+      startDate: startDate || this.currentMonthStart(),
+      endDate: endDate || this.today(),
     };
 
     const query = this.saleRepository.createQueryBuilder('sale')
@@ -96,14 +102,9 @@ export class DashboardService {
   }
 
   async getExpensesByCategory(startDate?: string, endDate?: string) {
-    // Set default date range to current month if not provided
-    const now = new Date();
-    const defaultStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const defaultEndDate = now.toISOString().split('T')[0];
-    
     const dateFilter = {
-      startDate: startDate || defaultStartDate,
-      endDate: endDate || defaultEndDate
+      startDate: startDate || this.currentMonthStart(),
+      endDate: endDate || this.today(),
     };
 
     const query = this.expenseRepository.createQueryBuilder('expense')
@@ -138,9 +139,11 @@ export class DashboardService {
     const now = new Date();
 
     for (let i = months - 1; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const startDate = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
-      const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+      const utcNow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+      const year = utcNow.getUTCFullYear();
+      const month = utcNow.getUTCMonth();
+      const startDate = this.monthStart(year, month);
+      const endDate = this.monthEnd(year, month);
 
       // Revenue for the month
       const revenueResult = await this.saleRepository.createQueryBuilder('sale')
@@ -155,7 +158,7 @@ export class DashboardService {
         .getRawOne();
 
       monthlyData.push({
-        month: date.toLocaleString('default', { month: 'short', year: 'numeric' }),
+        month: utcNow.toLocaleString('default', { month: 'short', year: 'numeric' }),
         revenue: parseFloat(revenueResult.total) || 0,
         expenses: parseFloat(expenseResult.total) || 0,
         profit: (parseFloat(revenueResult.total) || 0) - (parseFloat(expenseResult.total) || 0),
@@ -170,9 +173,11 @@ export class DashboardService {
     const now = new Date();
 
     for (let i = months - 1; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const startDate = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
-      const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+      const utcNow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+      const year = utcNow.getUTCFullYear();
+      const month = utcNow.getUTCMonth();
+      const startDate = this.monthStart(year, month);
+      const endDate = this.monthEnd(year, month);
 
       const revenueResult = await this.saleRepository.createQueryBuilder('sale')
         .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
@@ -189,7 +194,7 @@ export class DashboardService {
       const profit = revenue - expenses;
 
       monthlyData.push({
-        month: date.toLocaleString('default', { month: 'short', year: 'numeric' }),
+        month: utcNow.toLocaleString('default', { month: 'short', year: 'numeric' }),
         profit,
         profitMargin: revenue > 0 ? ((profit / revenue) * 100).toFixed(2) : 0,
       });
@@ -200,8 +205,9 @@ export class DashboardService {
 
   async getFinancialSummary(months: number = 6) {
     const now = new Date();
-    const startDate = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1).toISOString().split('T')[0];
-    const endDate = now.toISOString().split('T')[0];
+    const startUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
+    const startDate = this.monthStart(startUtc.getUTCFullYear(), startUtc.getUTCMonth());
+    const endDate = this.today();
 
     // Total Revenue
     const revenueResult = await this.saleRepository.createQueryBuilder('sale')
@@ -250,13 +256,9 @@ export class DashboardService {
   }
 
   async getSalesPerformanceByProduct(startDate?: string, endDate?: string) {
-    const now = new Date();
-    const defaultStartDate = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString().split('T')[0];
-    const defaultEndDate = now.toISOString().split('T')[0];
-    
     const dateFilter = {
-      startDate: startDate || defaultStartDate,
-      endDate: endDate || defaultEndDate
+      startDate: startDate || (() => { const now = new Date(); const s = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1)); return this.monthStart(s.getUTCFullYear(), s.getUTCMonth()); })(),
+      endDate: endDate || this.today(),
     };
 
     const query = this.saleRepository.createQueryBuilder('sale')
@@ -281,13 +283,9 @@ export class DashboardService {
   }
 
   async getTopExpenseCategories(limit: number = 5, startDate?: string, endDate?: string) {
-    const now = new Date();
-    const defaultStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const defaultEndDate = now.toISOString().split('T')[0];
-    
     const dateFilter = {
-      startDate: startDate || defaultStartDate,
-      endDate: endDate || defaultEndDate
+      startDate: startDate || this.currentMonthStart(),
+      endDate: endDate || this.today(),
     };
 
     const query = this.expenseRepository.createQueryBuilder('expense')
@@ -345,13 +343,9 @@ export class DashboardService {
   }
 
   async getPurchaseOrdersSummary(startDate?: string, endDate?: string) {
-    const now = new Date();
-    const defaultStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const defaultEndDate = now.toISOString().split('T')[0];
-    
     const dateFilter = {
-      startDate: startDate || defaultStartDate,
-      endDate: endDate || defaultEndDate
+      startDate: startDate || this.currentMonthStart(),
+      endDate: endDate || this.today(),
     };
 
     // Total orders
