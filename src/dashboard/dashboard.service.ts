@@ -22,35 +22,44 @@ export class DashboardService {
     private readonly inventoryRepository: Repository<InventoryItem>,
   ) {}
 
-  // UTC-safe date helpers
+  // IST-aware date helpers
+  // DB stores dates as plain dates (no timezone), so we need to work in IST
   private currentMonthStart(): string {
     const now = new Date();
-    return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`;
+    // Get IST date components
+    const istDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    return `${istDate.getFullYear()}-${String(istDate.getMonth() + 1).padStart(2, '0')}-01`;
   }
+  
   private today(): string {
-    return new Date().toISOString().split('T')[0];
+    const now = new Date();
+    // Get IST date
+    const istDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    return `${istDate.getFullYear()}-${String(istDate.getMonth() + 1).padStart(2, '0')}-${String(istDate.getDate()).padStart(2, '0')}`;
   }
+  
   private monthStart(year: number, month: number): string {
     return `${year}-${String(month + 1).padStart(2, '0')}-01`;
   }
+  
   private monthEnd(year: number, month: number): string {
-    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    const lastDay = new Date(year, month + 1, 0).getDate();
     return `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
   }
 
   async getDashboardKPIs(startDate?: string, endDate?: string) {
+    const start = startDate || this.currentMonthStart();
+    const end = endDate || this.today();
     const dateFilter = {
-      startDate: startDate || this.currentMonthStart(),
-      endDate: endDate || this.today(),
+      startDate: start,
+      endDate: end,
     };
 
     // Total Revenue MTD (use netAmount — the actual amount after deductions)
-    // Use AT TIME ZONE to convert stored UTC timestamps to IST before date comparison
     const revenueQuery = this.saleRepository.createQueryBuilder('sale')
       .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
       .addSelect('COUNT(*)', 'count')
-      .where("(sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date >= :startDate", dateFilter)
-      .andWhere("(sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date <= :endDate", dateFilter);
+      .where('sale.saleDate >= :startDate AND sale.saleDate <= :endDate', dateFilter);
     
     const revenueResult = await revenueQuery.getRawOne();
     const totalRevenue = parseFloat(revenueResult.total) || 0;
@@ -97,7 +106,7 @@ export class DashboardService {
       .select('sale.productType', 'productType')
       .addSelect('COALESCE(SUM(sale.netAmount), 0)', 'revenue')
       .addSelect('COUNT(*)', 'count')
-      .where("(sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date >= :startDate AND (sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date <= :endDate", dateFilter)
+      .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", dateFilter)
       .groupBy('sale.productType');
 
     return query.getRawMany();
@@ -139,18 +148,20 @@ export class DashboardService {
   async getMonthlyRevenueVsExpenses(months: number = 6) {
     const monthlyData = [];
     const now = new Date();
+    // Get IST date
+    const istDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
 
     for (let i = months - 1; i >= 0; i--) {
-      const utcNow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-      const year = utcNow.getUTCFullYear();
-      const month = utcNow.getUTCMonth();
+      const targetDate = new Date(istDate.getFullYear(), istDate.getMonth() - i, 1);
+      const year = targetDate.getFullYear();
+      const month = targetDate.getMonth();
       const startDate = this.monthStart(year, month);
       const endDate = this.monthEnd(year, month);
 
       // Revenue for the month
       const revenueResult = await this.saleRepository.createQueryBuilder('sale')
         .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
-        .where("(sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date >= :startDate AND (sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date <= :endDate", { startDate, endDate })
+        .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", { startDate, endDate })
         .getRawOne();
 
       // Expenses for the month
@@ -160,7 +171,7 @@ export class DashboardService {
         .getRawOne();
 
       monthlyData.push({
-        month: utcNow.toLocaleString('default', { month: 'short', year: 'numeric' }),
+        month: targetDate.toLocaleString('default', { month: 'short', year: 'numeric' }),
         revenue: parseFloat(revenueResult.total) || 0,
         expenses: parseFloat(expenseResult.total) || 0,
         profit: (parseFloat(revenueResult.total) || 0) - (parseFloat(expenseResult.total) || 0),
@@ -173,17 +184,19 @@ export class DashboardService {
   async getMonthlyProfitTrends(months: number = 6) {
     const monthlyData = [];
     const now = new Date();
+    // Get IST date
+    const istDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
 
     for (let i = months - 1; i >= 0; i--) {
-      const utcNow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-      const year = utcNow.getUTCFullYear();
-      const month = utcNow.getUTCMonth();
+      const targetDate = new Date(istDate.getFullYear(), istDate.getMonth() - i, 1);
+      const year = targetDate.getFullYear();
+      const month = targetDate.getMonth();
       const startDate = this.monthStart(year, month);
       const endDate = this.monthEnd(year, month);
 
       const revenueResult = await this.saleRepository.createQueryBuilder('sale')
         .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
-        .where("(sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date >= :startDate AND (sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date <= :endDate", { startDate, endDate })
+        .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", { startDate, endDate })
         .getRawOne();
 
       const expenseResult = await this.expenseRepository.createQueryBuilder('expense')
@@ -196,7 +209,7 @@ export class DashboardService {
       const profit = revenue - expenses;
 
       monthlyData.push({
-        month: utcNow.toLocaleString('default', { month: 'short', year: 'numeric' }),
+        month: targetDate.toLocaleString('default', { month: 'short', year: 'numeric' }),
         profit,
         profitMargin: revenue > 0 ? ((profit / revenue) * 100).toFixed(2) : 0,
       });
@@ -207,14 +220,16 @@ export class DashboardService {
 
   async getFinancialSummary(months: number = 6) {
     const now = new Date();
-    const startUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
-    const startDate = this.monthStart(startUtc.getUTCFullYear(), startUtc.getUTCMonth());
+    // Get IST date
+    const istDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const startUtc = new Date(istDate.getFullYear(), istDate.getMonth() - (months - 1), 1);
+    const startDate = this.monthStart(startUtc.getFullYear(), startUtc.getMonth());
     const endDate = this.today();
 
     // Total Revenue
     const revenueResult = await this.saleRepository.createQueryBuilder('sale')
       .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
-      .where("(sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date >= :startDate AND (sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date <= :endDate", { startDate, endDate })
+      .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", { startDate, endDate })
       .getRawOne();
     const totalRevenue = parseFloat(revenueResult.total) || 0;
 
@@ -259,7 +274,12 @@ export class DashboardService {
 
   async getSalesPerformanceByProduct(startDate?: string, endDate?: string) {
     const dateFilter = {
-      startDate: startDate || (() => { const now = new Date(); const s = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1)); return this.monthStart(s.getUTCFullYear(), s.getUTCMonth()); })(),
+      startDate: startDate || (() => { 
+        const now = new Date();
+        const istDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+        const s = new Date(istDate.getFullYear(), istDate.getMonth() - 5, 1); 
+        return this.monthStart(s.getFullYear(), s.getMonth()); 
+      })(),
       endDate: endDate || this.today(),
     };
 
@@ -269,7 +289,7 @@ export class DashboardService {
       .addSelect('COALESCE(SUM(sale.quantity), 0)', 'quantity')
       .addSelect('COUNT(*)', 'salesCount')
       .addSelect('COALESCE(AVG(sale.unitPrice), 0)', 'avgPrice')
-      .where("(sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date >= :startDate AND (sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date <= :endDate", dateFilter)
+      .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", dateFilter)
       .groupBy('sale.productType')
       .orderBy('revenue', 'DESC');
 
@@ -412,4 +432,5 @@ export class DashboardService {
     };
   }
 }
+
 
