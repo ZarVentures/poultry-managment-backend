@@ -156,7 +156,35 @@ export class SalesService {
       updatedAt: new Date(),
     });
 
-    await this.saleRepository.save(sale);
+    // Use update() instead of save() to avoid cascade FK issue with sale_payments
+    await this.saleRepository.update(id, {
+      invoiceNumber: sale.invoiceNumber,
+      saleNo: sale.saleNo,
+      purchaseBillNo: sale.purchaseBillNo,
+      cageNo: sale.cageNo,
+      customerName: sale.customerName,
+      saleDate: sale.saleDate,
+      saleMode: sale.saleMode,
+      productType: sale.productType,
+      quantity: sale.quantity,
+      unitPrice: sale.unitPrice,
+      totalAmount: sale.totalAmount,
+      transportCharges: sale.transportCharges,
+      loadingCharges: sale.loadingCharges,
+      commission: sale.commission,
+      otherCharges: sale.otherCharges,
+      weightShortage: sale.weightShortage,
+      mortalityDeduction: sale.mortalityDeduction,
+      otherDeduction: sale.otherDeduction,
+      grossAmount: sale.grossAmount,
+      netAmount: sale.netAmount,
+      unit: sale.unit,
+      paymentStatus: sale.paymentStatus,
+      amountReceived: sale.amountReceived,
+      notes: sale.notes,
+      retailerId: sale.retailerId,
+      updatedAt: sale.updatedAt,
+    });
     return this.findOne(id);
   }
 
