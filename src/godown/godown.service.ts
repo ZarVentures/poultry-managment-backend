@@ -81,7 +81,9 @@ export class GodownService {
   }
 
   async updateSale(id: string, data: any) {
-    await this.saleRepo.update(id, data);
+    // Filter out fields that don't exist in the entity
+    const { paymentMode, ...validData } = data;
+    await this.saleRepo.update(id, validData);
     return this.findOneSale(id);
   }
 
