@@ -45,10 +45,12 @@ export class DashboardService {
     };
 
     // Total Revenue MTD (use netAmount — the actual amount after deductions)
+    // Use AT TIME ZONE to convert stored UTC timestamps to IST before date comparison
     const revenueQuery = this.saleRepository.createQueryBuilder('sale')
       .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
       .addSelect('COUNT(*)', 'count')
-      .where("sale.saleDate::date >= :startDate AND sale.saleDate::date <= :endDate", dateFilter);
+      .where("(sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date >= :startDate", dateFilter)
+      .andWhere("(sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date <= :endDate", dateFilter);
     
     const revenueResult = await revenueQuery.getRawOne();
     const totalRevenue = parseFloat(revenueResult.total) || 0;
@@ -95,7 +97,7 @@ export class DashboardService {
       .select('sale.productType', 'productType')
       .addSelect('COALESCE(SUM(sale.netAmount), 0)', 'revenue')
       .addSelect('COUNT(*)', 'count')
-      .where('sale.saleDate::date >= :startDate AND sale.saleDate::date <= :endDate', dateFilter)
+      .where("(sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date >= :startDate AND (sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date <= :endDate", dateFilter)
       .groupBy('sale.productType');
 
     return query.getRawMany();
@@ -148,7 +150,7 @@ export class DashboardService {
       // Revenue for the month
       const revenueResult = await this.saleRepository.createQueryBuilder('sale')
         .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
-        .where('sale.saleDate::date >= :startDate AND sale.saleDate::date <= :endDate', { startDate, endDate })
+        .where("(sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date >= :startDate AND (sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date <= :endDate", { startDate, endDate })
         .getRawOne();
 
       // Expenses for the month
@@ -181,7 +183,7 @@ export class DashboardService {
 
       const revenueResult = await this.saleRepository.createQueryBuilder('sale')
         .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
-        .where('sale.saleDate::date >= :startDate AND sale.saleDate::date <= :endDate', { startDate, endDate })
+        .where("(sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date >= :startDate AND (sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date <= :endDate", { startDate, endDate })
         .getRawOne();
 
       const expenseResult = await this.expenseRepository.createQueryBuilder('expense')
@@ -212,7 +214,7 @@ export class DashboardService {
     // Total Revenue
     const revenueResult = await this.saleRepository.createQueryBuilder('sale')
       .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
-      .where('sale.saleDate::date >= :startDate AND sale.saleDate::date <= :endDate', { startDate, endDate })
+      .where("(sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date >= :startDate AND (sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date <= :endDate", { startDate, endDate })
       .getRawOne();
     const totalRevenue = parseFloat(revenueResult.total) || 0;
 
@@ -267,7 +269,7 @@ export class DashboardService {
       .addSelect('COALESCE(SUM(sale.quantity), 0)', 'quantity')
       .addSelect('COUNT(*)', 'salesCount')
       .addSelect('COALESCE(AVG(sale.unitPrice), 0)', 'avgPrice')
-      .where('sale.saleDate::date >= :startDate AND sale.saleDate::date <= :endDate', dateFilter)
+      .where("(sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date >= :startDate AND (sale.saleDate AT TIME ZONE 'Asia/Kolkata')::date <= :endDate", dateFilter)
       .groupBy('sale.productType')
       .orderBy('revenue', 'DESC');
 
@@ -410,3 +412,4 @@ export class DashboardService {
     };
   }
 }
+
