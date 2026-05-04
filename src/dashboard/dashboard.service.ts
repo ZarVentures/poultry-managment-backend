@@ -87,7 +87,7 @@ export class DashboardService {
 
     const query = this.saleRepository.createQueryBuilder('sale')
       .select('sale.productType', 'productType')
-      .addSelect('COALESCE(SUM(sale.totalAmount), 0)', 'revenue')
+      .addSelect('COALESCE(SUM(sale.netAmount), 0)', 'revenue')
       .addSelect('COUNT(*)', 'count')
       .where('sale.saleDate >= :startDate AND sale.saleDate <= :endDate', dateFilter)
       .groupBy('sale.productType');
@@ -144,7 +144,7 @@ export class DashboardService {
 
       // Revenue for the month
       const revenueResult = await this.saleRepository.createQueryBuilder('sale')
-        .select('COALESCE(SUM(sale.totalAmount), 0)', 'total')
+        .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
         .where('sale.saleDate >= :startDate AND sale.saleDate <= :endDate', { startDate, endDate })
         .getRawOne();
 
@@ -175,7 +175,7 @@ export class DashboardService {
       const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
 
       const revenueResult = await this.saleRepository.createQueryBuilder('sale')
-        .select('COALESCE(SUM(sale.totalAmount), 0)', 'total')
+        .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
         .where('sale.saleDate >= :startDate AND sale.saleDate <= :endDate', { startDate, endDate })
         .getRawOne();
 
@@ -205,7 +205,7 @@ export class DashboardService {
 
     // Total Revenue
     const revenueResult = await this.saleRepository.createQueryBuilder('sale')
-      .select('COALESCE(SUM(sale.totalAmount), 0)', 'total')
+      .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
       .where('sale.saleDate >= :startDate AND sale.saleDate <= :endDate', { startDate, endDate })
       .getRawOne();
     const totalRevenue = parseFloat(revenueResult.total) || 0;
@@ -261,7 +261,7 @@ export class DashboardService {
 
     const query = this.saleRepository.createQueryBuilder('sale')
       .select('sale.productType', 'productType')
-      .addSelect('COALESCE(SUM(sale.totalAmount), 0)', 'revenue')
+      .addSelect('COALESCE(SUM(sale.netAmount), 0)', 'revenue')
       .addSelect('COALESCE(SUM(sale.quantity), 0)', 'quantity')
       .addSelect('COUNT(*)', 'salesCount')
       .addSelect('COALESCE(AVG(sale.unitPrice), 0)', 'avgPrice')
@@ -370,7 +370,7 @@ export class DashboardService {
     // Total value
     const valueResult = await this.purchaseRepository
       .createQueryBuilder('po')
-      .select('COALESCE(SUM(po.totalAmount), 0)', 'total')
+      .select('COALESCE(SUM(po.netAmount), 0)', 'total')
       .where('po.orderDate >= :startDate AND po.orderDate <= :endDate', dateFilter)
       .getRawOne();
     const totalValue = parseFloat(valueResult.total) || 0;
