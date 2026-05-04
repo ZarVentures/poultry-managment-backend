@@ -33,9 +33,10 @@ export class DashboardService {
       endDate: endDate || defaultEndDate
     };
 
-    // Total Revenue MTD
+    // Total Revenue MTD (use netAmount — the actual amount after deductions)
     const revenueQuery = this.saleRepository.createQueryBuilder('sale')
-      .select('COALESCE(SUM(sale.totalAmount), 0)', 'total')
+      .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
+      .addSelect('COUNT(*)', 'count')
       .where('sale.saleDate >= :startDate AND sale.saleDate <= :endDate', dateFilter);
     
     const revenueResult = await revenueQuery.getRawOne();
@@ -57,13 +58,8 @@ export class DashboardService {
       where: { status: 'active' }
     });
 
-    // Total Sales Count MTD
-    const salesCountQuery = this.saleRepository.createQueryBuilder('sale')
-      .select('COUNT(*)', 'count')
-      .where('sale.saleDate >= :startDate AND sale.saleDate <= :endDate', dateFilter);
-    
-    const salesCountResult = await salesCountQuery.getRawOne();
-    const totalSales = parseInt(salesCountResult.count) || 0;
+    // Total Sales Count MTD — already fetched above
+    const totalSales = parseInt(revenueResult.count) || 0;
 
     return {
       totalRevenue,
