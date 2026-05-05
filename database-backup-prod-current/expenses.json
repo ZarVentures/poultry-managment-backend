@@ -1,0 +1,26 @@
+[
+  {
+    "id": "1",
+    "expense_date": "2026-03-28T18:30:00.000Z",
+    "expense_owner": "Test",
+    "category": "medicine",
+    "description": "Test",
+    "amount": "23323.00",
+    "payment_method": "cash",
+    "notes": "Test",
+    "created_at": "2026-03-29T07:30:10.901Z",
+    "updated_at": "2026-03-29T07:30:10.901Z"
+  },
+  {
+    "id": "2",
+    "expense_date": "2026-04-05T18:30:00.000Z",
+    "expense_owner": "Test",
+    "category": "labor",
+    "description": "Test",
+    "amount": "1000.00",
+    "payment_method": "cash",
+    "notes": "",
+    "created_at": "2026-04-06T17:07:22.178Z",
+    "updated_at": "2026-04-09T10:09:02.030Z"
+  }
+]

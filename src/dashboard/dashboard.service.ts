@@ -6,7 +6,6 @@ import { Expense } from '../expenses/expense.entity';
 import { Vehicle } from '../vehicles/vehicle.entity';
 import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { InventoryItem } from '../inventory/entities/inventory-item.entity';
-import { getTodayIST, getCurrentMonthStartIST, getMonthStart, getMonthEnd, getMonthsAgoIST } from '../common/date-utils';
 
 @Injectable()
 export class DashboardService {
@@ -23,10 +22,37 @@ export class DashboardService {
     private readonly inventoryRepository: Repository<InventoryItem>,
   ) {}
 
+  // IST-aware date helpers
+  // DB stores dates as plain dates (no timezone), so we need to work in IST
+  private currentMonthStart(): string {
+    const now = new Date();
+    // Get IST date components
+    const istDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    return `${istDate.getFullYear()}-${String(istDate.getMonth() + 1).padStart(2, '0')}-01`;
+  }
+  
+  private today(): string {
+    const now = new Date();
+    // Get IST date
+    const istDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    return `${istDate.getFullYear()}-${String(istDate.getMonth() + 1).padStart(2, '0')}-${String(istDate.getDate()).padStart(2, '0')}`;
+  }
+  
+  private monthStart(year: number, month: number): string {
+    return `${year}-${String(month + 1).padStart(2, '0')}-01`;
+  }
+  
+  private monthEnd(year: number, month: number): string {
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    return `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  }
+
   async getDashboardKPIs(startDate?: string, endDate?: string) {
+    const start = startDate || this.currentMonthStart();
+    const end = endDate || this.today();
     const dateFilter = {
-      startDate: startDate || getCurrentMonthStartIST(),
-      endDate: endDate || getTodayIST(),
+      startDate: start,
+      endDate: end,
     };
 
     // Total Revenue MTD (use netAmount — the actual amount after deductions)
@@ -72,15 +98,15 @@ export class DashboardService {
 
   async getRevenueByProductType(startDate?: string, endDate?: string) {
     const dateFilter = {
-      startDate: startDate || getCurrentMonthStartIST(),
-      endDate: endDate || getTodayIST(),
+      startDate: startDate || this.currentMonthStart(),
+      endDate: endDate || this.today(),
     };
 
     const query = this.saleRepository.createQueryBuilder('sale')
       .select('sale.productType', 'productType')
       .addSelect('COALESCE(SUM(sale.netAmount), 0)', 'revenue')
       .addSelect('COUNT(*)', 'count')
-      .where('sale.saleDate >= :startDate AND sale.saleDate <= :endDate', dateFilter)
+      .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", dateFilter)
       .groupBy('sale.productType');
 
     return query.getRawMany();
@@ -88,8 +114,8 @@ export class DashboardService {
 
   async getExpensesByCategory(startDate?: string, endDate?: string) {
     const dateFilter = {
-      startDate: startDate || getCurrentMonthStartIST(),
-      endDate: endDate || getTodayIST(),
+      startDate: startDate || this.currentMonthStart(),
+      endDate: endDate || this.today(),
     };
 
     const query = this.expenseRepository.createQueryBuilder('expense')
@@ -122,19 +148,20 @@ export class DashboardService {
   async getMonthlyRevenueVsExpenses(months: number = 6) {
     const monthlyData = [];
     const now = new Date();
+    // Get IST date
     const istDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
 
     for (let i = months - 1; i >= 0; i--) {
       const targetDate = new Date(istDate.getFullYear(), istDate.getMonth() - i, 1);
       const year = targetDate.getFullYear();
       const month = targetDate.getMonth();
-      const startDate = getMonthStart(year, month);
-      const endDate = getMonthEnd(year, month);
+      const startDate = this.monthStart(year, month);
+      const endDate = this.monthEnd(year, month);
 
       // Revenue for the month
       const revenueResult = await this.saleRepository.createQueryBuilder('sale')
         .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
-        .where('sale.saleDate >= :startDate AND sale.saleDate <= :endDate', { startDate, endDate })
+        .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", { startDate, endDate })
         .getRawOne();
 
       // Expenses for the month
@@ -157,18 +184,19 @@ export class DashboardService {
   async getMonthlyProfitTrends(months: number = 6) {
     const monthlyData = [];
     const now = new Date();
+    // Get IST date
     const istDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
 
     for (let i = months - 1; i >= 0; i--) {
       const targetDate = new Date(istDate.getFullYear(), istDate.getMonth() - i, 1);
       const year = targetDate.getFullYear();
       const month = targetDate.getMonth();
-      const startDate = getMonthStart(year, month);
-      const endDate = getMonthEnd(year, month);
+      const startDate = this.monthStart(year, month);
+      const endDate = this.monthEnd(year, month);
 
       const revenueResult = await this.saleRepository.createQueryBuilder('sale')
         .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
-        .where('sale.saleDate >= :startDate AND sale.saleDate <= :endDate', { startDate, endDate })
+        .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", { startDate, endDate })
         .getRawOne();
 
       const expenseResult = await this.expenseRepository.createQueryBuilder('expense')
@@ -192,15 +220,16 @@ export class DashboardService {
 
   async getFinancialSummary(months: number = 6) {
     const now = new Date();
+    // Get IST date
     const istDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     const startUtc = new Date(istDate.getFullYear(), istDate.getMonth() - (months - 1), 1);
-    const startDate = getMonthStart(startUtc.getFullYear(), startUtc.getMonth());
-    const endDate = getTodayIST();
+    const startDate = this.monthStart(startUtc.getFullYear(), startUtc.getMonth());
+    const endDate = this.today();
 
     // Total Revenue
     const revenueResult = await this.saleRepository.createQueryBuilder('sale')
       .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
-      .where('sale.saleDate >= :startDate AND sale.saleDate <= :endDate', { startDate, endDate })
+      .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", { startDate, endDate })
       .getRawOne();
     const totalRevenue = parseFloat(revenueResult.total) || 0;
 
@@ -245,8 +274,13 @@ export class DashboardService {
 
   async getSalesPerformanceByProduct(startDate?: string, endDate?: string) {
     const dateFilter = {
-      startDate: startDate || getMonthsAgoIST(5),
-      endDate: endDate || getTodayIST(),
+      startDate: startDate || (() => { 
+        const now = new Date();
+        const istDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+        const s = new Date(istDate.getFullYear(), istDate.getMonth() - 5, 1); 
+        return this.monthStart(s.getFullYear(), s.getMonth()); 
+      })(),
+      endDate: endDate || this.today(),
     };
 
     const query = this.saleRepository.createQueryBuilder('sale')
@@ -255,7 +289,7 @@ export class DashboardService {
       .addSelect('COALESCE(SUM(sale.quantity), 0)', 'quantity')
       .addSelect('COUNT(*)', 'salesCount')
       .addSelect('COALESCE(AVG(sale.unitPrice), 0)', 'avgPrice')
-      .where('sale.saleDate >= :startDate AND sale.saleDate <= :endDate', dateFilter)
+      .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", dateFilter)
       .groupBy('sale.productType')
       .orderBy('revenue', 'DESC');
 
@@ -272,8 +306,8 @@ export class DashboardService {
 
   async getTopExpenseCategories(limit: number = 5, startDate?: string, endDate?: string) {
     const dateFilter = {
-      startDate: startDate || getCurrentMonthStartIST(),
-      endDate: endDate || getTodayIST(),
+      startDate: startDate || this.currentMonthStart(),
+      endDate: endDate || this.today(),
     };
 
     const query = this.expenseRepository.createQueryBuilder('expense')
@@ -332,8 +366,8 @@ export class DashboardService {
 
   async getPurchaseOrdersSummary(startDate?: string, endDate?: string) {
     const dateFilter = {
-      startDate: startDate || getCurrentMonthStartIST(),
-      endDate: endDate || getTodayIST(),
+      startDate: startDate || this.currentMonthStart(),
+      endDate: endDate || this.today(),
     };
 
     // Total orders
@@ -398,3 +432,5 @@ export class DashboardService {
     };
   }
 }
+
+

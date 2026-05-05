@@ -1,0 +1,3755 @@
+[
+  {
+    "id": "4",
+    "purchase_order_id": "2",
+    "cage_id": "C1",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.35",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "5",
+    "purchase_order_id": "2",
+    "cage_id": "C2",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "36.90",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "6",
+    "purchase_order_id": "2",
+    "cage_id": "C3",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.65",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "7",
+    "purchase_order_id": "2",
+    "cage_id": "C4",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "34.50",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "8",
+    "purchase_order_id": "2",
+    "cage_id": "C5",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "35.50",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "9",
+    "purchase_order_id": "2",
+    "cage_id": "C6",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "36.60",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "10",
+    "purchase_order_id": "2",
+    "cage_id": "C7",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "34.65",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "11",
+    "purchase_order_id": "2",
+    "cage_id": "C8",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.95",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "12",
+    "purchase_order_id": "2",
+    "cage_id": "C9",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "36.45",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "13",
+    "purchase_order_id": "2",
+    "cage_id": "C10",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "33.55",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "14",
+    "purchase_order_id": "2",
+    "cage_id": "C11",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "36.45",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "15",
+    "purchase_order_id": "2",
+    "cage_id": "C12",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "35.15",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "16",
+    "purchase_order_id": "2",
+    "cage_id": "C13",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.35",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "17",
+    "purchase_order_id": "2",
+    "cage_id": "C14",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "35.60",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "18",
+    "purchase_order_id": "2",
+    "cage_id": "C15",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "36.25",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "19",
+    "purchase_order_id": "2",
+    "cage_id": "C16",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "34.30",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "20",
+    "purchase_order_id": "2",
+    "cage_id": "C17",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "26.10",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "21",
+    "purchase_order_id": "2",
+    "cage_id": "C18",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "33.60",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "22",
+    "purchase_order_id": "2",
+    "cage_id": "C19",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "36.50",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "23",
+    "purchase_order_id": "2",
+    "cage_id": "C20",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "33.78",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "24",
+    "purchase_order_id": "2",
+    "cage_id": "C21",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "26.00",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "25",
+    "purchase_order_id": "2",
+    "cage_id": "C22",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "29.70",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "26",
+    "purchase_order_id": "2",
+    "cage_id": "C23",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "30.95",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "27",
+    "purchase_order_id": "2",
+    "cage_id": "C24",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "33.05",
+    "created_at": "2026-03-29T18:21:58.371Z"
+  },
+  {
+    "id": "28",
+    "purchase_order_id": "3",
+    "cage_id": "C1",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "36.00",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "29",
+    "purchase_order_id": "3",
+    "cage_id": "C2",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "35.70",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "30",
+    "purchase_order_id": "3",
+    "cage_id": "C3",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "33.70",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "31",
+    "purchase_order_id": "3",
+    "cage_id": "C4",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "35.30",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "32",
+    "purchase_order_id": "3",
+    "cage_id": "C5",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "34.90",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "33",
+    "purchase_order_id": "3",
+    "cage_id": "C6",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "35.30",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "34",
+    "purchase_order_id": "3",
+    "cage_id": "C7",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "35.70",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "35",
+    "purchase_order_id": "3",
+    "cage_id": "C8",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "34.70",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "36",
+    "purchase_order_id": "3",
+    "cage_id": "C9",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "36.30",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "37",
+    "purchase_order_id": "3",
+    "cage_id": "C10",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "34.00",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "38",
+    "purchase_order_id": "3",
+    "cage_id": "C11",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "36.60",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "39",
+    "purchase_order_id": "3",
+    "cage_id": "C12",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "34.00",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "40",
+    "purchase_order_id": "3",
+    "cage_id": "C13",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "35.50",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "41",
+    "purchase_order_id": "3",
+    "cage_id": "C14",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "35.40",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "42",
+    "purchase_order_id": "3",
+    "cage_id": "C15",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "34.40",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "43",
+    "purchase_order_id": "3",
+    "cage_id": "C16",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "34.20",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "44",
+    "purchase_order_id": "3",
+    "cage_id": "C17",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "34.30",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "45",
+    "purchase_order_id": "3",
+    "cage_id": "C18",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "34.80",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "46",
+    "purchase_order_id": "3",
+    "cage_id": "C19",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "33.70",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "47",
+    "purchase_order_id": "3",
+    "cage_id": "C20",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "35.80",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "48",
+    "purchase_order_id": "3",
+    "cage_id": "C21",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "36.00",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "49",
+    "purchase_order_id": "3",
+    "cage_id": "C22",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "34.10",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "50",
+    "purchase_order_id": "3",
+    "cage_id": "C23",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "34.20",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "51",
+    "purchase_order_id": "3",
+    "cage_id": "C24",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "34.10",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "52",
+    "purchase_order_id": "3",
+    "cage_id": "C25",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "35.40",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "53",
+    "purchase_order_id": "3",
+    "cage_id": "C26",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "36.40",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "54",
+    "purchase_order_id": "3",
+    "cage_id": "C27",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "34.80",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "55",
+    "purchase_order_id": "3",
+    "cage_id": "C28",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "33.10",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "56",
+    "purchase_order_id": "3",
+    "cage_id": "C29",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "31.10",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "57",
+    "purchase_order_id": "3",
+    "cage_id": "C30",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "29.50",
+    "created_at": "2026-03-29T18:24:03.832Z"
+  },
+  {
+    "id": "58",
+    "purchase_order_id": "4",
+    "cage_id": "C1",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "38.00",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "59",
+    "purchase_order_id": "4",
+    "cage_id": "C2",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "38.20",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "60",
+    "purchase_order_id": "4",
+    "cage_id": "C3",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.90",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "61",
+    "purchase_order_id": "4",
+    "cage_id": "C4",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "36.00",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "62",
+    "purchase_order_id": "4",
+    "cage_id": "C5",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "36.30",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "63",
+    "purchase_order_id": "4",
+    "cage_id": "C6",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "36.80",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "64",
+    "purchase_order_id": "4",
+    "cage_id": "C7",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "40.10",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "65",
+    "purchase_order_id": "4",
+    "cage_id": "C8",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.30",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "66",
+    "purchase_order_id": "4",
+    "cage_id": "C9",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "34.60",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "67",
+    "purchase_order_id": "4",
+    "cage_id": "C10",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "36.80",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "68",
+    "purchase_order_id": "4",
+    "cage_id": "C11",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.00",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "69",
+    "purchase_order_id": "4",
+    "cage_id": "C12",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "38.60",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "70",
+    "purchase_order_id": "4",
+    "cage_id": "C13",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "36.10",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "71",
+    "purchase_order_id": "4",
+    "cage_id": "C14",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "38.20",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "72",
+    "purchase_order_id": "4",
+    "cage_id": "C15",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "38.80",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "73",
+    "purchase_order_id": "4",
+    "cage_id": "C16",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "35.30",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "74",
+    "purchase_order_id": "4",
+    "cage_id": "C17",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "38.20",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "75",
+    "purchase_order_id": "4",
+    "cage_id": "C18",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "39.10",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "76",
+    "purchase_order_id": "4",
+    "cage_id": "C19",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.90",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "77",
+    "purchase_order_id": "4",
+    "cage_id": "C20",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.60",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "78",
+    "purchase_order_id": "4",
+    "cage_id": "C21",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.50",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "79",
+    "purchase_order_id": "4",
+    "cage_id": "C22",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "38.80",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "80",
+    "purchase_order_id": "4",
+    "cage_id": "C23",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.50",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "81",
+    "purchase_order_id": "4",
+    "cage_id": "C24",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.00",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "82",
+    "purchase_order_id": "4",
+    "cage_id": "C25",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "38.10",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "83",
+    "purchase_order_id": "4",
+    "cage_id": "C26",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "35.00",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "84",
+    "purchase_order_id": "4",
+    "cage_id": "C27",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "36.90",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "85",
+    "purchase_order_id": "4",
+    "cage_id": "C28",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "39.00",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "86",
+    "purchase_order_id": "4",
+    "cage_id": "C29",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "38.80",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "87",
+    "purchase_order_id": "4",
+    "cage_id": "C30",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.30",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "88",
+    "purchase_order_id": "4",
+    "cage_id": "C31",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.00",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "89",
+    "purchase_order_id": "4",
+    "cage_id": "C32",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "35.70",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "90",
+    "purchase_order_id": "4",
+    "cage_id": "C33",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.70",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "91",
+    "purchase_order_id": "4",
+    "cage_id": "C34",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "38.30",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "92",
+    "purchase_order_id": "4",
+    "cage_id": "C35",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "38.10",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "93",
+    "purchase_order_id": "4",
+    "cage_id": "C36",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.10",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "94",
+    "purchase_order_id": "4",
+    "cage_id": "C37",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.20",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "95",
+    "purchase_order_id": "4",
+    "cage_id": "C38",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "36.40",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "96",
+    "purchase_order_id": "4",
+    "cage_id": "C39",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "39.30",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "97",
+    "purchase_order_id": "4",
+    "cage_id": "C40",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "41.90",
+    "created_at": "2026-03-29T18:26:34.132Z"
+  },
+  {
+    "id": "98",
+    "purchase_order_id": "5",
+    "cage_id": "C1",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "39.80",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "99",
+    "purchase_order_id": "5",
+    "cage_id": "C2",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "40.20",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "100",
+    "purchase_order_id": "5",
+    "cage_id": "C3",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "40.00",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "101",
+    "purchase_order_id": "5",
+    "cage_id": "C4",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "40.60",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "102",
+    "purchase_order_id": "5",
+    "cage_id": "C5",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "41.00",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "103",
+    "purchase_order_id": "5",
+    "cage_id": "C6",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "40.70",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "104",
+    "purchase_order_id": "5",
+    "cage_id": "C7",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "38.60",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "105",
+    "purchase_order_id": "5",
+    "cage_id": "C8",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "40.60",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "106",
+    "purchase_order_id": "5",
+    "cage_id": "C9",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "42.10",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "107",
+    "purchase_order_id": "5",
+    "cage_id": "C10",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "39.60",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "108",
+    "purchase_order_id": "5",
+    "cage_id": "C11",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "40.30",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "109",
+    "purchase_order_id": "5",
+    "cage_id": "C12",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "39.70",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "110",
+    "purchase_order_id": "5",
+    "cage_id": "C13",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "40.30",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "111",
+    "purchase_order_id": "5",
+    "cage_id": "C14",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "44.20",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "112",
+    "purchase_order_id": "5",
+    "cage_id": "C15",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "41.30",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "113",
+    "purchase_order_id": "5",
+    "cage_id": "C16",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "41.20",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "114",
+    "purchase_order_id": "5",
+    "cage_id": "C17",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "40.60",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "115",
+    "purchase_order_id": "5",
+    "cage_id": "C18",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "39.90",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "116",
+    "purchase_order_id": "5",
+    "cage_id": "C19",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "39.90",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "117",
+    "purchase_order_id": "5",
+    "cage_id": "C20",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "40.80",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "118",
+    "purchase_order_id": "5",
+    "cage_id": "C21",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "38.70",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "119",
+    "purchase_order_id": "5",
+    "cage_id": "C22",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "38.80",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "120",
+    "purchase_order_id": "5",
+    "cage_id": "C23",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "40.80",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "121",
+    "purchase_order_id": "5",
+    "cage_id": "C24",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "38.20",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "122",
+    "purchase_order_id": "5",
+    "cage_id": "C25",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "40.60",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "123",
+    "purchase_order_id": "5",
+    "cage_id": "C26",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "39.90",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "124",
+    "purchase_order_id": "5",
+    "cage_id": "C27",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "41.10",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "125",
+    "purchase_order_id": "5",
+    "cage_id": "C28",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "39.70",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "126",
+    "purchase_order_id": "5",
+    "cage_id": "C29",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "39.10",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "127",
+    "purchase_order_id": "5",
+    "cage_id": "C30",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "38.30",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "128",
+    "purchase_order_id": "5",
+    "cage_id": "C31",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "40.00",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "129",
+    "purchase_order_id": "5",
+    "cage_id": "C32",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "40.90",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "130",
+    "purchase_order_id": "5",
+    "cage_id": "C33",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "40.60",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "131",
+    "purchase_order_id": "5",
+    "cage_id": "C34",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "38.60",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "132",
+    "purchase_order_id": "5",
+    "cage_id": "C35",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "38.70",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "133",
+    "purchase_order_id": "5",
+    "cage_id": "C36",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "39.50",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "134",
+    "purchase_order_id": "5",
+    "cage_id": "C37",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "38.40",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "135",
+    "purchase_order_id": "5",
+    "cage_id": "C38",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "39.30",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "136",
+    "purchase_order_id": "5",
+    "cage_id": "C39",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "38.70",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "137",
+    "purchase_order_id": "5",
+    "cage_id": "C40",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "38.20",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "138",
+    "purchase_order_id": "5",
+    "cage_id": "C41",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "38.10",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "139",
+    "purchase_order_id": "5",
+    "cage_id": "C42",
+    "bird_type": "broiler",
+    "number_of_birds": 18,
+    "cage_weight": "35.50",
+    "created_at": "2026-03-29T18:58:06.406Z"
+  },
+  {
+    "id": "140",
+    "purchase_order_id": "6",
+    "cage_id": "C1",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "42.60",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "141",
+    "purchase_order_id": "6",
+    "cage_id": "C2",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "42.90",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "142",
+    "purchase_order_id": "6",
+    "cage_id": "C3",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "41.70",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "143",
+    "purchase_order_id": "6",
+    "cage_id": "C4",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "39.10",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "144",
+    "purchase_order_id": "6",
+    "cage_id": "C5",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "39.80",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "145",
+    "purchase_order_id": "6",
+    "cage_id": "C6",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "39.60",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "146",
+    "purchase_order_id": "6",
+    "cage_id": "C7",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "41.00",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "147",
+    "purchase_order_id": "6",
+    "cage_id": "C8",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "41.70",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "148",
+    "purchase_order_id": "6",
+    "cage_id": "C9",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "41.40",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "149",
+    "purchase_order_id": "6",
+    "cage_id": "C10",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "42.80",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "150",
+    "purchase_order_id": "6",
+    "cage_id": "C11",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "43.00",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "151",
+    "purchase_order_id": "6",
+    "cage_id": "C12",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "41.70",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "152",
+    "purchase_order_id": "6",
+    "cage_id": "C13",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "40.20",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "153",
+    "purchase_order_id": "6",
+    "cage_id": "C14",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "43.90",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "154",
+    "purchase_order_id": "6",
+    "cage_id": "C15",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "40.20",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "155",
+    "purchase_order_id": "6",
+    "cage_id": "C16",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "43.50",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "156",
+    "purchase_order_id": "6",
+    "cage_id": "C17",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "41.50",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "157",
+    "purchase_order_id": "6",
+    "cage_id": "C18",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "43.60",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "158",
+    "purchase_order_id": "6",
+    "cage_id": "C19",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "45.30",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "159",
+    "purchase_order_id": "6",
+    "cage_id": "C20",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "42.40",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "160",
+    "purchase_order_id": "6",
+    "cage_id": "C21",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "42.70",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "161",
+    "purchase_order_id": "6",
+    "cage_id": "C22",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "43.30",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "162",
+    "purchase_order_id": "6",
+    "cage_id": "C23",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "43.40",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "163",
+    "purchase_order_id": "6",
+    "cage_id": "C24",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "42.20",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "164",
+    "purchase_order_id": "6",
+    "cage_id": "C25",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "40.60",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "165",
+    "purchase_order_id": "6",
+    "cage_id": "C26",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "44.30",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "166",
+    "purchase_order_id": "6",
+    "cage_id": "C27",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "41.50",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "167",
+    "purchase_order_id": "6",
+    "cage_id": "C28",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "43.90",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "168",
+    "purchase_order_id": "6",
+    "cage_id": "C29",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "44.40",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "169",
+    "purchase_order_id": "6",
+    "cage_id": "C30",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "44.40",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "170",
+    "purchase_order_id": "6",
+    "cage_id": "C31",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "41.00",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "171",
+    "purchase_order_id": "6",
+    "cage_id": "C32",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "43.30",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "172",
+    "purchase_order_id": "6",
+    "cage_id": "C33",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "41.90",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "173",
+    "purchase_order_id": "6",
+    "cage_id": "C34",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "42.90",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "174",
+    "purchase_order_id": "6",
+    "cage_id": "C35",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "40.10",
+    "created_at": "2026-03-29T19:00:06.748Z"
+  },
+  {
+    "id": "257",
+    "purchase_order_id": "9",
+    "cage_id": "C1",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "33.70",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "258",
+    "purchase_order_id": "9",
+    "cage_id": "C2",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "33.60",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "259",
+    "purchase_order_id": "9",
+    "cage_id": "C3",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "35.40",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "260",
+    "purchase_order_id": "9",
+    "cage_id": "C4",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "33.10",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "261",
+    "purchase_order_id": "9",
+    "cage_id": "C5",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "34.30",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "262",
+    "purchase_order_id": "9",
+    "cage_id": "C6",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "36.20",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "263",
+    "purchase_order_id": "9",
+    "cage_id": "C7",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "33.90",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "264",
+    "purchase_order_id": "9",
+    "cage_id": "C8",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "35.20",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "265",
+    "purchase_order_id": "9",
+    "cage_id": "C9",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "36.60",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "266",
+    "purchase_order_id": "9",
+    "cage_id": "C10",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "35.60",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "267",
+    "purchase_order_id": "9",
+    "cage_id": "C11",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "35.20",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "268",
+    "purchase_order_id": "9",
+    "cage_id": "C12",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "34.20",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "269",
+    "purchase_order_id": "9",
+    "cage_id": "C13",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "35.00",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "270",
+    "purchase_order_id": "9",
+    "cage_id": "C14",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "35.10",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "271",
+    "purchase_order_id": "9",
+    "cage_id": "C15",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "36.70",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "272",
+    "purchase_order_id": "9",
+    "cage_id": "C16",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "34.60",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "273",
+    "purchase_order_id": "9",
+    "cage_id": "C17",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "37.40",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "274",
+    "purchase_order_id": "9",
+    "cage_id": "C18",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "37.70",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "275",
+    "purchase_order_id": "9",
+    "cage_id": "C19",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "36.20",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "276",
+    "purchase_order_id": "9",
+    "cage_id": "C20",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "36.20",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "277",
+    "purchase_order_id": "9",
+    "cage_id": "C21",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "36.90",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "278",
+    "purchase_order_id": "9",
+    "cage_id": "C22",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "35.50",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "279",
+    "purchase_order_id": "9",
+    "cage_id": "C23",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "36.10",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "280",
+    "purchase_order_id": "9",
+    "cage_id": "C24",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "37.20",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "281",
+    "purchase_order_id": "9",
+    "cage_id": "C25",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "36.10",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "282",
+    "purchase_order_id": "9",
+    "cage_id": "C26",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "35.50",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "283",
+    "purchase_order_id": "9",
+    "cage_id": "C27",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "35.10",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "284",
+    "purchase_order_id": "9",
+    "cage_id": "C28",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "34.80",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "285",
+    "purchase_order_id": "9",
+    "cage_id": "C29",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "36.20",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "286",
+    "purchase_order_id": "9",
+    "cage_id": "C30",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "39.20",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "287",
+    "purchase_order_id": "9",
+    "cage_id": "C31",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "32.50",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "288",
+    "purchase_order_id": "9",
+    "cage_id": "C32",
+    "bird_type": "broiler",
+    "number_of_birds": 17,
+    "cage_weight": "33.40",
+    "created_at": "2026-03-29T19:10:57.055Z"
+  },
+  {
+    "id": "289",
+    "purchase_order_id": "10",
+    "cage_id": "C1",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "36.80",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "290",
+    "purchase_order_id": "10",
+    "cage_id": "C2",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "36.00",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "291",
+    "purchase_order_id": "10",
+    "cage_id": "C3",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "34.80",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "292",
+    "purchase_order_id": "10",
+    "cage_id": "C4",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "35.10",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "293",
+    "purchase_order_id": "10",
+    "cage_id": "C5",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "35.60",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "294",
+    "purchase_order_id": "10",
+    "cage_id": "C6",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "36.80",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "295",
+    "purchase_order_id": "10",
+    "cage_id": "C7",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "36.20",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "296",
+    "purchase_order_id": "10",
+    "cage_id": "C8",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "35.20",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "297",
+    "purchase_order_id": "10",
+    "cage_id": "C9",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "36.20",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "298",
+    "purchase_order_id": "10",
+    "cage_id": "C10",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "34.10",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "299",
+    "purchase_order_id": "10",
+    "cage_id": "C11",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "34.90",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "300",
+    "purchase_order_id": "10",
+    "cage_id": "C12",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "35.50",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "301",
+    "purchase_order_id": "10",
+    "cage_id": "C13",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "35.60",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "302",
+    "purchase_order_id": "10",
+    "cage_id": "C14",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "35.80",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "303",
+    "purchase_order_id": "10",
+    "cage_id": "C15",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "35.20",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "304",
+    "purchase_order_id": "10",
+    "cage_id": "C16",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "37.30",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "305",
+    "purchase_order_id": "10",
+    "cage_id": "C17",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "37.50",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "306",
+    "purchase_order_id": "10",
+    "cage_id": "C18",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "35.40",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "307",
+    "purchase_order_id": "10",
+    "cage_id": "C19",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "37.50",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "308",
+    "purchase_order_id": "10",
+    "cage_id": "C20",
+    "bird_type": "",
+    "number_of_birds": 17,
+    "cage_weight": "37.30",
+    "created_at": "2026-03-29T19:12:31.267Z"
+  },
+  {
+    "id": "309",
+    "purchase_order_id": "11",
+    "cage_id": "C1",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "37.05",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "310",
+    "purchase_order_id": "11",
+    "cage_id": "C2",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "36.25",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "311",
+    "purchase_order_id": "11",
+    "cage_id": "C3",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "35.05",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "312",
+    "purchase_order_id": "11",
+    "cage_id": "C4",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "35.30",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "313",
+    "purchase_order_id": "11",
+    "cage_id": "C5",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "36.60",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "314",
+    "purchase_order_id": "11",
+    "cage_id": "C6",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "36.25",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "315",
+    "purchase_order_id": "11",
+    "cage_id": "C7",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "36.25",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "316",
+    "purchase_order_id": "11",
+    "cage_id": "C8",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "35.50",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "317",
+    "purchase_order_id": "11",
+    "cage_id": "C9",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "33.55",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "318",
+    "purchase_order_id": "11",
+    "cage_id": "C10",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "34.15",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "319",
+    "purchase_order_id": "11",
+    "cage_id": "C11",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "34.90",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "320",
+    "purchase_order_id": "11",
+    "cage_id": "C12",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "35.85",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "321",
+    "purchase_order_id": "11",
+    "cage_id": "C13",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "36.00",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "322",
+    "purchase_order_id": "11",
+    "cage_id": "C14",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "35.75",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "323",
+    "purchase_order_id": "11",
+    "cage_id": "C15",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "34.05",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "324",
+    "purchase_order_id": "11",
+    "cage_id": "C16",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "34.55",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "325",
+    "purchase_order_id": "11",
+    "cage_id": "C17",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "32.35",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "326",
+    "purchase_order_id": "11",
+    "cage_id": "C18",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "35.15",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "327",
+    "purchase_order_id": "11",
+    "cage_id": "C19",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "34.70",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "328",
+    "purchase_order_id": "11",
+    "cage_id": "C20",
+    "bird_type": "",
+    "number_of_birds": 15,
+    "cage_weight": "35.55",
+    "created_at": "2026-03-29T19:14:28.707Z"
+  },
+  {
+    "id": "334",
+    "purchase_order_id": "17",
+    "cage_id": "C1",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "32.90",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "335",
+    "purchase_order_id": "17",
+    "cage_id": "C2",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "36.70",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "336",
+    "purchase_order_id": "17",
+    "cage_id": "C3",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "37.80",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "337",
+    "purchase_order_id": "17",
+    "cage_id": "C4",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "37.10",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "338",
+    "purchase_order_id": "17",
+    "cage_id": "C5",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "36.80",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "339",
+    "purchase_order_id": "17",
+    "cage_id": "C6",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "35.10",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "340",
+    "purchase_order_id": "17",
+    "cage_id": "C7",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "34.80",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "341",
+    "purchase_order_id": "17",
+    "cage_id": "C8",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "36.40",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "342",
+    "purchase_order_id": "17",
+    "cage_id": "C9",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "35.50",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "343",
+    "purchase_order_id": "17",
+    "cage_id": "C10",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "36.70",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "344",
+    "purchase_order_id": "17",
+    "cage_id": "C11",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "37.50",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "345",
+    "purchase_order_id": "17",
+    "cage_id": "C12",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "36.30",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "346",
+    "purchase_order_id": "17",
+    "cage_id": "C13",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "37.90",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "347",
+    "purchase_order_id": "17",
+    "cage_id": "C14",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "36.10",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "348",
+    "purchase_order_id": "17",
+    "cage_id": "C15",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "34.50",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "349",
+    "purchase_order_id": "17",
+    "cage_id": "C16",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "38.80",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "350",
+    "purchase_order_id": "17",
+    "cage_id": "C17",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "34.30",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "351",
+    "purchase_order_id": "17",
+    "cage_id": "C18",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "34.70",
+    "created_at": "2026-04-09T06:33:32.038Z"
+  },
+  {
+    "id": "352",
+    "purchase_order_id": "18",
+    "cage_id": "C1",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "37.90",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "353",
+    "purchase_order_id": "18",
+    "cage_id": "C2",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "35.90",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "354",
+    "purchase_order_id": "18",
+    "cage_id": "C3",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "37.70",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "355",
+    "purchase_order_id": "18",
+    "cage_id": "C4",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "35.00",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "356",
+    "purchase_order_id": "18",
+    "cage_id": "C5",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "35.90",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "357",
+    "purchase_order_id": "18",
+    "cage_id": "C6",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "35.10",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "358",
+    "purchase_order_id": "18",
+    "cage_id": "C7",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "38.60",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "359",
+    "purchase_order_id": "18",
+    "cage_id": "C8",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "37.30",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "360",
+    "purchase_order_id": "18",
+    "cage_id": "C9",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "35.60",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "361",
+    "purchase_order_id": "18",
+    "cage_id": "C10",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "36.80",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "362",
+    "purchase_order_id": "18",
+    "cage_id": "C11",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "36.50",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "363",
+    "purchase_order_id": "18",
+    "cage_id": "C12",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "33.90",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "364",
+    "purchase_order_id": "18",
+    "cage_id": "C13",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "34.30",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "365",
+    "purchase_order_id": "18",
+    "cage_id": "C14",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "36.60",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "366",
+    "purchase_order_id": "18",
+    "cage_id": "C15",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "34.50",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "367",
+    "purchase_order_id": "18",
+    "cage_id": "C16",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "36.10",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "368",
+    "purchase_order_id": "18",
+    "cage_id": "C17",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "35.50",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "369",
+    "purchase_order_id": "18",
+    "cage_id": "C18",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "35.70",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "370",
+    "purchase_order_id": "18",
+    "cage_id": "C19",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "36.80",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "371",
+    "purchase_order_id": "18",
+    "cage_id": "C20",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "35.90",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "372",
+    "purchase_order_id": "18",
+    "cage_id": "C21",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "34.40",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "373",
+    "purchase_order_id": "18",
+    "cage_id": "C22",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "36.20",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "374",
+    "purchase_order_id": "18",
+    "cage_id": "C23",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "35.90",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "375",
+    "purchase_order_id": "18",
+    "cage_id": "C24",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "34.70",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "376",
+    "purchase_order_id": "18",
+    "cage_id": "C25",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "35.40",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "377",
+    "purchase_order_id": "18",
+    "cage_id": "C26",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "35.40",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "378",
+    "purchase_order_id": "18",
+    "cage_id": "C27",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "33.80",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "379",
+    "purchase_order_id": "18",
+    "cage_id": "C28",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "32.40",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "380",
+    "purchase_order_id": "18",
+    "cage_id": "C29",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "31.40",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "381",
+    "purchase_order_id": "18",
+    "cage_id": "C30",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "36.20",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "382",
+    "purchase_order_id": "18",
+    "cage_id": "C31",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "34.00",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "383",
+    "purchase_order_id": "18",
+    "cage_id": "C32",
+    "bird_type": "broiler",
+    "number_of_birds": 15,
+    "cage_weight": "37.40",
+    "created_at": "2026-04-09T06:49:23.913Z"
+  },
+  {
+    "id": "384",
+    "purchase_order_id": "19",
+    "cage_id": "C1",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "27.60",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "385",
+    "purchase_order_id": "19",
+    "cage_id": "C2",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "26.60",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "386",
+    "purchase_order_id": "19",
+    "cage_id": "C3",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "28.30",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "387",
+    "purchase_order_id": "19",
+    "cage_id": "C4",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "29.60",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "388",
+    "purchase_order_id": "19",
+    "cage_id": "C5",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "27.90",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "389",
+    "purchase_order_id": "19",
+    "cage_id": "C6",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "39.20",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "390",
+    "purchase_order_id": "19",
+    "cage_id": "C7",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "39.50",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "391",
+    "purchase_order_id": "19",
+    "cage_id": "C8",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "39.60",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "392",
+    "purchase_order_id": "19",
+    "cage_id": "C9",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "38.70",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "393",
+    "purchase_order_id": "19",
+    "cage_id": "C10",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "38.70",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "394",
+    "purchase_order_id": "19",
+    "cage_id": "C11",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "39.40",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "395",
+    "purchase_order_id": "19",
+    "cage_id": "C12",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.40",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "396",
+    "purchase_order_id": "19",
+    "cage_id": "C13",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "38.00",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "397",
+    "purchase_order_id": "19",
+    "cage_id": "C14",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "40.70",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "398",
+    "purchase_order_id": "19",
+    "cage_id": "C15",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "39.90",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "399",
+    "purchase_order_id": "19",
+    "cage_id": "C16",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "37.90",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "400",
+    "purchase_order_id": "19",
+    "cage_id": "C17",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "38.80",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "401",
+    "purchase_order_id": "19",
+    "cage_id": "C18",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "34.40",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "402",
+    "purchase_order_id": "19",
+    "cage_id": "C19",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "34.30",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "403",
+    "purchase_order_id": "19",
+    "cage_id": "C20",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "32.60",
+    "created_at": "2026-04-09T07:14:40.931Z"
+  },
+  {
+    "id": "404",
+    "purchase_order_id": "20",
+    "cage_id": "C1",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "34.20",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "405",
+    "purchase_order_id": "20",
+    "cage_id": "C2",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "33.90",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "406",
+    "purchase_order_id": "20",
+    "cage_id": "C3",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "33.45",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "407",
+    "purchase_order_id": "20",
+    "cage_id": "C4",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "32.75",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "408",
+    "purchase_order_id": "20",
+    "cage_id": "C5",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "33.90",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "409",
+    "purchase_order_id": "20",
+    "cage_id": "C6",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "33.45",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "410",
+    "purchase_order_id": "20",
+    "cage_id": "C7",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "32.80",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "411",
+    "purchase_order_id": "20",
+    "cage_id": "C8",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "33.15",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "412",
+    "purchase_order_id": "20",
+    "cage_id": "C9",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "31.80",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "413",
+    "purchase_order_id": "20",
+    "cage_id": "C10",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "34.45",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "414",
+    "purchase_order_id": "20",
+    "cage_id": "C11",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "31.25",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "415",
+    "purchase_order_id": "20",
+    "cage_id": "C12",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "33.90",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "416",
+    "purchase_order_id": "20",
+    "cage_id": "C13",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "30.95",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "417",
+    "purchase_order_id": "20",
+    "cage_id": "C14",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "31.90",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "418",
+    "purchase_order_id": "20",
+    "cage_id": "C15",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "33.95",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "419",
+    "purchase_order_id": "20",
+    "cage_id": "C16",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "31.75",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "420",
+    "purchase_order_id": "20",
+    "cage_id": "C17",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "32.35",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "421",
+    "purchase_order_id": "20",
+    "cage_id": "C18",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "29.66",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "422",
+    "purchase_order_id": "20",
+    "cage_id": "C19",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "30.90",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "423",
+    "purchase_order_id": "20",
+    "cage_id": "C20",
+    "bird_type": "broiler",
+    "number_of_birds": 16,
+    "cage_weight": "30.10",
+    "created_at": "2026-04-10T12:42:05.598Z"
+  },
+  {
+    "id": "424",
+    "purchase_order_id": "21",
+    "cage_id": "C1",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "36.50",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "425",
+    "purchase_order_id": "21",
+    "cage_id": "C2",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "34.80",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "426",
+    "purchase_order_id": "21",
+    "cage_id": "C3",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "33.80",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "427",
+    "purchase_order_id": "21",
+    "cage_id": "C4",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "34.20",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "428",
+    "purchase_order_id": "21",
+    "cage_id": "C5",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "34.90",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "429",
+    "purchase_order_id": "21",
+    "cage_id": "C6",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "32.40",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "430",
+    "purchase_order_id": "21",
+    "cage_id": "C7",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "31.60",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "431",
+    "purchase_order_id": "21",
+    "cage_id": "C8",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "32.00",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "432",
+    "purchase_order_id": "21",
+    "cage_id": "C9",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "32.80",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "433",
+    "purchase_order_id": "21",
+    "cage_id": "C10",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "30.00",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "434",
+    "purchase_order_id": "21",
+    "cage_id": "C11",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "33.10",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "435",
+    "purchase_order_id": "21",
+    "cage_id": "C12",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "33.40",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "436",
+    "purchase_order_id": "21",
+    "cage_id": "C13",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "35.50",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "437",
+    "purchase_order_id": "21",
+    "cage_id": "C14",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "36.00",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "438",
+    "purchase_order_id": "21",
+    "cage_id": "C15",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "32.90",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "439",
+    "purchase_order_id": "21",
+    "cage_id": "C16",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "33.20",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "440",
+    "purchase_order_id": "21",
+    "cage_id": "C17",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "29.80",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "441",
+    "purchase_order_id": "21",
+    "cage_id": "C18",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "31.80",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "442",
+    "purchase_order_id": "21",
+    "cage_id": "C19",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "32.40",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "443",
+    "purchase_order_id": "21",
+    "cage_id": "C20",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "33.60",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "444",
+    "purchase_order_id": "21",
+    "cage_id": "C21",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "32.30",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "445",
+    "purchase_order_id": "21",
+    "cage_id": "C22",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "32.70",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "446",
+    "purchase_order_id": "21",
+    "cage_id": "C23",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "31.60",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "447",
+    "purchase_order_id": "21",
+    "cage_id": "C24",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "31.40",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "448",
+    "purchase_order_id": "21",
+    "cage_id": "C25",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "29.80",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "449",
+    "purchase_order_id": "21",
+    "cage_id": "C26",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "31.60",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "450",
+    "purchase_order_id": "21",
+    "cage_id": "C27",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "31.60",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "451",
+    "purchase_order_id": "21",
+    "cage_id": "C28",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "32.80",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "452",
+    "purchase_order_id": "21",
+    "cage_id": "C29",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "33.00",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "453",
+    "purchase_order_id": "21",
+    "cage_id": "C30",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "32.20",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "454",
+    "purchase_order_id": "21",
+    "cage_id": "C31",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "33.40",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "455",
+    "purchase_order_id": "21",
+    "cage_id": "C32",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "31.50",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "456",
+    "purchase_order_id": "21",
+    "cage_id": "C33",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "31.40",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "457",
+    "purchase_order_id": "21",
+    "cage_id": "C34",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "31.00",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "458",
+    "purchase_order_id": "21",
+    "cage_id": "C35",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "31.70",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "459",
+    "purchase_order_id": "21",
+    "cage_id": "C36",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "31.70",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "460",
+    "purchase_order_id": "21",
+    "cage_id": "C37",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "32.60",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "461",
+    "purchase_order_id": "21",
+    "cage_id": "C38",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "29.90",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "462",
+    "purchase_order_id": "21",
+    "cage_id": "C39",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "30.00",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "463",
+    "purchase_order_id": "21",
+    "cage_id": "C40",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "30.20",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "464",
+    "purchase_order_id": "21",
+    "cage_id": "C41",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "32.40",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "465",
+    "purchase_order_id": "21",
+    "cage_id": "C42",
+    "bird_type": "broiler",
+    "number_of_birds": 12,
+    "cage_weight": "36.70",
+    "created_at": "2026-04-13T06:00:11.455Z"
+  },
+  {
+    "id": "466",
+    "purchase_order_id": "22",
+    "cage_id": "C1",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "39.75",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "467",
+    "purchase_order_id": "22",
+    "cage_id": "C2",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "36.95",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "468",
+    "purchase_order_id": "22",
+    "cage_id": "C3",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "36.05",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "469",
+    "purchase_order_id": "22",
+    "cage_id": "C4",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "36.25",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "470",
+    "purchase_order_id": "22",
+    "cage_id": "C5",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "39.25",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "471",
+    "purchase_order_id": "22",
+    "cage_id": "C6",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "38.00",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "472",
+    "purchase_order_id": "22",
+    "cage_id": "C7",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "36.00",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "473",
+    "purchase_order_id": "22",
+    "cage_id": "C8",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "37.20",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "474",
+    "purchase_order_id": "22",
+    "cage_id": "C9",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "36.25",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "475",
+    "purchase_order_id": "22",
+    "cage_id": "C10",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "36.25",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "476",
+    "purchase_order_id": "22",
+    "cage_id": "C11",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "35.60",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "477",
+    "purchase_order_id": "22",
+    "cage_id": "C12",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "36.45",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "478",
+    "purchase_order_id": "22",
+    "cage_id": "C13",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "34.95",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "479",
+    "purchase_order_id": "22",
+    "cage_id": "C14",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "36.25",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "480",
+    "purchase_order_id": "22",
+    "cage_id": "C15",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "34.30",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "481",
+    "purchase_order_id": "22",
+    "cage_id": "C16",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "35.00",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "482",
+    "purchase_order_id": "22",
+    "cage_id": "C17",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "36.45",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "483",
+    "purchase_order_id": "22",
+    "cage_id": "C18",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "35.85",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "484",
+    "purchase_order_id": "22",
+    "cage_id": "C19",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "35.90",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "485",
+    "purchase_order_id": "22",
+    "cage_id": "C20",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "34.95",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "486",
+    "purchase_order_id": "22",
+    "cage_id": "C21",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "34.80",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "487",
+    "purchase_order_id": "22",
+    "cage_id": "C22",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "35.30",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "488",
+    "purchase_order_id": "22",
+    "cage_id": "C23",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "34.50",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "489",
+    "purchase_order_id": "22",
+    "cage_id": "C24",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "35.30",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "490",
+    "purchase_order_id": "22",
+    "cage_id": "C25",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "33.50",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "491",
+    "purchase_order_id": "22",
+    "cage_id": "C26",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "34.45",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "492",
+    "purchase_order_id": "22",
+    "cage_id": "C27",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "36.00",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "493",
+    "purchase_order_id": "22",
+    "cage_id": "C28",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "36.60",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "494",
+    "purchase_order_id": "22",
+    "cage_id": "C29",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "36.95",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "495",
+    "purchase_order_id": "22",
+    "cage_id": "C30",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "33.70",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "496",
+    "purchase_order_id": "22",
+    "cage_id": "C31",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "34.80",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "497",
+    "purchase_order_id": "22",
+    "cage_id": "C32",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "33.75",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "498",
+    "purchase_order_id": "22",
+    "cage_id": "C33",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "36.20",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "499",
+    "purchase_order_id": "22",
+    "cage_id": "C34",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "35.30",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "500",
+    "purchase_order_id": "22",
+    "cage_id": "C35",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "34.65",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "501",
+    "purchase_order_id": "22",
+    "cage_id": "C36",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "35.90",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "502",
+    "purchase_order_id": "22",
+    "cage_id": "C37",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "34.75",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "503",
+    "purchase_order_id": "22",
+    "cage_id": "C38",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "34.15",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "504",
+    "purchase_order_id": "22",
+    "cage_id": "C39",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "33.70",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "505",
+    "purchase_order_id": "22",
+    "cage_id": "C40",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "31.90",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "506",
+    "purchase_order_id": "22",
+    "cage_id": "C41",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "35.45",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  },
+  {
+    "id": "507",
+    "purchase_order_id": "22",
+    "cage_id": "C42",
+    "bird_type": null,
+    "number_of_birds": 15,
+    "cage_weight": "32.70",
+    "created_at": "2026-04-14T05:43:32.257Z"
+  }
+]

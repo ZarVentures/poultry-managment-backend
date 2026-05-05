@@ -1,0 +1,79 @@
+[
+  {
+    "key": "currency",
+    "value": "USD",
+    "category": "general",
+    "description": "System currency",
+    "updated_at": "2026-04-07T11:15:41.303Z"
+  },
+  {
+    "key": "date_format",
+    "value": "DD/MM/YYYY",
+    "category": "general",
+    "description": "Date format",
+    "updated_at": "2026-03-28T10:52:35.820Z"
+  },
+  {
+    "key": "emailAlerts",
+    "value": "true",
+    "category": "general",
+    "description": null,
+    "updated_at": "2026-04-02T09:35:27.535Z"
+  },
+  {
+    "key": "farmEmail",
+    "value": "info@azizpoultry.com",
+    "category": "general",
+    "description": null,
+    "updated_at": "2026-04-02T09:35:27.520Z"
+  },
+  {
+    "key": "farmLocation",
+    "value": "Country, Region",
+    "category": "general",
+    "description": null,
+    "updated_at": "2026-04-07T10:11:01.196Z"
+  },
+  {
+    "key": "farmName",
+    "value": "Aziz Poultry Farm",
+    "category": "general",
+    "description": "Farm name",
+    "updated_at": "2026-03-28T10:52:35.820Z"
+  },
+  {
+    "key": "farmPhone",
+    "value": "+1-234-567-8900",
+    "category": "general",
+    "description": null,
+    "updated_at": "2026-04-07T10:11:01.243Z"
+  },
+  {
+    "key": "godown_capacity",
+    "value": "10001",
+    "category": "godown",
+    "description": "Maximum godown capacity in number of birds",
+    "updated_at": "2026-04-09T06:55:17.042Z"
+  },
+  {
+    "key": "language",
+    "value": "en",
+    "category": "general",
+    "description": "System language",
+    "updated_at": "2026-03-28T10:52:35.820Z"
+  },
+  {
+    "key": "notifications",
+    "value": "true",
+    "category": "general",
+    "description": null,
+    "updated_at": "2026-04-07T11:15:41.306Z"
+  },
+  {
+    "key": "theme",
+    "value": "dark",
+    "category": "general",
+    "description": "UI theme",
+    "updated_at": "2026-04-13T18:02:48.121Z"
+  }
+]

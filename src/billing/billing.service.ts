@@ -5,6 +5,7 @@ import { BillingParty } from './entities/billing-party.entity';
 import { BillingSale } from './entities/billing-sale.entity';
 import { BillingPayment } from './entities/billing-payment.entity';
 import { BillingLedger } from './entities/billing-ledger.entity';
+import { getTodayIST } from '../common/date-utils';
 
 @Injectable()
 export class BillingService {
@@ -41,7 +42,7 @@ export class BillingService {
         debit: data.openingBalance > 0 ? data.openingBalance : 0,
         credit: data.openingBalance < 0 ? Math.abs(data.openingBalance) : 0,
         balance: data.openingBalance,
-        date: new Date().toISOString().split('T')[0],
+        date: getTodayIST(),
       }));
     }
 

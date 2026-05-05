@@ -1,0 +1,29 @@
+{
+  "exportedAt": "2026-04-17T08:42:29.789Z",
+  "tables": {
+    "audit_logs": 0,
+    "cages": 119,
+    "expenses": 2,
+    "farmers": 56,
+    "godown_expenses": 0,
+    "godown_inward_entries": 0,
+    "godown_mortalities": 0,
+    "godown_mortality": 3,
+    "godown_sales": 3,
+    "inventory_items": 0,
+    "mortalities": 4,
+    "products": 0,
+    "purchase_order_items": 0,
+    "purchase_order_payments": 2,
+    "purchase_orders": 25,
+    "retailers": 32,
+    "role_permissions": 0,
+    "sale_customers": 0,
+    "sale_payments": 0,
+    "sales": 5,
+    "settings": 11,
+    "user_permissions": 0,
+    "users": 19,
+    "vehicles": 3
+  }
+}

@@ -1,0 +1,53 @@
+[
+  {
+    "id": "2",
+    "vehicle_number": "CG-07",
+    "vehicle_type": "Truck",
+    "driver_name": "Test",
+    "phone": "0",
+    "owner_name": "0",
+    "address": "Test",
+    "total_capacity": 55,
+    "petrol_tank_capacity": "55.00",
+    "mileage": "55.00",
+    "join_date": "2026-03-28T18:30:00.000Z",
+    "status": "active",
+    "note": "",
+    "created_at": "2026-03-29T18:17:48.912Z",
+    "updated_at": "2026-03-29T18:17:48.912Z"
+  },
+  {
+    "id": "3",
+    "vehicle_number": "CA-1090",
+    "vehicle_type": "Truck",
+    "driver_name": "Test",
+    "phone": "0",
+    "owner_name": "Test",
+    "address": "Test",
+    "total_capacity": 55,
+    "petrol_tank_capacity": "55.00",
+    "mileage": "55.00",
+    "join_date": "2026-03-28T18:30:00.000Z",
+    "status": "active",
+    "note": "",
+    "created_at": "2026-03-29T18:18:22.099Z",
+    "updated_at": "2026-03-29T18:18:22.099Z"
+  },
+  {
+    "id": "4",
+    "vehicle_number": "CA-1688",
+    "vehicle_type": "Truck",
+    "driver_name": "Test",
+    "phone": "0",
+    "owner_name": "Test",
+    "address": "Test",
+    "total_capacity": 25,
+    "petrol_tank_capacity": "25.00",
+    "mileage": "25.00",
+    "join_date": "2026-03-28T18:30:00.000Z",
+    "status": "active",
+    "note": "",
+    "created_at": "2026-03-29T19:08:43.224Z",
+    "updated_at": "2026-03-29T19:08:43.224Z"
+  }
+]

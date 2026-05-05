@@ -1,0 +1,11 @@
+[
+  {
+    "id": "7",
+    "mortality_date": "2026-04-10T18:30:00.000Z",
+    "number_of_birds_died": 4,
+    "reason": "HEAT",
+    "notes": "WEIGHT-9000",
+    "created_at": "2026-04-14T05:53:41.370Z",
+    "updated_at": "2026-04-14T05:53:41.370Z"
+  }
+]
