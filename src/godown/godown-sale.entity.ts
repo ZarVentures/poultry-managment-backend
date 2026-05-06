@@ -38,6 +38,9 @@ export class GodownSale {
   @Column({ name: 'payment_status', type: 'enum', enum: ['paid', 'pending', 'partial'] })
   paymentStatus!: 'paid' | 'pending' | 'partial';
 
+  @Column({ name: 'payment_mode', type: 'varchar', length: 50, nullable: true })
+  paymentMode?: string;
+
   @Column({ name: 'amount_received', type: 'numeric', precision: 14, scale: 2 })
   amountReceived!: number;
 

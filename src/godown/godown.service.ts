@@ -82,7 +82,7 @@ export class GodownService {
 
   async updateSale(id: string, data: any) {
     // Filter out fields that don't exist in the entity
-    const { paymentMode, cages, retailerId, vehicleId, ...validData } = data;
+    const { cages, retailerId, vehicleId, ...validData } = data;
     
     // Only include retailerId and vehicleId if they have valid values
     if (retailerId) {
