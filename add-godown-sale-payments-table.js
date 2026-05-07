@@ -5,13 +5,18 @@ const client = new Client({
   host: process.env.DB_HOST,
   port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME,
-  user: process.env.DB_USER,
+  user: process.env.DB_USERNAME || process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
 });
 
 async function addGodownSalePaymentsTable() {
   try {
+    console.log('🔌 Connecting to database...');
+    console.log(`   Host: ${process.env.DB_HOST}`);
+    console.log(`   Database: ${process.env.DB_NAME}`);
+    console.log(`   User: ${process.env.DB_USERNAME || process.env.DB_USER}`);
+    
     await client.connect();
     console.log('✅ Connected to database');
 
