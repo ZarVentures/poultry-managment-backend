@@ -4,7 +4,6 @@ import { GodownController } from './godown.controller';
 import { GodownService } from './godown.service';
 import { GodownInwardEntry } from './godown-inward.entity';
 import { GodownSale } from './godown-sale.entity';
-import { GodownSalePayment } from './godown-sale-payment.entity';
 import { GodownMortality } from './godown-mortality.entity';
 import { GodownExpense } from './godown-expense.entity';
 import { CagesModule } from '../cages/cages.module';
@@ -14,7 +13,6 @@ import { CagesModule } from '../cages/cages.module';
     TypeOrmModule.forFeature([
       GodownInwardEntry,
       GodownSale,
-      GodownSalePayment,
       GodownMortality,
       GodownExpense,
     ]),

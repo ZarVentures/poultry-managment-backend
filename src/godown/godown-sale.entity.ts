@@ -1,5 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
-import { GodownSalePayment } from './godown-sale-payment.entity';
+import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
 @Entity('godown_sales')
 export class GodownSale {
@@ -53,7 +52,4 @@ export class GodownSale {
 
   @Column({ name: 'updated_at', type: 'timestamptz', default: () => 'NOW()' })
   updatedAt!: Date;
-
-  @OneToMany(() => GodownSalePayment, payment => payment.godownSale)
-  payments?: GodownSalePayment[];
 }

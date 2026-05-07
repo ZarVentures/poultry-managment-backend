@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GodownInwardEntry } from './godown-inward.entity';
 import { GodownSale } from './godown-sale.entity';
-import { GodownSalePayment } from './godown-sale-payment.entity';
 import { GodownMortality } from './godown-mortality.entity';
 import { GodownExpense } from './godown-expense.entity';
 import { CagesService } from '../cages/cages.service';
@@ -15,8 +14,6 @@ export class GodownService {
     private inwardRepo: Repository<GodownInwardEntry>,
     @InjectRepository(GodownSale)
     private saleRepo: Repository<GodownSale>,
-    @InjectRepository(GodownSalePayment)
-    private salePaymentRepo: Repository<GodownSalePayment>,
     @InjectRepository(GodownMortality)
     private mortalityRepo: Repository<GodownMortality>,
     @InjectRepository(GodownExpense)
@@ -62,30 +59,10 @@ export class GodownService {
   // ─── Sales ────────────────────────────────────────────────────────────────
 
   async createSale(data: any) {
-    const { cageIds, godownSaleWeight, payments, ...saleData } = data;
-    
-    // Calculate total payment made from payments array
-    const totalPaymentMade = (payments || []).reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
-    saleData.amountReceived = totalPaymentMade;
-    
+    const { cageIds, godownSaleWeight, ...saleData } = data;
     const sale = this.saleRepo.create(saleData);
     const savedResult = await this.saleRepo.save(sale);
     const savedId: string = (savedResult as any).id ?? (savedResult as any)[0]?.id;
-
-    // Save payments if provided
-    if (payments && payments.length > 0) {
-      const validPayments = payments
-        .filter((p: any) => parseFloat(p.amount || '0') > 0)
-        .map((p: any) => this.salePaymentRepo.create({
-          godownSaleId: savedId,
-          paymentMode: p.paymentMode,
-          amount: parseFloat(p.amount),
-          isAdvance: p.isAdvance ?? false,
-        }));
-      if (validPayments.length > 0) {
-        await this.salePaymentRepo.save(validPayments);
-      }
-    }
 
     // Mark selected cages as godown_sold in master cages table
     if (cageIds && cageIds.length > 0) {
@@ -96,45 +73,23 @@ export class GodownService {
   }
 
   async findAllSales() {
-    return this.saleRepo.find({ 
-      order: { saleDate: 'DESC' },
-      relations: ['payments']
-    });
+    return this.saleRepo.find({ order: { saleDate: 'DESC' } });
   }
 
   async findOneSale(id: string) {
-    return this.saleRepo.findOne({ 
-      where: { id },
-      relations: ['payments']
-    });
+    return this.saleRepo.findOne({ where: { id } });
   }
 
   async updateSale(id: string, data: any) {
     // Filter out fields that don't exist in the entity
-    const { cages, payments, ...validData } = data;
+    const { cages, retailerId, vehicleId, ...validData } = data;
     
-    // Handle payments update
-    if (payments !== undefined) {
-      // Delete existing payments
-      await this.salePaymentRepo.delete({ godownSaleId: id });
-      
-      // Add new payments
-      const validPayments = payments
-        .filter((p: any) => parseFloat(p.amount || '0') > 0)
-        .map((p: any) => this.salePaymentRepo.create({
-          godownSaleId: id,
-          paymentMode: p.paymentMode,
-          amount: parseFloat(p.amount),
-          isAdvance: p.isAdvance ?? false,
-        }));
-      
-      if (validPayments.length > 0) {
-        await this.salePaymentRepo.save(validPayments);
-      }
-      
-      // Update amount_received
-      const totalPaymentMade = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
-      validData.amountReceived = totalPaymentMade;
+    // Only include retailerId and vehicleId if they have valid values
+    if (retailerId) {
+      validData.retailerId = retailerId;
+    }
+    if (vehicleId) {
+      validData.vehicleId = vehicleId;
     }
     
     await this.saleRepo.update(id, validData);
