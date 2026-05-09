@@ -8,6 +8,7 @@ import { GodownSalePayment } from './entities/godown-sale-payment.entity';
 import { GodownMortality } from './godown-mortality.entity';
 import { GodownExpense } from './godown-expense.entity';
 import { CagesModule } from '../cages/cages.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
   imports: [
@@ -19,9 +20,10 @@ import { CagesModule } from '../cages/cages.module';
       GodownExpense,
     ]),
     CagesModule,
+    PermissionsModule,
   ],
   controllers: [GodownController],
   providers: [GodownService],
   exports: [GodownService],
 })
-export class GodownModule {}
+export class GodownModule { }
