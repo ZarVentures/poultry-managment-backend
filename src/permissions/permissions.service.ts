@@ -18,7 +18,7 @@ export class PermissionsService {
     private rolePermissionRepository: Repository<RolePermission>,
     @InjectRepository(UserPermission)
     private userPermissionRepository: Repository<UserPermission>,
-  ) {}
+  ) { }
 
   /**
    * Get permissions for a user on a specific resource
@@ -184,5 +184,9 @@ export class PermissionsService {
    */
   async deleteUserPermission(userId: string, resource: string): Promise<void> {
     await this.userPermissionRepository.delete({ userId, resource });
+  }
+
+  async deleteRole(role: string): Promise<void> {
+    await this.rolePermissionRepository.delete({ role });
   }
 }
