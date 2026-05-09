@@ -1,7 +1,7 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 import { Exclude } from 'class-transformer';
 
-export type UserRole = 'admin' | 'manager' | 'staff';
+export type UserRole = string;
 export type UserStatus = 'active' | 'inactive';
 
 @Entity({ name: 'users' })
@@ -23,12 +23,11 @@ export class User {
   passwordHash!: string;
 
   @Column({
-    type: 'enum',
-    enum: ['admin', 'manager', 'staff'],
-    enumName: 'user_role',
+    type: 'varchar',
+    length: 50,
     default: 'manager',
   })
-  role!: UserRole;
+  role!: string;
 
   @Column({
     type: 'enum',
