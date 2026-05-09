@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-require('dotenv').config();
+require('dotenv').config({ path: '.env.staging' });
 
 async function migrate() {
     const client = new Client({
