@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { GodownSalePayment } from './godown-sale-payment.entity';
 
 @Entity('godown_sales')
 export class GodownSale {
@@ -38,6 +39,9 @@ export class GodownSale {
   @Column({ name: 'payment_status', type: 'enum', enum: ['paid', 'pending', 'partial'] })
   paymentStatus!: 'paid' | 'pending' | 'partial';
 
+  @Column({ name: 'payment_mode', type: 'varchar', length: 50, nullable: true })
+  paymentMode?: string;
+
   @Column({ name: 'amount_received', type: 'numeric', precision: 14, scale: 2 })
   amountReceived!: number;
 
@@ -49,4 +53,7 @@ export class GodownSale {
 
   @Column({ name: 'updated_at', type: 'timestamptz', default: () => 'NOW()' })
   updatedAt!: Date;
+
+  @OneToMany(() => GodownSalePayment, (payment) => payment.godownSale, { cascade: true })
+  payments!: GodownSalePayment[];
 }
