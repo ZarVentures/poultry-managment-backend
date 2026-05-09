@@ -10,6 +10,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage, FileFilterCallback } from 'multer';
@@ -17,17 +18,23 @@ import { extname, join } from 'path';
 import { SalesService } from './sales.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { Permissions } from '../auth/decorators/permissions.decorator';
 
 @Controller('sales')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class SalesController {
-  constructor(private readonly salesService: SalesService) {}
+  constructor(private readonly salesService: SalesService) { }
 
   @Post()
+  @Permissions('sales', 'create')
   create(@Body() createSaleDto: CreateSaleDto) {
     return this.salesService.create(createSaleDto);
   }
 
   @Get()
+  @Permissions('sales', 'read')
   findAll(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -44,11 +51,13 @@ export class SalesController {
   }
 
   @Get(':id')
+  @Permissions('sales', 'read')
   findOne(@Param('id') id: string) {
     return this.salesService.findOne(id);
   }
 
   @Patch(':id')
+  @Permissions('sales', 'update')
   update(@Param('id') id: string, @Body() updateSaleDto: UpdateSaleDto) {
     return this.salesService.update(id, updateSaleDto);
   }
@@ -63,6 +72,7 @@ export class SalesController {
   }
 
   @Delete(':id')
+  @Permissions('sales', 'delete')
   remove(@Param('id') id: string) {
     return this.salesService.remove(id);
   }
