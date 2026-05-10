@@ -10,7 +10,7 @@ export class PaymentVouchersController {
   constructor(private readonly paymentVouchersService: PaymentVouchersService) {}
 
   @Post()
-  create(@Body() createDto: CreatePaymentVoucherDto, @Request() req) {
+  create(@Body() createDto: CreatePaymentVoucherDto, @Request() req: any) {
     return this.paymentVouchersService.create(createDto, req.user.userId);
   }
 
@@ -43,7 +43,7 @@ export class PaymentVouchersController {
   }
 
   @Post(':id/approve')
-  approve(@Param('id') id: string, @Request() req) {
+  approve(@Param('id') id: string, @Request() req: any) {
     return this.paymentVouchersService.approve(+id, req.user.userId);
   }
 
