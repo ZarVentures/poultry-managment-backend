@@ -9,6 +9,9 @@ export class GodownSale {
   @Column({ name: 'sale_date', type: 'date' })
   saleDate!: string;
 
+  @Column({ name: 'sale_no', type: 'varchar', length: 50, nullable: true })
+  saleNo?: string;
+
   @Column({ name: 'invoice_number', type: 'varchar', length: 50, nullable: true })
   invoiceNumber?: string;
 
