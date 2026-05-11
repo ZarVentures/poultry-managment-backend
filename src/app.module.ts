@@ -27,6 +27,8 @@ import { CagesModule } from './cages/cages.module';
 import { Cage } from './cages/cage.entity';
 import { ExpensesModule } from './expenses/expenses.module';
 import { Expense } from './expenses/expense.entity';
+import { ExpenseCategoriesModule } from './expense-categories/expense-categories.module';
+import { ExpenseCategory } from './expense-categories/expense-category.entity';
 import { ReportsModule } from './reports/reports.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { InventoryModule } from './inventory/inventory.module';
@@ -71,7 +73,7 @@ import { Product } from './products/product.entity';
             ssl: {
               rejectUnauthorized: false
             },
-            entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment, Sale, SalePayment, Expense, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownSalePayment, GodownMortality, GodownExpense, Cage, RolePermission, UserPermission, Mortality, Product, BillingParty, BillingSale, BillingPayment, BillingLedger, PaymentVoucher],
+            entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment, Sale, SalePayment, Expense, ExpenseCategory, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownSalePayment, GodownMortality, GodownExpense, Cage, RolePermission, UserPermission, Mortality, Product, BillingParty, BillingSale, BillingPayment, BillingLedger, PaymentVoucher],
             synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
             logging: config.get<boolean>('DB_LOGGING', false),
             timezone: 'Z', // Use UTC for consistency, handle IST in application layer
@@ -86,7 +88,7 @@ import { Product } from './products/product.entity';
           username: config.get<string>('DB_USERNAME', 'postgres'),
           password: config.get<string>('DB_PASSWORD', 'postgres'),
           database: config.get<string>('DB_NAME', 'poultry'),
-          entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment, Sale, SalePayment, Expense, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownSalePayment, GodownMortality, GodownExpense, Cage, RolePermission, UserPermission, Mortality, Product, BillingParty, BillingSale, BillingPayment, BillingLedger, PaymentVoucher],
+          entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment, Sale, SalePayment, Expense, ExpenseCategory, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownSalePayment, GodownMortality, GodownExpense, Cage, RolePermission, UserPermission, Mortality, Product, BillingParty, BillingSale, BillingPayment, BillingLedger, PaymentVoucher],
           synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
           logging: config.get<boolean>('DB_LOGGING', false),
           timezone: 'Z', // Use UTC for consistency, handle IST in application layer
@@ -102,6 +104,7 @@ import { Product } from './products/product.entity';
     PurchasesModule,
     SalesModule,
     ExpensesModule,
+    ExpenseCategoriesModule,
     ReportsModule,
     DashboardModule,
     InventoryModule,

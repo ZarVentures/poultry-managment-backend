@@ -9,8 +9,14 @@ export class CreateExpenseDto {
   @IsString()
   expenseOwner?: string;
 
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  // Legacy field for backward compatibility
+  @IsOptional()
   @IsEnum(['feed', 'labor', 'medicine', 'utilities', 'equipment', 'maintenance', 'transportation', 'other'])
-  category!: ExpenseCategoryType;
+  category?: ExpenseCategoryType;
 
   @IsString()
   description!: string;

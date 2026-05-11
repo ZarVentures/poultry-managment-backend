@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { ExpenseCategory } from '../expense-categories/expense-category.entity';
 
 export type ExpenseCategoryType = 'feed' | 'labor' | 'medicine' | 'utilities' | 'equipment' | 'maintenance' | 'transportation' | 'other';
 export type PaymentMethodType = 'cash' | 'bank_transfer' | 'check' | 'credit_card';
@@ -14,12 +15,22 @@ export class Expense {
   @Column({ name: 'expense_owner', type: 'varchar', length: 150, nullable: true })
   expenseOwner?: string;
 
+  // Legacy category field (kept for backward compatibility)
   @Column({
     type: 'enum',
     enum: ['feed', 'labor', 'medicine', 'utilities', 'equipment', 'maintenance', 'transportation', 'other'],
     enumName: 'expense_category_type',
+    nullable: true,
   })
-  category!: ExpenseCategoryType;
+  category?: ExpenseCategoryType;
+
+  // New category relationship
+  @Column({ name: 'category_id', type: 'bigint', nullable: true })
+  categoryId?: string;
+
+  @ManyToOne(() => ExpenseCategory, (category) => category.expenses, { eager: true })
+  @JoinColumn({ name: 'category_id' })
+  expenseCategory?: ExpenseCategory;
 
   @Column({ type: 'text' })
   description!: string;
