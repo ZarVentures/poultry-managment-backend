@@ -34,15 +34,40 @@ export class SalesService {
     return { totalAmount, transportCharges, loadingCharges, commission, otherCharges, weightShortage, mortalityDeduction, otherDeduction, grossAmount, netAmount };
   }
 
+  private async generateInvoiceNumber(): Promise<string> {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const prefix = `SL-${year}-${month}-`;
+
+    // Find the last invoice number with this prefix
+    const lastSale = await this.saleRepository
+      .createQueryBuilder('sale')
+      .where('sale.invoiceNumber LIKE :prefix', { prefix: `${prefix}%` })
+      .orderBy('sale.id', 'DESC')
+      .limit(1)
+      .getOne();
+
+    if (lastSale && lastSale.invoiceNumber) {
+      const lastNumber = parseInt(lastSale.invoiceNumber.split('-').pop() || '0');
+      return `${prefix}${String(lastNumber + 1).padStart(4, '0')}`;
+    }
+
+    return `${prefix}0001`;
+  }
+
   async create(dto: CreateSaleDto): Promise<Sale> {
-    const existing = await this.saleRepository.findOne({ where: { invoiceNumber: dto.invoiceNumber } });
-    if (existing) throw new BadRequestException(`Sale ${dto.invoiceNumber} already exists`);
+    // Auto-generate invoice number if not provided
+    const invoiceNumber = dto.invoiceNumber || await this.generateInvoiceNumber();
+    
+    const existing = await this.saleRepository.findOne({ where: { invoiceNumber } });
+    if (existing) throw new BadRequestException(`Sale ${invoiceNumber} already exists`);
 
     const amounts = this.calcAmounts(dto);
     const totalPaymentMade = (dto.payments || []).reduce((s, p) => s + parseFloat(p.amount || '0'), 0);
 
     const sale = this.saleRepository.create({
-      invoiceNumber: dto.invoiceNumber,
+      invoiceNumber,
       saleNo: dto.saleNo,
       purchaseBillNo: dto.purchaseBillNo,
       cageNo: dto.cageNo,

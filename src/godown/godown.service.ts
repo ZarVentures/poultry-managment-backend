@@ -61,8 +61,35 @@ export class GodownService {
 
   // ─── Sales ────────────────────────────────────────────────────────────────
 
+  private async generateSaleNumber(): Promise<string> {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const prefix = `GDS-${year}-${month}-`;
+
+    // Find the last sale number with this prefix
+    const lastSale = await this.saleRepo
+      .createQueryBuilder('sale')
+      .where('sale.saleNo LIKE :prefix', { prefix: `${prefix}%` })
+      .orderBy('sale.id', 'DESC')
+      .limit(1)
+      .getOne();
+
+    if (lastSale && lastSale.saleNo) {
+      const lastNumber = parseInt(lastSale.saleNo.split('-').pop() || '0');
+      return `${prefix}${String(lastNumber + 1).padStart(4, '0')}`;
+    }
+
+    return `${prefix}0001`;
+  }
+
   async createSale(data: any) {
     const { cageIds, godownSaleWeight, payments, ...saleData } = data;
+    
+    // Auto-generate sale number if not provided
+    if (!saleData.saleNo) {
+      saleData.saleNo = await this.generateSaleNumber();
+    }
     
     // Calculate total payment made from payments array
     const totalPaymentMade = (payments || []).reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);

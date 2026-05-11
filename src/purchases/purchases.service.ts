@@ -31,9 +31,34 @@ export class PurchasesService {
     return { totalWeight, ratePerKg, totalAmount, transportCharges, otherCharges, grossAmount, netAmount };
   }
 
+  private async generateOrderNumber(): Promise<string> {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const prefix = `PO-${year}-${month}-`;
+
+    // Find the last order number with this prefix
+    const lastOrder = await this.purchaseOrderRepository
+      .createQueryBuilder('po')
+      .where('po.orderNumber LIKE :prefix', { prefix: `${prefix}%` })
+      .orderBy('po.id', 'DESC')
+      .limit(1)
+      .getOne();
+
+    if (lastOrder && lastOrder.orderNumber) {
+      const lastNumber = parseInt(lastOrder.orderNumber.split('-').pop() || '0');
+      return `${prefix}${String(lastNumber + 1).padStart(4, '0')}`;
+    }
+
+    return `${prefix}0001`;
+  }
+
   async create(dto: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
-    const existing = await this.purchaseOrderRepository.findOne({ where: { orderNumber: dto.orderNumber } });
-    if (existing) throw new BadRequestException(`Purchase order ${dto.orderNumber} already exists`);
+    // Auto-generate order number if not provided
+    const orderNumber = dto.orderNumber || await this.generateOrderNumber();
+    
+    const existing = await this.purchaseOrderRepository.findOne({ where: { orderNumber } });
+    if (existing) throw new BadRequestException(`Purchase order ${orderNumber} already exists`);
 
     let totalWeight = 0;
     if (dto.cages && dto.cages.length > 0) {
@@ -47,7 +72,7 @@ export class PurchasesService {
     const balanceAmount = amounts.netAmount - totalPaymentMade;
 
     const order = this.purchaseOrderRepository.create({
-      orderNumber: dto.orderNumber,
+      orderNumber,
       supplierName: dto.supplierName,
       orderDate: dto.orderDate,
       dueDate: dto.dueDate,
