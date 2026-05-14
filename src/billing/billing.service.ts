@@ -1,19 +1,27 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { BillingParty } from './entities/billing-party.entity';
-import { BillingSale } from './entities/billing-sale.entity';
 import { BillingPayment } from './entities/billing-payment.entity';
 import { BillingLedger } from './entities/billing-ledger.entity';
+import { Expense } from '../expenses/expense.entity';
+import { InventoryItem } from '../inventory/entities/inventory-item.entity';
+import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
+import { Sale } from '../sales/sale.entity';
+import { BillingSale } from './entities/billing-sale.entity';
 import { getTodayIST } from '../common/date-utils';
 
 @Injectable()
 export class BillingService {
   constructor(
     @InjectRepository(BillingParty) private partyRepo: Repository<BillingParty>,
-    @InjectRepository(BillingSale) private saleRepo: Repository<BillingSale>,
     @InjectRepository(BillingPayment) private paymentRepo: Repository<BillingPayment>,
     @InjectRepository(BillingLedger) private ledgerRepo: Repository<BillingLedger>,
+    @InjectRepository(Expense) private expenseRepo: Repository<Expense>,
+    @InjectRepository(InventoryItem) private inventoryRepo: Repository<InventoryItem>,
+    @InjectRepository(PurchaseOrder) private purchaseRepo: Repository<PurchaseOrder>,
+    @InjectRepository(BillingSale) private saleRepo: Repository<BillingSale>,
+    @InjectRepository(Sale) private mainSaleRepo: Repository<Sale>,
   ) {}
 
   // ─── Parties ──────────────────────────────────────────────────────────────
@@ -195,5 +203,132 @@ export class BillingService {
       pendingPayments: parties.reduce((s, p) => s + Math.max(0, Number(p.currentBalance)), 0),
       totalLedgers: parties.length,
     };
+  }
+
+  async getCompanyReport(fromDate?: string, toDate?: string) {
+    try {
+    const salesQuery = this.mainSaleRepo.createQueryBuilder('sale')
+      .leftJoinAndSelect('sale.retailer', 'retailer');
+    
+    if (fromDate && toDate) {
+      salesQuery.where('sale.saleDate BETWEEN :fromDate AND :toDate', { fromDate, toDate });
+    }
+    const sales = await salesQuery.getMany();
+
+    const purchasesQuery = this.purchaseRepo.createQueryBuilder('po');
+    if (fromDate && toDate) {
+      purchasesQuery.where('po.orderDate BETWEEN :fromDate AND :toDate', { fromDate, toDate });
+    }
+    const purchases = await purchasesQuery.getMany();
+
+    const expensesQuery = this.expenseRepo.createQueryBuilder('exp');
+    if (fromDate && toDate) {
+      expensesQuery.where('exp.expenseDate BETWEEN :fromDate AND :toDate', { fromDate, toDate });
+    }
+    const expenses = await expensesQuery.getMany();
+
+    const inventory = await this.inventoryRepo.find();
+
+    const totalRevenue = sales.reduce((sum, s) => sum + Number(s.netAmount || s.totalAmount || 0), 0);
+
+    const totalPurchases = purchases.reduce((sum, p) => sum + Number(p.netAmount || p.grossAmount || 0), 0);
+    const totalTransportCharges = purchases.reduce((sum, p) => sum + Number(p.transportCharges || 0), 0);
+    const totalOtherCharges = purchases.reduce((sum, p) => sum + Number(p.otherCharges || 0), 0);
+
+    const totalDirectExpenses = expenses
+      .filter(e => ['feed', 'medicine', 'transportation'].includes(e.category || ''))
+      .reduce((sum, e) => sum + Number(e.amount), 0);
+
+    const openingStock = 0;
+    const closingStock = inventory.reduce((sum, item) => sum + Number(item.currentStockLevel || 0), 0);
+
+    const cogs = openingStock + totalPurchases + totalTransportCharges + totalOtherCharges + totalDirectExpenses - closingStock;
+
+    const grossProfit = totalRevenue - cogs;
+
+    const operatingExpenses = expenses
+      .filter(e => !['feed', 'medicine', 'transportation'].includes(e.category || ''))
+      .reduce((sum, e) => sum + Number(e.amount), 0);
+
+    const netProfit = grossProfit - operatingExpenses;
+
+    const partyWiseSales: Record<string, number> = {};
+    for (const sale of sales) {
+      const customerName = sale.customerName || 'Unknown';
+      partyWiseSales[customerName] = (partyWiseSales[customerName] || 0) + Number(sale.netAmount || sale.totalAmount || 0);
+    }
+
+    const expenseBreakdown: Record<string, number> = {};
+    for (const expense of expenses) {
+      const category = expense.category || 'other';
+      expenseBreakdown[category] = (expenseBreakdown[category] || 0) + Number(expense.amount);
+    }
+
+    const summary = {
+      totalRevenue,
+      costOfGoodsSold: cogs,
+      grossProfit,
+      operatingExpenses,
+      netProfit,
+      openingStock,
+      closingStock,
+      totalPurchases,
+      totalDirectExpenses,
+    };
+
+    const detailedStatement = [
+      { label: 'Sales Revenue', value: totalRevenue, type: 'income' },
+      { label: 'Opening Stock', value: openingStock, type: 'expense' },
+      { label: 'Purchases', value: totalPurchases, type: 'expense' },
+      { label: 'Direct Expenses', value: totalDirectExpenses, type: 'expense' },
+      { label: 'Closing Stock', value: closingStock, type: 'income' },
+      { label: 'Cost of Goods Sold', value: cogs, type: 'expense' },
+      { label: 'Gross Profit', value: grossProfit, type: 'profit' },
+      { label: 'Operating Expenses', value: operatingExpenses, type: 'expense' },
+      { label: 'Net Profit', value: netProfit, type: 'profit' },
+    ];
+
+    const keyInsights = [];
+    if (totalRevenue > 0) {
+      if (grossProfit > 0) {
+        const grossMargin = ((grossProfit / totalRevenue) * 100).toFixed(1);
+        keyInsights.push({ type: 'success', message: `Gross Profit Margin: ${grossMargin}%` });
+      } else {
+        keyInsights.push({ type: 'error', message: 'Gross Loss detected' });
+      }
+      if (netProfit > 0) {
+        const netMargin = ((netProfit / totalRevenue) * 100).toFixed(1);
+        keyInsights.push({ type: 'success', message: `Net Profit Margin: ${netMargin}%` });
+      } else {
+        keyInsights.push({ type: 'error', message: 'Net Loss detected' });
+      }
+      if (operatingExpenses > totalRevenue * 0.5) {
+        keyInsights.push({ type: 'warning', message: 'Operating expenses exceed 50% of revenue' });
+      }
+    }
+
+    const auditLog = {
+      generatedAt: new Date().toISOString(),
+      dateRange: fromDate && toDate ? { from: fromDate, to: toDate } : null,
+      dataSources: {
+        salesCount: sales.length,
+        purchasesCount: purchases.length,
+        expensesCount: expenses.length,
+        inventoryItemsCount: inventory.length,
+      },
+    };
+
+    return {
+        summary,
+        detailedStatement,
+        partyWiseSales: Object.entries(partyWiseSales).map(([party, amount]) => ({ party, amount })),
+        expenseBreakdown: Object.entries(expenseBreakdown).map(([category, amount]) => ({ category, amount })),
+        keyInsights,
+        auditLog,
+      };
+    } catch (error) {
+      console.error('Error in getCompanyReport:', error);
+      throw error;
+    }
   }
 }

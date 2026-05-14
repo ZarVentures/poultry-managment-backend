@@ -9,6 +9,13 @@ export class BillingController {
   @Get('summary')
   getSummary() { return this.billingService.getSummary(); }
 
+  // Company Report
+  @Get('company-report')
+  getCompanyReport(
+    @Query('from') fromDate?: string,
+    @Query('to') toDate?: string,
+  ) { return this.billingService.getCompanyReport(fromDate, toDate); }
+
   // Parties
   @Get('parties')
   getParties() { return this.billingService.getParties(); }
