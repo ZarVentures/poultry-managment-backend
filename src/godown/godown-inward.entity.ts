@@ -23,8 +23,14 @@ export class GodownInwardEntry {
   @Column({ name: 'average_weight', type: 'numeric', precision: 10, scale: 2, nullable: true })
   averageWeight?: number;
 
+  @Column({ name: 'actual_weight', type: 'numeric', precision: 10, scale: 2, nullable: true })
+  actualWeight?: number;
+
+  @Column({ name: 'weight_loss', type: 'numeric', precision: 10, scale: 2, default: 0 })
+  weightLoss!: number;
+
   @Column({ name: 'total_weight', type: 'numeric', precision: 10, scale: 2, nullable: true })
-  totalWeight?: number;
+  totalWeight?: number; // This will store the final available stock weight
 
   @Column({ name: 'rate_per_kg', type: 'numeric', precision: 10, scale: 2, nullable: true })
   ratePerKg?: number;

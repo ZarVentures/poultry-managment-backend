@@ -14,11 +14,11 @@ export class ReportsService {
     private readonly saleRepository: Repository<Sale>,
     @InjectRepository(Expense)
     private readonly expenseRepository: Repository<Expense>,
-  ) {}
+  ) { }
 
   async getPurchaseReport(startDate?: string, endDate?: string) {
     const whereClause: any = {};
-    
+
     if (startDate && endDate) {
       whereClause.orderDate = Between(new Date(startDate), new Date(endDate));
     }
@@ -46,7 +46,7 @@ export class ReportsService {
 
   async getSalesReport(startDate?: string, endDate?: string) {
     const whereClause: any = {};
-    
+
     if (startDate && endDate) {
       whereClause.saleDate = Between(new Date(startDate), new Date(endDate));
     }
@@ -74,7 +74,7 @@ export class ReportsService {
 
   async getMortalityReport(startDate?: string, endDate?: string) {
     const whereClause: any = {};
-    
+
     if (startDate && endDate) {
       whereClause.orderDate = Between(new Date(startDate), new Date(endDate));
     }
@@ -109,7 +109,7 @@ export class ReportsService {
     const whereClausePurchase: any = {};
     const whereClauseSale: any = {};
     const whereClauseExpense: any = {};
-    
+
     if (startDate && endDate) {
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -120,12 +120,15 @@ export class ReportsService {
 
     const purchases = await this.purchaseRepository.find({ where: whereClausePurchase });
     const sales = await this.saleRepository.find({ where: whereClauseSale });
-    const expenses = await this.expenseRepository.find({ where: whereClauseExpense });
+    const expenses = await this.expenseRepository.find({
+      where: whereClauseExpense,
+      relations: ['expenseCategory']
+    });
 
     const totalRevenue = sales.reduce((sum, s) => sum + parseFloat(s.netAmount as any), 0);
     const totalCost = purchases.reduce((sum, p) => sum + parseFloat(p.netAmount as any), 0);
     const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount as any), 0);
-    
+
     const grossProfit = totalRevenue - totalCost;
     const netProfit = grossProfit - totalExpenses;
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
@@ -160,9 +163,9 @@ export class ReportsService {
 
   private groupExpensesByCategory(expenses: Expense[]) {
     const grouped: Record<string, number> = {};
-    
+
     expenses.forEach(expense => {
-      const category = expense.category || 'Other';
+      const category = expense.expenseCategory?.name || expense.category || 'Other';
       if (!grouped[category]) {
         grouped[category] = 0;
       }
@@ -175,7 +178,7 @@ export class ReportsService {
   async getGrossProfitReport(startDate?: string, endDate?: string) {
     const whereClausePurchase: any = {};
     const whereClauseSale: any = {};
-    
+
     if (startDate && endDate) {
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -204,12 +207,15 @@ export class ReportsService {
 
   async getExpenseBreakdown(startDate?: string, endDate?: string) {
     const whereClause: any = {};
-    
+
     if (startDate && endDate) {
       whereClause.expenseDate = Between(new Date(startDate), new Date(endDate));
     }
 
-    const expenses = await this.expenseRepository.find({ where: whereClause });
+    const expenses = await this.expenseRepository.find({
+      where: whereClause,
+      relations: ['expenseCategory']
+    });
     const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount as any), 0);
     const byCategory = this.groupExpensesByCategory(expenses);
 
@@ -217,7 +223,7 @@ export class ReportsService {
       category,
       amount,
       percentage: totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0,
-      count: expenses.filter(e => (e.category || 'Other') === category).length,
+      count: expenses.filter(e => (e.expenseCategory?.name || e.category || 'Other') === category).length,
     })).sort((a, b) => b.amount - a.amount);
 
     return {
@@ -232,12 +238,12 @@ export class ReportsService {
 
   async getBatchWiseProfit(startDate?: string, endDate?: string) {
     const whereClause: any = {};
-    
+
     if (startDate && endDate) {
       whereClause.orderDate = Between(new Date(startDate), new Date(endDate));
     }
 
-    const purchases = await this.purchaseRepository.find({ 
+    const purchases = await this.purchaseRepository.find({
       where: whereClause,
       order: { orderDate: 'DESC' },
     });
@@ -271,7 +277,7 @@ export class ReportsService {
 
   async getFarmWiseProfit(startDate?: string, endDate?: string) {
     const whereClause: any = {};
-    
+
     if (startDate && endDate) {
       whereClause.orderDate = Between(new Date(startDate), new Date(endDate));
     }
@@ -280,10 +286,10 @@ export class ReportsService {
 
     // Group by farmer
     const farmData: Record<string, any> = {};
-    
+
     purchases.forEach(purchase => {
       const farmerKey = purchase.farmerId || purchase.supplierName || 'Unknown';
-      
+
       if (!farmData[farmerKey]) {
         farmData[farmerKey] = {
           farmerId: purchase.farmerId,
@@ -295,7 +301,7 @@ export class ReportsService {
           totalWeight: 0,
         };
       }
-      
+
       farmData[farmerKey].totalOrders += 1;
       farmData[farmerKey].totalCost += parseFloat(purchase.netAmount as any);
       farmData[farmerKey].totalWeight += parseFloat(purchase.totalWeight as any || '0');
@@ -316,7 +322,7 @@ export class ReportsService {
 
   async getCustomerWiseSales(startDate?: string, endDate?: string) {
     const whereClause: any = {};
-    
+
     if (startDate && endDate) {
       whereClause.saleDate = Between(new Date(startDate), new Date(endDate));
     }
@@ -325,10 +331,10 @@ export class ReportsService {
 
     // Group by customer
     const customerData: Record<string, any> = {};
-    
+
     sales.forEach(sale => {
       const customerKey = sale.customerName || 'Unknown';
-      
+
       if (!customerData[customerKey]) {
         customerData[customerKey] = {
           customerName: sale.customerName,
@@ -337,7 +343,7 @@ export class ReportsService {
           totalQuantity: 0,
         };
       }
-      
+
       customerData[customerKey].totalSales += 1;
       customerData[customerKey].totalRevenue += parseFloat(sale.netAmount as any);
       customerData[customerKey].totalQuantity += parseFloat(sale.quantity as any || '0');

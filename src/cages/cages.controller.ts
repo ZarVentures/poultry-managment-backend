@@ -3,7 +3,7 @@ import { CagesService } from './cages.service';
 
 @Controller('cages')
 export class CagesController {
-  constructor(private readonly cagesService: CagesService) {}
+  constructor(private readonly cagesService: CagesService) { }
 
   // Get cages by purchase order number (for sale/godown forms)
   @Get('by-purchase/:orderNumber')
@@ -60,5 +60,22 @@ export class CagesController {
     @Body('godownSaleWeight') godownSaleWeight?: number,
   ) {
     return this.cagesService.markGodownSold(cageIds, godownSaleId, godownSaleWeight);
+  }
+
+  // Get all cages currently in godown
+  @Get('in-godown')
+  getInGodown() {
+    return this.cagesService.getInGodown();
+  }
+
+  // Handle partial cage sale
+  @Patch('partial-godown-sale')
+  partialGodownSale(
+    @Body('cageId') cageId: string,
+    @Body('godownSaleId') godownSaleId: string,
+    @Body('soldBirds') soldBirds: number,
+    @Body('soldWeight') soldWeight: number,
+  ) {
+    return this.cagesService.partialGodownSale(cageId, godownSaleId, soldBirds, soldWeight);
   }
 }

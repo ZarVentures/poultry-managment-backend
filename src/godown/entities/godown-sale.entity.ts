@@ -42,6 +42,9 @@ export class GodownSale {
   @Column({ name: 'payment_status', type: 'enum', enum: ['paid', 'pending', 'partial'] })
   paymentStatus!: 'paid' | 'pending' | 'partial';
 
+  @Column({ name: 'weight_loss', type: 'numeric', precision: 10, scale: 2, default: 0 })
+  weightLoss!: number;
+
   @Column({ name: 'payment_mode', type: 'varchar', length: 50, nullable: true })
   paymentMode?: string;
 

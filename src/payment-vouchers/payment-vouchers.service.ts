@@ -4,13 +4,15 @@ import { Repository, Between } from 'typeorm';
 import { PaymentVoucher } from './payment-voucher.entity';
 import { CreatePaymentVoucherDto } from './dto/create-payment-voucher.dto';
 import { UpdatePaymentVoucherDto } from './dto/update-payment-voucher.dto';
+import { BillingService } from '../billing/billing.service';
 
 @Injectable()
 export class PaymentVouchersService {
   constructor(
     @InjectRepository(PaymentVoucher)
     private paymentVoucherRepository: Repository<PaymentVoucher>,
-  ) {}
+    private billingService: BillingService,
+  ) { }
 
   async create(createDto: CreatePaymentVoucherDto, userId: number): Promise<PaymentVoucher> {
     // Generate voucher number
@@ -22,7 +24,11 @@ export class PaymentVouchersService {
       createdById: userId,
     });
 
-    return await this.paymentVoucherRepository.save(voucher);
+    const savedVoucher = await this.paymentVoucherRepository.save(voucher);
+    if (savedVoucher.status === 'paid') {
+      await this.integrateWithLedger(savedVoucher);
+    }
+    return savedVoucher;
   }
 
   async findAll(filters?: {
@@ -71,7 +77,11 @@ export class PaymentVouchersService {
   async update(id: number, updateDto: UpdatePaymentVoucherDto): Promise<PaymentVoucher> {
     const voucher = await this.findOne(id);
     Object.assign(voucher, updateDto);
-    return await this.paymentVoucherRepository.save(voucher);
+    const saved = await this.paymentVoucherRepository.save(voucher);
+    if (saved.status === 'paid') {
+      await this.integrateWithLedger(saved);
+    }
+    return saved;
   }
 
   async remove(id: number): Promise<void> {
@@ -87,7 +97,9 @@ export class PaymentVouchersService {
     if (!voucher.paidDate) {
       voucher.paidDate = new Date();
     }
-    return await this.paymentVoucherRepository.save(voucher);
+    const savedApprove = await this.paymentVoucherRepository.save(voucher);
+    await this.integrateWithLedger(savedApprove);
+    return savedApprove;
   }
 
   async cancel(id: number): Promise<PaymentVoucher> {
@@ -137,7 +149,7 @@ export class PaymentVouchersService {
   private async generateVoucherNumber(): Promise<string> {
     const year = new Date().getFullYear();
     const month = String(new Date().getMonth() + 1).padStart(2, '0');
-    
+
     // Get the last voucher number for this month
     const lastVoucher = await this.paymentVoucherRepository
       .createQueryBuilder('voucher')
@@ -152,5 +164,30 @@ export class PaymentVouchersService {
     }
 
     return `PV-${year}-${month}-${String(sequence).padStart(4, '0')}`;
+  }
+
+  private async integrateWithLedger(voucher: PaymentVoucher) {
+    if (voucher.status !== 'paid') return;
+
+    try {
+      const parties = await this.billingService.getParties();
+      const party = parties.find(p => p.name.toLowerCase() === voucher.payeeName.toLowerCase());
+
+      if (party) {
+        // Payment Voucher is typically 'money going out'
+        // In the ledger of a party:
+        // Debit increases their balance (they owe us more / we owe them less)
+        // If we pay them, we owe them less, so DEBIT.
+        await this.billingService.recordVoucher(
+          party.id,
+          voucher.voucherNumber,
+          Number(voucher.amount),
+          new Date(voucher.voucherDate).toISOString().split('T')[0],
+          'debit'
+        );
+      }
+    } catch (error) {
+      console.error('Failed to integrate voucher with ledger:', error);
+    }
   }
 }

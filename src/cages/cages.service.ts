@@ -8,7 +8,7 @@ export class CagesService {
   constructor(
     @InjectRepository(Cage)
     private readonly cageRepo: Repository<Cage>,
-  ) {}
+  ) { }
 
   // Create cages from a purchase order
   async createFromPurchase(purchaseOrderId: string, cageData: Array<{
@@ -90,6 +90,60 @@ export class CagesService {
       .set(updateData)
       .whereInIds(cageIds)
       .execute();
+  }
+
+  // Handle partial cage sale by splitting the record
+  async partialGodownSale(
+    cageId: string,
+    godownSaleId: string,
+    soldBirds: number,
+    soldWeight: number,
+    weightLoss: number = 0
+  ): Promise<void> {
+    const cage = await this.cageRepo.findOne({ where: { id: cageId } });
+    if (!cage) throw new NotFoundException(`Cage ${cageId} not found`);
+
+    if (soldBirds >= cage.numberOfBirds) {
+      // Full sale
+      await this.markGodownSold([cageId], godownSaleId, soldWeight);
+      return;
+    }
+
+    // Partial sale: Split the record
+    const remainingBirds = cage.numberOfBirds - soldBirds;
+    const originalInwardWeight = Number(cage.godownInwardWeight || cage.purchaseWeight || 0);
+
+    // The portion we are selling originally weighed (soldWeight + weightLoss)
+    const inwardWeightOfSoldPortion = Number(soldWeight) + Number(weightLoss);
+    const remainingWeight = Math.max(0, originalInwardWeight - inwardWeightOfSoldPortion);
+
+    // 1. Create a new record for the SOLD portion
+    const soldCage = this.cageRepo.create({
+      ...cage,
+      id: undefined, // Let DB generate new ID
+      numberOfBirds: soldBirds,
+      godownInwardWeight: inwardWeightOfSoldPortion,
+      godownSaleWeight: soldWeight,
+      status: 'godown_sold',
+      godownSaleId,
+      updatedAt: new Date(),
+    });
+
+    // 2. Update the existing record with the REMAINING portion
+    cage.numberOfBirds = remainingBirds;
+    cage.godownInwardWeight = remainingWeight;
+    cage.updatedAt = new Date();
+
+    await this.cageRepo.save([soldCage, cage]);
+  }
+
+  // Get all cages currently in godown
+  async getInGodown(): Promise<Cage[]> {
+    return this.cageRepo.find({
+      where: { status: 'in_godown' },
+      order: { cageId: 'ASC' },
+      relations: ['purchaseOrder'],
+    });
   }
 
   // Get full cage journey for a purchase bill (weight loss tracking)

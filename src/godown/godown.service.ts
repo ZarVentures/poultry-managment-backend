@@ -22,19 +22,25 @@ export class GodownService {
     @InjectRepository(GodownExpense)
     private expenseRepo: Repository<GodownExpense>,
     private readonly cagesService: CagesService,
-  ) {}
+  ) { }
 
   // ─── Inward Entries ───────────────────────────────────────────────────────
 
   async createInward(data: any) {
-    const { cageIds, godownInwardWeight, ...entryData } = data;
+    const { cageIds, godownInwardWeight, actualWeight, weightLoss, ...entryData } = data;
+
+    if (actualWeight) entryData.actualWeight = parseFloat(actualWeight);
+    if (weightLoss) entryData.weightLoss = parseFloat(weightLoss);
+    // If godownInwardWeight is provided, it's the final stock weight
+    if (godownInwardWeight) entryData.totalWeight = parseFloat(godownInwardWeight);
+
     const entry = this.inwardRepo.create(entryData);
     const savedResult = await this.inwardRepo.save(entry);
     const savedId: string = (savedResult as any).id ?? (savedResult as any)[0]?.id;
 
     // Mark selected cages as in_godown in master cages table
     if (cageIds && cageIds.length > 0) {
-      await this.cagesService.markInGodown(cageIds, savedId, godownInwardWeight);
+      await this.cagesService.markInGodown(cageIds, savedId, parseFloat(godownInwardWeight || entryData.totalWeight || 0));
     }
 
     return this.findOneInward(savedId);
@@ -84,17 +90,21 @@ export class GodownService {
   }
 
   async createSale(data: any) {
-    const { cageIds, godownSaleWeight, payments, ...saleData } = data;
-    
+    const { cageIds, godownSaleWeight, payments, weightLoss, ...saleData } = data;
+
     // Auto-generate sale number if not provided
     if (!saleData.saleNo) {
       saleData.saleNo = await this.generateSaleNumber();
     }
-    
+
+    if (weightLoss) {
+      saleData.weightLoss = parseFloat(weightLoss);
+    }
+
     // Calculate total payment made from payments array
     const totalPaymentMade = (payments || []).reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
     saleData.amountReceived = totalPaymentMade;
-    
+
     const sale = this.saleRepo.create(saleData);
     const savedResult = await this.saleRepo.save(sale);
     const savedId: string = (savedResult as any).id ?? (savedResult as any)[0]?.id;
@@ -114,7 +124,21 @@ export class GodownService {
     }
 
     // Mark selected cages as godown_sold in master cages table
-    if (cageIds && cageIds.length > 0) {
+    // Support either simple cageIds array or detailed cages array with partials
+    const { cages: cageDetails } = data;
+    if (cageDetails && Array.isArray(cageDetails) && cageDetails.length > 0) {
+      for (const cage of cageDetails) {
+        if (cage.id && (cage.soldBirds || cage.numberOfBirds)) {
+          await this.cagesService.partialGodownSale(
+            cage.id,
+            savedId,
+            cage.soldBirds || cage.numberOfBirds,
+            cage.soldWeight || cage.cageWeight || 0,
+            cage.weightLoss || 0
+          );
+        }
+      }
+    } else if (cageIds && cageIds.length > 0) {
       await this.cagesService.markGodownSold(cageIds, savedId, godownSaleWeight);
     }
 
@@ -122,14 +146,14 @@ export class GodownService {
   }
 
   async findAllSales() {
-    return this.saleRepo.find({ 
+    return this.saleRepo.find({
       order: { saleDate: 'DESC' },
       relations: ['payments']
     });
   }
 
   async findOneSale(id: string) {
-    return this.saleRepo.findOne({ 
+    return this.saleRepo.findOne({
       where: { id },
       relations: ['payments']
     });
@@ -138,12 +162,12 @@ export class GodownService {
   async updateSale(id: string, data: any) {
     // Filter out fields that don't exist in the entity
     const { cages, payments, ...validData } = data;
-    
+
     // Handle payments update
     if (payments !== undefined) {
       // Delete existing payments
       await this.salePaymentRepo.delete({ godownSaleId: id });
-      
+
       // Add new payments
       const validPayments = payments
         .filter((p: any) => parseFloat(p.amount || '0') > 0)
@@ -152,16 +176,16 @@ export class GodownService {
           paymentMode: p.paymentMode,
           amount: parseFloat(p.amount),
         }));
-      
+
       if (validPayments.length > 0) {
         await this.salePaymentRepo.save(validPayments);
       }
-      
+
       // Update amount_received
       const totalPaymentMade = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
       validData.amountReceived = totalPaymentMade;
     }
-    
+
     await this.saleRepo.update(id, validData);
     return this.findOneSale(id);
   }

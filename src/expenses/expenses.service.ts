@@ -10,7 +10,7 @@ export class ExpensesService {
   constructor(
     @InjectRepository(Expense)
     private readonly expenseRepository: Repository<Expense>,
-  ) {}
+  ) { }
 
   async create(createExpenseDto: CreateExpenseDto): Promise<Expense> {
     const expense = this.expenseRepository.create({
@@ -27,6 +27,7 @@ export class ExpensesService {
     paymentMethod?: string,
   ): Promise<Expense[]> {
     const query = this.expenseRepository.createQueryBuilder('expense')
+      .leftJoinAndSelect('expense.expenseCategory', 'expenseCategory')
       .orderBy('expense.expenseDate', 'DESC');
 
     if (startDate && endDate) {
@@ -48,7 +49,10 @@ export class ExpensesService {
   }
 
   async findOne(id: string): Promise<Expense> {
-    const expense = await this.expenseRepository.findOne({ where: { id } });
+    const expense = await this.expenseRepository.findOne({
+      where: { id },
+      relations: ['expenseCategory']
+    });
     if (!expense) {
       throw new NotFoundException(`Expense with ID ${id} not found`);
     }
@@ -75,9 +79,10 @@ export class ExpensesService {
 
   async getExpensesByCategory(startDate?: string, endDate?: string): Promise<any[]> {
     const query = this.expenseRepository.createQueryBuilder('expense')
-      .select('expense.category', 'category')
+      .leftJoin('expense.expenseCategory', 'cat')
+      .select('COALESCE(cat.name, expense.category)', 'category')
       .addSelect('SUM(expense.amount)', 'total')
-      .groupBy('expense.category');
+      .groupBy('COALESCE(cat.name, expense.category)');
 
     if (startDate && endDate) {
       query.andWhere('expense.expenseDate BETWEEN :startDate AND :endDate', {
