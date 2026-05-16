@@ -74,6 +74,8 @@ export class ReportsService {
       totalSales: sales.length,
       totalAmount: sales.reduce((sum, s) => sum + parseFloat(s.totalAmount as any), 0),
       totalNetAmount: sales.reduce((sum, s) => sum + parseFloat(s.netAmount as any), 0),
+      totalWeightShortage: sales.reduce((sum, s) => sum + parseFloat((s.weightShortage || 0) as any), 0),
+      totalMortalityDeduction: sales.reduce((sum, s) => sum + parseFloat((s.mortalityDeduction || 0) as any), 0),
       totalPaid: sales.filter(s => s.paymentStatus === 'paid').length,
       totalPending: sales.filter(s => s.paymentStatus === 'pending').length,
       totalPartial: sales.filter(s => s.paymentStatus === 'partial').length,
@@ -187,6 +189,36 @@ export class ReportsService {
     });
 
     return grouped;
+  }
+
+  async getGodownSalesReport(startDate?: string, endDate?: string) {
+    const whereClause: any = {};
+
+    if (startDate && endDate) {
+      whereClause.saleDate = Between(new Date(startDate), new Date(endDate));
+    }
+
+    const sales = await this.godownSaleRepository.find({
+      where: whereClause,
+      order: { saleDate: 'DESC' },
+      relations: ['payments'],
+    });
+
+    const summary = {
+      totalSales: sales.length,
+      totalAmount: sales.reduce((sum, s) => sum + parseFloat((s.totalAmount || 0) as any), 0),
+      totalWeightLoss: sales.reduce((sum, s) => sum + parseFloat((s.weightLoss || 0) as any), 0),
+      totalAmountReceived: sales.reduce((sum, s) => sum + parseFloat((s.amountReceived || 0) as any), 0),
+      totalPaid: sales.filter(s => s.paymentStatus === 'paid').length,
+      totalPending: sales.filter(s => s.paymentStatus === 'pending').length,
+      totalPartial: sales.filter(s => s.paymentStatus === 'partial').length,
+    };
+
+    return {
+      summary,
+      sales,
+      dateRange: { startDate, endDate },
+    };
   }
 
   async getGrossProfitReport(startDate?: string, endDate?: string) {

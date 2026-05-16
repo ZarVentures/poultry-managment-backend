@@ -98,4 +98,12 @@ export class ReportsController {
   ) {
     return this.reportsService.getCollectionReport({ startDate, endDate, mode, page, limit });
   }
+
+  @Get('godown-sales')
+  async getGodownSalesReport(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportsService.getGodownSalesReport(startDate, endDate);
+  }
 }
