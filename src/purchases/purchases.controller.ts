@@ -20,7 +20,7 @@ import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 
 @Controller('purchases')
 export class PurchasesController {
-  constructor(private readonly purchasesService: PurchasesService) {}
+  constructor(private readonly purchasesService: PurchasesService) { }
 
   @Post()
   create(@Body() createPurchaseOrderDto: CreatePurchaseOrderDto) {
@@ -33,8 +33,10 @@ export class PurchasesController {
     @Query('endDate') endDate?: string,
     @Query('supplier') supplier?: string,
     @Query('status') status?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
-    return this.purchasesService.findAll(startDate, endDate, supplier, status);
+    return this.purchasesService.findAll(startDate, endDate, supplier, status, page, limit);
   }
 
   @Get('invoices/list')

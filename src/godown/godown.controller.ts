@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
 import { GodownService } from './godown.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
@@ -18,8 +18,12 @@ export class GodownController {
 
   @Get('inward')
   @Permissions('godown', 'read')
-  findAllInward() {
-    return this.godownService.findAllInward();
+  findAllInward(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.godownService.findAllInward(page, limit, search);
   }
 
   @Get('inward/:id')
@@ -49,8 +53,12 @@ export class GodownController {
 
   @Get('sales')
   @Permissions('godown', 'read')
-  findAllSales() {
-    return this.godownService.findAllSales();
+  findAllSales(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.godownService.findAllSales(page, limit, search);
   }
 
   @Get('sales/:id')
@@ -80,8 +88,12 @@ export class GodownController {
 
   @Get('mortality')
   @Permissions('godown', 'read')
-  findAllMortality() {
-    return this.godownService.findAllMortality();
+  findAllMortality(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.godownService.findAllMortality(page, limit, search);
   }
 
   @Get('mortality/:id')
@@ -111,8 +123,12 @@ export class GodownController {
 
   @Get('expenses')
   @Permissions('godown', 'read')
-  findAllExpenses() {
-    return this.godownService.findAllExpenses();
+  findAllExpenses(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.godownService.findAllExpenses(page, limit, search);
   }
 
   @Get('expenses/:id')

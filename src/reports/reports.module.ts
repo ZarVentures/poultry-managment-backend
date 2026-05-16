@@ -5,13 +5,17 @@ import { ReportsService } from './reports.service';
 import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { Sale } from '../sales/sale.entity';
 import { Expense } from '../expenses/expense.entity';
+import { Retailer } from '../retailers/retailer.entity';
+import { GodownSale } from '../godown/entities/godown-sale.entity';
+import { SalePayment } from '../sales/sale-payment.entity';
+import { GodownSalePayment } from '../godown/entities/godown-sale-payment.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PurchaseOrder, Sale, Expense]),
+    TypeOrmModule.forFeature([PurchaseOrder, Sale, Expense, Retailer, GodownSale, SalePayment, GodownSalePayment]),
   ],
   controllers: [ReportsController],
   providers: [ReportsService],
   exports: [ReportsService],
 })
-export class ReportsModule {}
+export class ReportsModule { }

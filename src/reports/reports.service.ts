@@ -5,6 +5,12 @@ import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { Sale } from '../sales/sale.entity';
 import { Expense } from '../expenses/expense.entity';
 
+import { Retailer } from '../retailers/retailer.entity';
+import { GodownSale } from '../godown/entities/godown-sale.entity';
+
+import { SalePayment } from '../sales/sale-payment.entity';
+import { GodownSalePayment } from '../godown/entities/godown-sale-payment.entity';
+
 @Injectable()
 export class ReportsService {
   constructor(
@@ -14,6 +20,14 @@ export class ReportsService {
     private readonly saleRepository: Repository<Sale>,
     @InjectRepository(Expense)
     private readonly expenseRepository: Repository<Expense>,
+    @InjectRepository(Retailer)
+    private readonly retailerRepository: Repository<Retailer>,
+    @InjectRepository(GodownSale)
+    private readonly godownSaleRepository: Repository<GodownSale>,
+    @InjectRepository(SalePayment)
+    private readonly salePaymentRepository: Repository<SalePayment>,
+    @InjectRepository(GodownSalePayment)
+    private readonly godownSalePaymentRepository: Repository<GodownSalePayment>,
   ) { }
 
   async getPurchaseReport(startDate?: string, endDate?: string) {
@@ -359,6 +373,163 @@ export class ReportsService {
         totalSales: sales.length,
       },
       dateRange: { startDate, endDate },
+    };
+  }
+
+  async getOutstandingReport(page?: number, limit?: number, sortBy: string = 'outstanding') {
+    const offset = page && limit ? (page - 1) * limit : 0;
+    const take = limit ? limit : 1000;
+
+    const query = `
+      SELECT 
+        r.id, r.name, r.phone,
+        CAST(COALESCE(s.total_sales, 0) + COALESCE(gs.total_sales, 0) AS FLOAT) as "totalSales",
+        CAST(COALESCE(s.total_received, 0) + COALESCE(gs.total_received, 0) AS FLOAT) as "totalReceived",
+        CAST((COALESCE(s.total_sales, 0) + COALESCE(gs.total_sales, 0)) - (COALESCE(s.total_received, 0) + COALESCE(gs.total_received, 0)) AS FLOAT) as outstanding,
+        CAST(COALESCE(s.sales_count, 0) + COALESCE(gs.sales_count, 0) AS INTEGER) as "salesCount"
+      FROM retailers r
+      LEFT JOIN (
+        SELECT retailer_id, SUM(net_amount) as total_sales, SUM(amount_received) as total_received, COUNT(*) as sales_count
+        FROM sales
+        GROUP BY retailer_id
+      ) s ON s.retailer_id = r.id
+      LEFT JOIN (
+        SELECT retailer_id, SUM(total_amount) as total_sales, SUM(amount_received) as total_received, COUNT(*) as sales_count
+        FROM godown_sales
+        GROUP BY retailer_id
+      ) gs ON gs.retailer_id = r.id
+      ORDER BY ${sortBy === 'name' ? 'r.name ASC' : 'outstanding DESC'}
+      OFFSET ${offset} LIMIT ${take}
+    `;
+
+    const countQuery = `SELECT COUNT(*) FROM retailers`;
+
+    // Global summary totals (for all retailers)
+    const summaryQuery = `
+      SELECT 
+        SUM(outstanding) FILTER (WHERE outstanding > 0) as "totalOutstanding",
+        SUM(outstanding) FILTER (WHERE outstanding < 0) as "totalOverpaid",
+        COUNT(*) FILTER (WHERE outstanding > 0) as "overdueCount",
+        COUNT(*) as "totalRetailers"
+      FROM (
+        SELECT 
+          (COALESCE(s.total_sales, 0) + COALESCE(gs.total_sales, 0)) - (COALESCE(s.total_received, 0) + COALESCE(gs.total_received, 0)) as outstanding
+        FROM retailers r
+        LEFT JOIN (
+          SELECT retailer_id, SUM(net_amount) as total_sales, SUM(amount_received) as total_received
+          FROM sales
+          GROUP BY retailer_id
+        ) s ON s.retailer_id = r.id
+        LEFT JOIN (
+          SELECT retailer_id, SUM(total_amount) as total_sales, SUM(amount_received) as total_received
+          FROM godown_sales
+          GROUP BY retailer_id
+        ) gs ON gs.retailer_id = r.id
+      ) t
+    `;
+
+    const [data, counts, summaryData] = await Promise.all([
+      this.retailerRepository.query(query),
+      this.retailerRepository.query(countQuery),
+      this.retailerRepository.query(summaryQuery),
+    ]);
+
+    const total = parseInt(counts[0].count);
+    const summary = summaryData[0];
+
+    return {
+      data,
+      total,
+      page: page || 1,
+      limit: limit || total,
+      summary: {
+        totalOutstanding: parseFloat(summary.totalOutstanding || 0),
+        totalOverpaid: Math.abs(parseFloat(summary.totalOverpaid || 0)),
+        overdueCount: parseInt(summary.overdueCount || 0),
+        totalRetailers: parseInt(summary.totalRetailers || 0),
+      }
+    };
+  }
+
+  async getCollectionReport(filters: { startDate?: string; endDate?: string; mode?: string; page?: number; limit?: number }) {
+    const { startDate, endDate, mode, page, limit } = filters;
+    const offset = page && limit ? (page - 1) * limit : 0;
+    const take = limit ? limit : 20;
+
+    let whereClause = 'WHERE 1=1';
+    if (startDate && endDate) {
+      whereClause += ` AND created_at BETWEEN '${startDate} 00:00:00' AND '${endDate} 23:59:59'`;
+    }
+    if (mode && mode !== 'all') {
+      whereClause += ` AND LOWER(payment_mode) = '${mode.toLowerCase()}'`;
+    }
+
+    const unionQuery = `
+      SELECT 
+        id, sale_id, invoice_number, customer_name, payment_mode, amount, created_at, 'Regular' as type
+      FROM (
+        SELECT p.id, p.sale_id, s.invoice_number, s.customer_name, p.payment_mode, p.amount, p.created_at
+        FROM sale_payments p
+        JOIN sales s ON s.id = p.sale_id
+      ) t1
+      UNION ALL
+      SELECT 
+        id, godown_sale_id as sale_id, invoice_number, customer_name, payment_mode, amount, created_at, 'Godown' as type
+      FROM (
+        SELECT p.id, p.godown_sale_id, s.invoice_number, s.customer_name, p.payment_mode, p.amount, p.created_at
+        FROM godown_sale_payments p
+        JOIN godown_sales s ON s.id = p.godown_sale_id
+      ) t2
+    `;
+
+    const dataQuery = `
+      SELECT * FROM (${unionQuery}) u
+      ${whereClause}
+      ORDER BY created_at DESC
+      OFFSET ${offset} LIMIT ${take}
+    `;
+
+    const countQuery = `
+      SELECT COUNT(*) as total, SUM(amount) as total_amount
+      FROM (${unionQuery}) u
+      ${whereClause}
+    `;
+
+    const summaryQuery = `
+      SELECT 
+        LOWER(payment_mode) as mode, 
+        SUM(amount) as amount 
+      FROM (${unionQuery}) u
+      ${whereClause}
+      GROUP BY LOWER(payment_mode)
+    `;
+
+    const [data, counts, summaryData] = await Promise.all([
+      this.salePaymentRepository.query(dataQuery),
+      this.salePaymentRepository.query(countQuery),
+      this.salePaymentRepository.query(summaryQuery),
+    ]);
+
+    const total = parseInt(counts[0].total || 0);
+    const totalAmount = parseFloat(counts[0].total_amount || 0);
+
+    const modeTotals: Record<string, number> = {};
+    summaryData.forEach((s: any) => {
+      modeTotals[s.mode] = parseFloat(s.amount);
+    });
+
+    return {
+      data: data.map((d: any) => ({
+        ...d,
+        amount: parseFloat(d.amount),
+      })),
+      total,
+      page: page || 1,
+      limit: limit || total,
+      summary: {
+        totalAmount,
+        modeTotals
+      }
     };
   }
 }

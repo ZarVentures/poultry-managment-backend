@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { RetailersService } from './retailers.service';
 import { CreateRetailerDto } from './dto/create-retailer.dto';
@@ -16,7 +17,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @Controller('retailers')
 @UseGuards(JwtAuthGuard)
 export class RetailersController {
-  constructor(private readonly retailersService: RetailersService) {}
+  constructor(private readonly retailersService: RetailersService) { }
 
   @Post()
   create(@Body() createRetailerDto: CreateRetailerDto) {
@@ -24,8 +25,12 @@ export class RetailersController {
   }
 
   @Get()
-  findAll() {
-    return this.retailersService.findAll();
+  findAll(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.retailersService.findAll(page, limit, search);
   }
 
   @Get('active/list')

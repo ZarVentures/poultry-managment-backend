@@ -13,7 +13,7 @@ export class SalesService {
     private readonly saleRepository: Repository<Sale>,
     @InjectRepository(SalePayment)
     private readonly salePaymentRepository: Repository<SalePayment>,
-  ) {}
+  ) { }
 
   private calcAmounts(dto: {
     quantity?: string; unitPrice?: string;
@@ -59,7 +59,7 @@ export class SalesService {
   async create(dto: CreateSaleDto): Promise<Sale> {
     // Auto-generate invoice number if not provided
     const invoiceNumber = dto.invoiceNumber || await this.generateInvoiceNumber();
-    
+
     const existing = await this.saleRepository.findOne({ where: { invoiceNumber } });
     if (existing) throw new BadRequestException(`Sale ${invoiceNumber} already exists`);
 
@@ -98,7 +98,16 @@ export class SalesService {
     return this.findOne(savedId);
   }
 
-  async findAll(startDate?: string, endDate?: string, customer?: string, productType?: string, paymentStatus?: string, retailerId?: string): Promise<Sale[]> {
+  async findAll(
+    startDate?: string,
+    endDate?: string,
+    customer?: string,
+    productType?: string,
+    paymentStatus?: string,
+    retailerId?: string,
+    page?: number,
+    limit?: number,
+  ): Promise<any> {
     const query = this.saleRepository.createQueryBuilder('sale')
       .leftJoinAndSelect('sale.retailer', 'retailer')
       .leftJoinAndSelect('sale.payments', 'payments')
@@ -109,6 +118,27 @@ export class SalesService {
     if (productType) query.andWhere('sale.productType = :productType', { productType });
     if (paymentStatus) query.andWhere('sale.paymentStatus = :paymentStatus', { paymentStatus });
     if (retailerId) query.andWhere('sale.retailerId = :retailerId', { retailerId });
+
+    if (page && limit) {
+      const take = limit;
+      const skip = (page - 1) * limit;
+      const [data, total] = await query
+        .skip(skip)
+        .take(take)
+        .getManyAndCount();
+
+      // For summary stats, we need to run a separate count/sum on the same filtered query
+      // but without skip/take
+      const allFiltered = await query.getMany();
+      const summary = {
+        totalBirds: allFiltered.reduce((s, x) => s + Number(x.quantity || 0), 0),
+        totalRevenue: allFiltered.reduce((s, x) => s + Number(x.netAmount || x.totalAmount || 0), 0),
+        totalReceived: allFiltered.reduce((s, x) => s + Number(x.amountReceived || 0), 0),
+        totalPending: allFiltered.reduce((s, x) => s + Math.max(0, Number(x.netAmount || x.totalAmount || 0) - Number(x.amountReceived || 0)), 0),
+      };
+
+      return { data, total, page, limit, summary };
+    }
 
     return query.getMany();
   }

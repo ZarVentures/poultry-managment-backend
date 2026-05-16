@@ -46,8 +46,24 @@ export class GodownService {
     return this.findOneInward(savedId);
   }
 
-  async findAllInward() {
-    return this.inwardRepo.find({ order: { entryDate: 'DESC' } });
+  async findAllInward(page?: number, limit?: number, search?: string) {
+    const query = this.inwardRepo.createQueryBuilder('inward')
+      .orderBy('inward.entryDate', 'DESC');
+
+    if (search) {
+      query.andWhere(
+        '(inward.farmerName ILIKE :search OR inward.vehicleNumber ILIKE :search OR inward.farmHouseName ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    if (page && limit) {
+      const skip = (page - 1) * limit;
+      const [data, total] = await query.skip(skip).take(limit).getManyAndCount();
+      return { data, total, page, limit };
+    }
+
+    return query.getMany();
   }
 
   async findOneInward(id: string) {
@@ -145,11 +161,25 @@ export class GodownService {
     return this.findOneSale(savedId);
   }
 
-  async findAllSales() {
-    return this.saleRepo.find({
-      order: { saleDate: 'DESC' },
-      relations: ['payments']
-    });
+  async findAllSales(page?: number, limit?: number, search?: string) {
+    const query = this.saleRepo.createQueryBuilder('sale')
+      .leftJoinAndSelect('sale.payments', 'payments')
+      .orderBy('sale.saleDate', 'DESC');
+
+    if (search) {
+      query.andWhere(
+        '(sale.retailerName ILIKE :search OR sale.saleNo ILIKE :search OR sale.vehicleNumber ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    if (page && limit) {
+      const skip = (page - 1) * limit;
+      const [data, total] = await query.skip(skip).take(limit).getManyAndCount();
+      return { data, total, page, limit };
+    }
+
+    return query.getMany();
   }
 
   async findOneSale(id: string) {
@@ -201,11 +231,25 @@ export class GodownService {
     return this.mortalityRepo.save(mortality);
   }
 
-  async findAllMortality() {
-    return this.mortalityRepo.find({
-      order: { mortalityDate: 'DESC' },
-      relations: ['godownInward'],
-    });
+  async findAllMortality(page?: number, limit?: number, search?: string) {
+    const query = this.mortalityRepo.createQueryBuilder('mortality')
+      .leftJoinAndSelect('mortality.godownInward', 'godownInward')
+      .orderBy('mortality.mortalityDate', 'DESC');
+
+    if (search) {
+      query.andWhere(
+        '(godownInward.farmerName ILIKE :search OR mortality.reason ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    if (page && limit) {
+      const skip = (page - 1) * limit;
+      const [data, total] = await query.skip(skip).take(limit).getManyAndCount();
+      return { data, total, page, limit };
+    }
+
+    return query.getMany();
   }
 
   async findOneMortality(id: string) {
@@ -228,8 +272,24 @@ export class GodownService {
     return this.expenseRepo.save(expense);
   }
 
-  async findAllExpenses() {
-    return this.expenseRepo.find({ order: { expenseDate: 'DESC' } });
+  async findAllExpenses(page?: number, limit?: number, search?: string) {
+    const query = this.expenseRepo.createQueryBuilder('expense')
+      .orderBy('expense.expenseDate', 'DESC');
+
+    if (search) {
+      query.andWhere(
+        '(expense.expenseCategory ILIKE :search OR expense.description ILIKE :search OR expense.paidTo ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    if (page && limit) {
+      const skip = (page - 1) * limit;
+      const [data, total] = await query.skip(skip).take(limit).getManyAndCount();
+      return { data, total, page, limit };
+    }
+
+    return query.getMany();
   }
 
   async findOneExpense(id: string) {

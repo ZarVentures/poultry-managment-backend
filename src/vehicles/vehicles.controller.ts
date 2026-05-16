@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, UseGuards, Query } from '@nestjs/common';
 import { VehiclesService } from './vehicles.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
@@ -8,11 +8,15 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @Controller('vehicles')
 @UseGuards(JwtAuthGuard)
 export class VehiclesController {
-  constructor(private readonly vehiclesService: VehiclesService) {}
+  constructor(private readonly vehiclesService: VehiclesService) { }
 
   @Get()
-  async findAll(): Promise<Vehicle[]> {
-    return this.vehiclesService.findAll();
+  async findAll(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ): Promise<any> {
+    return this.vehiclesService.findAll(page, limit, search);
   }
 
   @Get('active/list')

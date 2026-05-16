@@ -10,10 +10,26 @@ export class VehiclesService {
   constructor(
     @InjectRepository(Vehicle)
     private readonly vehiclesRepository: Repository<Vehicle>,
-  ) {}
+  ) { }
 
-  async findAll(): Promise<Vehicle[]> {
-    return this.vehiclesRepository.find({ order: { driverName: 'ASC' } });
+  async findAll(page?: number, limit?: number, search?: string) {
+    const query = this.vehiclesRepository.createQueryBuilder('vehicle')
+      .orderBy('vehicle.vehicleNumber', 'ASC');
+
+    if (search) {
+      query.andWhere(
+        '(vehicle.vehicleNumber ILIKE :search OR vehicle.driverName ILIKE :search OR vehicle.ownerName ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    if (page && limit) {
+      const skip = (page - 1) * limit;
+      const [data, total] = await query.skip(skip).take(limit).getManyAndCount();
+      return { data, total, page, limit };
+    }
+
+    return query.getMany();
   }
 
   async findActive(): Promise<Vehicle[]> {

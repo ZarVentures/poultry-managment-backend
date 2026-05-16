@@ -18,7 +18,7 @@ export class PurchasesService {
     @InjectRepository(PurchaseOrderPayment)
     private readonly purchaseOrderPaymentRepository: Repository<PurchaseOrderPayment>,
     private readonly cagesService: CagesService,
-  ) {}
+  ) { }
 
   private calcAmounts(dto: { totalWeight?: string; ratePerKg?: string; transportCharges?: string; otherCharges?: string }) {
     const totalWeight = parseFloat(dto.totalWeight || '0');
@@ -56,7 +56,7 @@ export class PurchasesService {
   async create(dto: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
     // Auto-generate order number if not provided
     const orderNumber = dto.orderNumber || await this.generateOrderNumber();
-    
+
     const existing = await this.purchaseOrderRepository.findOne({ where: { orderNumber } });
     if (existing) throw new BadRequestException(`Purchase order ${orderNumber} already exists`);
 
@@ -130,7 +130,14 @@ export class PurchasesService {
     return this.findOne(savedId);
   }
 
-  async findAll(startDate?: string, endDate?: string, supplier?: string, status?: string): Promise<PurchaseOrder[]> {
+  async findAll(
+    startDate?: string,
+    endDate?: string,
+    supplier?: string,
+    status?: string,
+    page?: number,
+    limit?: number
+  ): Promise<any> {
     const query = this.purchaseOrderRepository.createQueryBuilder('po')
       .leftJoinAndSelect('po.items', 'items')
       .leftJoinAndSelect('po.payments', 'payments')
@@ -139,7 +146,54 @@ export class PurchasesService {
 
     if (startDate && endDate) query.andWhere('po.orderDate BETWEEN :startDate AND :endDate', { startDate, endDate });
     if (supplier) query.andWhere('po.supplierName ILIKE :supplier', { supplier: `%${supplier}%` });
-    if (status) query.andWhere('po.status = :status', { status });
+    if (status) {
+      if (status === 'pending_or_partial') {
+        query.andWhere('po.purchasePaymentStatus IN (:...statuses)', { statuses: ['pending', 'partial'] });
+      } else {
+        query.andWhere('po.purchasePaymentStatus = :status', { status });
+      }
+    }
+
+    if (page && limit) {
+      const skip = (page - 1) * limit;
+      const [data, total] = await query.skip(skip).take(limit).getManyAndCount();
+
+      // Summary statistics for the filtered dataset
+      const summaryQuery = await this.purchaseOrderRepository.createQueryBuilder('po')
+        .select([
+          'SUM(po.totalWeight) as "totalWeight"',
+          'SUM(po.netAmount) as "totalAmount"',
+          'SUM(po.totalPaymentMade) as "totalPaid"',
+          'SUM(po.balanceAmount) as "totalBalance"',
+          'COUNT(po.id) as count'
+        ]);
+
+      if (startDate && endDate) summaryQuery.andWhere('po.orderDate BETWEEN :startDate AND :endDate', { startDate, endDate });
+      if (supplier) summaryQuery.andWhere('po.supplierName ILIKE :supplier', { supplier: `%${supplier}%` });
+      if (status) {
+        if (status === 'pending_or_partial') {
+          summaryQuery.andWhere('po.purchasePaymentStatus IN (:...statuses)', { statuses: ['pending', 'partial'] });
+        } else {
+          summaryQuery.andWhere('po.purchasePaymentStatus = :status', { status });
+        }
+      }
+
+      const summary = await summaryQuery.getRawOne();
+
+      return {
+        data,
+        total,
+        page,
+        limit,
+        summary: {
+          totalWeight: parseFloat(summary.totalWeight || 0),
+          totalAmount: parseFloat(summary.totalAmount || 0),
+          totalPaid: parseFloat(summary.totalPaid || 0),
+          totalBalance: parseFloat(summary.totalBalance || 0),
+          count: parseInt(summary.count || 0),
+        }
+      };
+    }
 
     return query.getMany();
   }

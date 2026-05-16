@@ -10,17 +10,31 @@ export class RetailersService {
   constructor(
     @InjectRepository(Retailer)
     private readonly retailerRepository: Repository<Retailer>,
-  ) {}
+  ) { }
 
   async create(createRetailerDto: CreateRetailerDto): Promise<Retailer> {
     const retailer = this.retailerRepository.create(createRetailerDto);
     return this.retailerRepository.save(retailer);
   }
 
-  async findAll(): Promise<Retailer[]> {
-    return this.retailerRepository.find({
-      order: { createdAt: 'DESC' },
-    });
+  async findAll(page?: number, limit?: number, search?: string) {
+    const query = this.retailerRepository.createQueryBuilder('retailer')
+      .orderBy('retailer.createdAt', 'DESC');
+
+    if (search) {
+      query.andWhere(
+        '(retailer.name ILIKE :search OR retailer.phone ILIKE :search OR retailer.shopName ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    if (page && limit) {
+      const skip = (page - 1) * limit;
+      const [data, total] = await query.skip(skip).take(limit).getManyAndCount();
+      return { data, total, page, limit };
+    }
+
+    return query.getMany();
   }
 
   async findActive(): Promise<Retailer[]> {

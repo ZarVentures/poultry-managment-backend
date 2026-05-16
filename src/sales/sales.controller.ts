@@ -41,8 +41,10 @@ export class SalesController {
     @Query('customer') customer?: string,
     @Query('productType') productType?: string,
     @Query('paymentStatus') paymentStatus?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
-    return this.salesService.findAll(startDate, endDate, customer, productType, paymentStatus);
+    return this.salesService.findAll(startDate, endDate, customer, productType, paymentStatus, undefined, page, limit);
   }
 
   @Get('invoices/list')

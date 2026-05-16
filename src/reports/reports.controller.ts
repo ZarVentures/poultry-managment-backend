@@ -5,7 +5,7 @@ import { ReportsService } from './reports.service';
 @Controller('reports')
 @UseGuards(JwtAuthGuard)
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) {}
+  constructor(private readonly reportsService: ReportsService) { }
 
   @Get('purchases')
   async getPurchaseReport(
@@ -77,5 +77,25 @@ export class ReportsController {
     @Query('endDate') endDate?: string,
   ) {
     return this.reportsService.getCustomerWiseSales(startDate, endDate);
+  }
+
+  @Get('outstanding')
+  async getOutstandingReport(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('sortBy') sortBy?: string,
+  ) {
+    return this.reportsService.getOutstandingReport(page, limit, sortBy);
+  }
+
+  @Get('collection')
+  async getCollectionReport(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('mode') mode?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.reportsService.getCollectionReport({ startDate, endDate, mode, page, limit });
   }
 }
