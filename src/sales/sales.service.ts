@@ -56,6 +56,10 @@ export class SalesService {
     return `${prefix}0001`;
   }
 
+  async generateNextInvoiceNumber(): Promise<string> {
+    return this.generateInvoiceNumber();
+  }
+
   async create(dto: CreateSaleDto): Promise<Sale> {
     // Auto-generate invoice number if not provided
     const invoiceNumber = dto.invoiceNumber || await this.generateInvoiceNumber();

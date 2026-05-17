@@ -22,6 +22,12 @@ import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 export class PurchasesController {
   constructor(private readonly purchasesService: PurchasesService) { }
 
+  @Get('next-order-number')
+  async getNextOrderNumber() {
+    const nextOrderNumber = await this.purchasesService.generateNextOrderNumber();
+    return { nextOrderNumber };
+  }
+
   @Post()
   create(@Body() createPurchaseOrderDto: CreatePurchaseOrderDto) {
     return this.purchasesService.create(createPurchaseOrderDto);

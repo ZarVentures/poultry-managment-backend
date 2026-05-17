@@ -105,6 +105,10 @@ export class GodownService {
     return `${prefix}0001`;
   }
 
+  async generateNextSaleNumber(): Promise<string> {
+    return this.generateSaleNumber();
+  }
+
   async createSale(data: any) {
     const { cageIds, godownSaleWeight, payments, weightLoss, ...saleData } = data;
 

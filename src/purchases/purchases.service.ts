@@ -53,6 +53,10 @@ export class PurchasesService {
     return `${prefix}0001`;
   }
 
+  async generateNextOrderNumber(): Promise<string> {
+    return this.generateOrderNumber();
+  }
+
   async create(dto: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
     // Auto-generate order number if not provided
     const orderNumber = dto.orderNumber || await this.generateOrderNumber();
