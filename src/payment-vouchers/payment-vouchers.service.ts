@@ -170,22 +170,25 @@ export class PaymentVouchersService {
     if (voucher.status !== 'paid') return;
 
     try {
-      const parties = await this.billingService.getParties();
-      const party = parties.find(p => p.name.toLowerCase() === voucher.payeeName.toLowerCase());
+      // Find or create billing party for this payee
+      const party = await this.billingService.findOrCreatePartyByName(
+        voucher.payeeName,
+        voucher.payeeType === 'retailer' ? 'Retailer' : 
+        voucher.payeeType === 'farmer' ? 'Farm' : 'Trader'
+      );
 
-      if (party) {
-        // Payment Voucher is typically 'money going out'
-        // In the ledger of a party:
-        // Debit increases their balance (they owe us more / we owe them less)
-        // If we pay them, we owe them less, so DEBIT.
-        await this.billingService.recordVoucher(
-          party.id,
-          voucher.voucherNumber,
-          Number(voucher.amount),
-          new Date(voucher.voucherDate).toISOString().split('T')[0],
-          'debit'
-        );
-      }
+      // Payment Voucher is typically 'money going out'
+      // In the ledger of a party:
+      // Debit increases their balance (they owe us more / we owe them less)
+      // If we pay them, we owe them less, so DEBIT.
+      await this.billingService.recordVoucher(
+        party.id,
+        voucher.voucherNumber,
+        Number(voucher.amount),
+        new Date(voucher.voucherDate).toISOString().split('T')[0],
+        'debit'
+      );
+      console.log(`✅ Voucher ${voucher.voucherNumber} integrated with billing ledger for party ${party.name} (ID: ${party.id})`);
     } catch (error) {
       console.error('Failed to integrate voucher with ledger:', error);
     }

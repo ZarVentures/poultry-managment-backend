@@ -61,4 +61,10 @@ export class BillingController {
   // Ledger
   @Get('ledger/:partyId')
   getLedger(@Param('partyId') partyId: string) { return this.billingService.getLedger(partyId); }
+
+  @Get('ledger-by-name/:name')
+  async getLedgerByName(@Param('name') name: string) {
+    const party = await this.billingService.findOrCreatePartyByName(name);
+    return this.billingService.getLedger(party.id);
+  }
 }

@@ -171,9 +171,35 @@ export class BillingService {
     await this.recalculatePartyBalance(partyId);
   }
 
-
   async getLedger(partyId: string): Promise<BillingLedger[]> {
     return this.ledgerRepo.find({ where: { partyId }, order: { date: 'ASC', createdAt: 'ASC' } });
+  }
+
+  // Helper: Find or create billing party by name
+  async findOrCreatePartyByName(name: string, type: PartyType = 'Retailer', phone?: string, address?: string): Promise<BillingParty> {
+    // Try to find existing party by name (case-insensitive)
+    const existing = await this.partyRepo
+      .createQueryBuilder('party')
+      .where('LOWER(party.name) = LOWER(:name)', { name })
+      .getOne();
+    
+    if (existing) {
+      return existing;
+    }
+
+    // Create new party
+    const party = this.partyRepo.create({
+      name,
+      type,
+      phone: phone || null,
+      address: address || null,
+      openingBalance: 0,
+      currentBalance: 0,
+      creditLimit: 0,
+      paymentTerms: 30,
+    });
+
+    return await this.partyRepo.save(party);
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
