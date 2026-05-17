@@ -1,86 +1,54 @@
 const { Client } = require('pg');
+require('dotenv').config();
 
-const client = new Client({
-  host: process.env.DB_HOST || 'poultry-db.c5w6ew4smp2q.ap-south-1.rds.amazonaws.com',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  user: process.env.DB_USERNAME || 'poultry_user',
-  password: process.env.DB_PASSWORD || 'poultry_user1212',
-  database: process.env.DB_NAME || 'poultry_stage',
-});
+async function addExpenseCategoriesTable() {
+  const client = new Client({
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+  });
 
-async function createExpenseCategoriesTable() {
   try {
     await client.connect();
-    console.log('Connected to database');
+    console.log('✅ Connected to database');
 
     // Create expense_categories table
+    console.log('Creating expense_categories table...');
     await client.query(`
       CREATE TABLE IF NOT EXISTS expense_categories (
-        id BIGSERIAL PRIMARY KEY,
-        name VARCHAR(100) NOT NULL UNIQUE,
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) UNIQUE NOT NULL,
         description TEXT,
-        icon VARCHAR(50),
-        is_active BOOLEAN DEFAULT true,
-        is_system BOOLEAN DEFAULT false,
+        "isActive" BOOLEAN DEFAULT true,
+        "isDefault" BOOLEAN DEFAULT false,
+        "sortOrder" INTEGER DEFAULT 0,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
-    console.log('✓ Created expense_categories table');
-
-    // Insert default system categories
-    await client.query(`
-      INSERT INTO expense_categories (name, description, icon, is_system) VALUES
-      ('Feed', 'Animal feed and nutrition', '🌾', true),
-      ('Labor', 'Labor and wages', '👷', true),
-      ('Medicine', 'Veterinary medicine and healthcare', '💊', true),
-      ('Utilities', 'Electricity, water, and other utilities', '💡', true),
-      ('Equipment', 'Equipment purchase and rental', '🔧', true),
-      ('Maintenance', 'Repairs and maintenance', '🔨', true),
-      ('Transportation', 'Vehicle and transportation costs', '🚚', true),
-      ('Other', 'Miscellaneous expenses', '📝', true)
-      ON CONFLICT (name) DO NOTHING;
-    `);
-    console.log('✓ Inserted default expense categories');
+    console.log('✅ expense_categories table created');
 
     // Add category_id column to expenses table
+    console.log('Adding category_id column to expenses table...');
     await client.query(`
       ALTER TABLE expenses 
       ADD COLUMN IF NOT EXISTS category_id BIGINT REFERENCES expense_categories(id);
     `);
-    console.log('✓ Added category_id column to expenses table');
+    console.log('✅ category_id column added to expenses table');
 
-    // Migrate existing category data to category_id
-    const categories = await client.query('SELECT id, name FROM expense_categories');
-    const categoryMap = {
-      'feed': 'Feed',
-      'labor': 'Labor',
-      'medicine': 'Medicine',
-      'utilities': 'Utilities',
-      'equipment': 'Equipment',
-      'maintenance': 'Maintenance',
-      'transportation': 'Transportation',
-      'other': 'Other'
-    };
+    console.log('\n✅ Migration completed successfully!');
+    console.log('\nNext steps:');
+    console.log('1. Run the seed endpoint: POST http://your-api/expense-categories/seed');
+    console.log('2. Or use the backend to seed default categories');
 
-    for (const [oldValue, newName] of Object.entries(categoryMap)) {
-      const category = categories.rows.find(c => c.name === newName);
-      if (category) {
-        await client.query(
-          `UPDATE expenses SET category_id = $1 WHERE category = $2 AND category_id IS NULL`,
-          [category.id, oldValue]
-        );
-        console.log(`✓ Migrated '${oldValue}' expenses to category_id ${category.id}`);
-      }
-    }
-
-    console.log('\n✅ Expense categories table created and data migrated successfully!');
   } catch (error) {
-    console.error('❌ Error:', error.message);
+    console.error('❌ Migration failed:', error.message);
     throw error;
   } finally {
     await client.end();
   }
 }
 
-createExpenseCategoriesTable();
+addExpenseCategoriesTable();
