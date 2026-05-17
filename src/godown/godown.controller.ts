@@ -45,7 +45,7 @@ export class GodownController {
   }
 
   // Sales
-  @Get('sales/next-sale-number')
+  @Get('sales/generate/next-sale-number')
   @Permissions('godown', 'read')
   async getNextSaleNumber() {
     const nextSaleNumber = await this.godownService.generateNextSaleNumber();

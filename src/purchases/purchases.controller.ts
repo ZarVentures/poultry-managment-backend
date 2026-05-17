@@ -22,7 +22,7 @@ import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 export class PurchasesController {
   constructor(private readonly purchasesService: PurchasesService) { }
 
-  @Get('next-order-number')
+  @Get('generate/next-order-number')
   async getNextOrderNumber() {
     const nextOrderNumber = await this.purchasesService.generateNextOrderNumber();
     return { nextOrderNumber };

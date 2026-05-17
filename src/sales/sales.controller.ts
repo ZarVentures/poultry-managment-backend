@@ -27,7 +27,7 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 export class SalesController {
   constructor(private readonly salesService: SalesService) { }
 
-  @Get('next-invoice-number')
+  @Get('generate/next-invoice-number')
   @Permissions('sales', 'read')
   async getNextInvoiceNumber() {
     const nextInvoiceNumber = await this.salesService.generateNextInvoiceNumber();
