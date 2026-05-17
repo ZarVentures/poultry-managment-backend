@@ -69,10 +69,12 @@ export class DashboardService {
     const revenueQuery = this.saleRepository.createQueryBuilder('sale')
       .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
       .addSelect('COUNT(*)', 'count')
+      .addSelect('COALESCE(SUM(sale.numberOfBirds), 0)', 'totalBirds')
       .where('sale.saleDate >= :startDate AND sale.saleDate <= :endDate', dateFilter);
     
     const revenueResult = await revenueQuery.getRawOne();
     const totalRevenue = parseFloat(revenueResult.total) || 0;
+    const totalBirdsSold = parseInt(revenueResult.totalBirds) || 0;
 
     // Total Expenses MTD
     const expenseQuery = this.expenseRepository.createQueryBuilder('expense')
@@ -99,6 +101,7 @@ export class DashboardService {
       profit,
       totalVehicles,
       totalSales,
+      totalBirdsSold,
       period: {
         startDate: dateFilter.startDate,
         endDate: dateFilter.endDate

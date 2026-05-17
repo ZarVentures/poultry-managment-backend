@@ -24,6 +24,9 @@ export class Sale {
   @Column({ name: 'cage_no', type: 'varchar', length: 100, nullable: true })
   cageNo?: string;
 
+  @Column({ name: 'number_of_birds', type: 'integer', nullable: true, default: 0 })
+  numberOfBirds?: number;
+
   @Column({ name: 'customer_name', type: 'varchar', length: 150 })
   customerName!: string;
 
