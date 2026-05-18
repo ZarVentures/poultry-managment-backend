@@ -17,8 +17,8 @@ const ORDERED_TABLES = [
   'settings',
   'products',
   'inventory_items',
-  'cages',
   'purchase_orders',
+  'cages',
   'purchase_order_items',
   'purchase_order_payments',
   'sales',            // ← parent of sale_payments
@@ -52,8 +52,16 @@ async function syncTable(stage, prod, table) {
 
   // 3. Truncation moved to orderedSync to satisfy FK constraints
 
-  // 4. Insert row by row
-  const cols = Object.keys(data.rows[0]);
+  // 4. Get non-generated columns from staging database
+  const columnsRes = await stage.query(`
+    SELECT column_name 
+    FROM information_schema.columns 
+    WHERE table_name = $1 
+      AND is_generated = 'NEVER'
+  `, [table]);
+  const prodCols = Object.keys(data.rows[0]);
+  const cols = columnsRes.rows.map(r => r.column_name).filter(c => prodCols.includes(c));
+
   const colList = cols.map(c => `"${c}"`).join(', ');
   let inserted = 0;
   let failed = 0;
