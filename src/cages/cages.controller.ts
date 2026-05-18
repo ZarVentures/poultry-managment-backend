@@ -78,6 +78,13 @@ export class CagesController {
     return this.cagesService.getInGodown();
   }
 
+  // Get cages by godown sale ID
+  @Get('by-godown-sale/:saleId')
+  getByGodownSaleId(@Param('saleId') saleId: string) {
+    return this.cagesService.getByGodownSaleId(saleId);
+  }
+
+
   // Handle partial cage sale
   @Patch('partial-godown-sale')
   partialGodownSale(

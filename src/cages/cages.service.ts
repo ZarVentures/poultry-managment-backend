@@ -201,6 +201,16 @@ export class CagesService {
     });
   }
 
+  // Get cages by godown sale ID
+  async getByGodownSaleId(godownSaleId: string): Promise<Cage[]> {
+    return this.cageRepo.find({
+      where: { godownSaleId },
+      order: { cageId: 'ASC' },
+      relations: ['purchaseOrder'],
+    });
+  }
+
+
   // Delete cages for a purchase order (used when purchase is deleted)
   async deleteByPurchaseOrderId(purchaseOrderId: string): Promise<void> {
     await this.cageRepo.delete({ purchaseOrderId });
