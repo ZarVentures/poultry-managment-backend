@@ -43,16 +43,17 @@ export class BillingService {
     const saved = await this.partyRepo.save(party);
     const savedId: string = (saved as any).id ?? (saved as any)[0]?.id;
 
-    // Create opening balance ledger entry if openingBalance > 0
-    if (data.openingBalance && data.openingBalance !== 0) {
+    // Create opening balance ledger entry if openingBalance is non-zero
+    if (data.openingBalance && Number(data.openingBalance) !== 0) {
+      const parsedOpening = Number(data.openingBalance);
       await this.ledgerRepo.save(this.ledgerRepo.create({
         partyId: savedId,
         referenceType: 'Opening',
         referenceId: savedId,
-        debit: data.openingBalance > 0 ? data.openingBalance : 0,
-        credit: data.openingBalance < 0 ? Math.abs(data.openingBalance) : 0,
-        balance: data.openingBalance,
-        date: getTodayIST(),
+        debit: parsedOpening > 0 ? parsedOpening : 0,
+        credit: parsedOpening < 0 ? Math.abs(parsedOpening) : 0,
+        balance: parsedOpening,
+        date: '2000-01-01', // Set to a very old date so it always acts as the starting seed balance
       }));
     }
 
@@ -60,6 +61,36 @@ export class BillingService {
   }
 
   async updateParty(id: string, data: Partial<BillingParty>): Promise<BillingParty> {
+    // Sync the "Opening" entry in the billing_ledger table when opening balance is updated
+    if (data.openingBalance !== undefined) {
+      const existingOpening = await this.ledgerRepo.findOne({
+        where: { partyId: id, referenceType: 'Opening' },
+      });
+
+      const parsedOpening = Number(data.openingBalance || 0);
+
+      if (existingOpening) {
+        if (parsedOpening === 0) {
+          await this.ledgerRepo.remove(existingOpening);
+        } else {
+          existingOpening.debit = parsedOpening > 0 ? parsedOpening : 0;
+          existingOpening.credit = parsedOpening < 0 ? Math.abs(parsedOpening) : 0;
+          existingOpening.balance = parsedOpening;
+          await this.ledgerRepo.save(existingOpening);
+        }
+      } else if (parsedOpening !== 0) {
+        await this.ledgerRepo.save(this.ledgerRepo.create({
+          partyId: id,
+          referenceType: 'Opening',
+          referenceId: id,
+          debit: parsedOpening > 0 ? parsedOpening : 0,
+          credit: parsedOpening < 0 ? Math.abs(parsedOpening) : 0,
+          balance: parsedOpening,
+          date: '2000-01-01',
+        }));
+      }
+    }
+
     await this.partyRepo.update(id, { ...data, updatedAt: new Date() });
     return this.getParty(id);
   }
