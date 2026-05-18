@@ -92,7 +92,7 @@ async function runCheck() {
 
   // 1. Table Counts Comparison
   console.log('📊 --- TABLE ROW COUNTS COMPARISON ---');
-  const tables = ['farmers', 'purchase_orders', 'purchase_order_payments', 'cages', 'sales', 'sale_payments', 'billing_parties', 'billing_sales', 'billing_payments', 'billing_ledger'];
+  const tables = ['farmers', 'retailers', 'purchase_orders', 'purchase_order_payments', 'cages', 'sales', 'sale_payments', 'billing_parties', 'billing_sales', 'billing_payments', 'billing_ledger'];
   for (const table of tables) {
     try {
       const prodRes = await prod.query(`SELECT COUNT(*) FROM "${table}"`);
@@ -112,17 +112,9 @@ async function runCheck() {
   // 2. Search for Wahid
   console.log('\n👤 --- SEARCHING FOR "WAHID" ---');
   try {
-    const wahidFarmersProd = await prod.query(`SELECT id, name FROM farmers WHERE LOWER(name) LIKE '%wahid%'`);
-    console.log('   PROD farmers matching "wahid":');
-    wahidFarmersProd.rows.forEach(r => console.log(`     - [ID: ${r.id}] ${r.name}`));
-
     const wahidFarmersStage = await stage.query(`SELECT id, name FROM farmers WHERE LOWER(name) LIKE '%wahid%'`);
     console.log('   STAGE farmers matching "wahid":');
     wahidFarmersStage.rows.forEach(r => console.log(`     - [ID: ${r.id}] ${r.name}`));
-
-    const wahidPurchasesProd = await prod.query(`SELECT DISTINCT supplier_name FROM purchase_orders WHERE LOWER(supplier_name) LIKE '%wahid%'`);
-    console.log('   PROD purchase order suppliers matching "wahid":');
-    wahidPurchasesProd.rows.forEach(r => console.log(`     - ${r.supplier_name}`));
 
     const wahidPurchasesStage = await stage.query(`SELECT DISTINCT supplier_name FROM purchase_orders WHERE LOWER(supplier_name) LIKE '%wahid%'`);
     console.log('   STAGE purchase order suppliers matching "wahid":');
@@ -131,7 +123,21 @@ async function runCheck() {
     console.log(`   ⚠️ Error searching for Wahid: ${e.message}`);
   }
 
-  // 3. Distinct Suppliers List
+  // 3. Search for Alim
+  console.log('\n👤 --- SEARCHING FOR "ALIM" ---');
+  try {
+    const alimRetailersStage = await stage.query(`SELECT id, name FROM retailers WHERE LOWER(name) LIKE '%alim%'`);
+    console.log('   STAGE retailers matching "alim":');
+    alimRetailersStage.rows.forEach(r => console.log(`     - [ID: ${r.id}] ${r.name}`));
+
+    const alimSalesStage = await stage.query(`SELECT DISTINCT customer_name FROM sales WHERE LOWER(customer_name) LIKE '%alim%'`);
+    console.log('   STAGE sales customer names matching "alim":');
+    alimSalesStage.rows.forEach(r => console.log(`     - ${r.customer_name}`));
+  } catch (e) {
+    console.log(`   ⚠️ Error searching for Alim: ${e.message}`);
+  }
+
+  // 4. Distinct Suppliers List
   console.log('\n🧾 --- DISTINCT SUPPLIERS IN STAGE PURCHASE_ORDERS ---');
   try {
     const suppliers = await stage.query(`SELECT DISTINCT supplier_name FROM purchase_orders ORDER BY supplier_name LIMIT 20`);
@@ -145,6 +151,22 @@ async function runCheck() {
     }
   } catch (e) {
     console.log(`   ⚠️ Error listing suppliers: ${e.message}`);
+  }
+
+  // 5. Distinct Customers List in Sales
+  console.log('\n🧾 --- DISTINCT CUSTOMERS IN STAGE SALES ---');
+  try {
+    const customers = await stage.query(`SELECT DISTINCT customer_name FROM sales ORDER BY customer_name LIMIT 20`);
+    if (customers.rows.length === 0) {
+      console.log('   (No sales found in staging yet)');
+    } else {
+      customers.rows.forEach(r => console.log(`     - ${r.customer_name}`));
+      if (customers.rows.length === 20) {
+        console.log('     ... (truncated list)');
+      }
+    }
+  } catch (e) {
+    console.log(`   ⚠️ Error listing customers from sales: ${e.message}`);
   }
 
   console.log('\n=======================================');
