@@ -32,6 +32,11 @@ const ORDERED_TABLES = [
   'godown_expenses',
   'role_permissions',
   'user_permissions',
+  'payment_vouchers',
+  'billing_parties',
+  'billing_sales',
+  'billing_payments',
+  'billing_ledger',
 ];
 
 async function syncTable(stage, prod, table) {
@@ -45,8 +50,7 @@ async function syncTable(stage, prod, table) {
   const data = await prod.query(`SELECT * FROM "${table}"`);
   if (data.rows.length === 0) { console.log(`     ⏭️  Empty in prod.`); return; }
 
-  // 3. Truncate staging (only this table, not cascade, to avoid wiping already-synced parents)
-  await stage.query(`TRUNCATE TABLE "${table}" RESTART IDENTITY`);
+  // 3. Truncation moved to orderedSync to satisfy FK constraints
 
   // 4. Insert row by row
   const cols = Object.keys(data.rows[0]);
@@ -73,6 +77,20 @@ async function orderedSync() {
   console.log('--- ORDERED FK-SAFE SYNC (PROD -> STAGING) ---\n');
 
   try {
+    // Truncate all tables in reverse order to satisfy foreign keys
+    console.log('🧹 Clearing staging tables in reverse order...');
+    for (const table of [...ORDERED_TABLES].reverse()) {
+      try {
+        const checkStage = await stage.query(`SELECT 1 FROM information_schema.tables WHERE table_name = '${table}'`);
+        if (checkStage.rows.length > 0) {
+          await stage.query(`TRUNCATE TABLE "${table}" RESTART IDENTITY CASCADE`);
+        }
+      } catch (e) {
+        console.log(`     ⚠️  Truncate failed for ${table}: ${e.message.split('\n')[0]}`);
+      }
+    }
+    console.log('🧹 Clearing complete!\n');
+
     for (const table of ORDERED_TABLES) {
       console.log(`  📦 ${table}`);
       try {

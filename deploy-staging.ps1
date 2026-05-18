@@ -11,25 +11,11 @@ $PM2_NAME = "poultry-backend-stage"
 
 Write-Host "📡 Connecting to EC2..." -ForegroundColor Cyan
 
-# Commands to run on EC2
-$commands = @"
-cd $APP_DIR && \
-echo '📥 Pulling latest code from staging branch...' && \
-git fetch origin && \
-git checkout staging && \
-git pull origin staging && \
-echo '📦 Installing dependencies...' && \
-npm install && \
-echo '🔨 Building application...' && \
-npm run build && \
-echo '🔄 Restarting PM2 process...' && \
-pm2 restart $PM2_NAME && \
-echo '✅ Deployment complete!' && \
-pm2 logs $PM2_NAME --lines 20
-"@
+# Commands to run on EC2 (semicolon separated)
+$commands = 'cd ' + $APP_DIR + ' && git fetch origin && git checkout staging && git pull origin staging && npm install && npm run build && pm2 restart ' + $PM2_NAME + ' && pm2 logs ' + $PM2_NAME + ' --lines 20'
 
 # Execute via SSH
-ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} $commands
+ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "$commands"
 
 Write-Host "`n✅ Staging backend deployed successfully!" -ForegroundColor Green
 Write-Host "🔍 Check logs with: ssh ubuntu@$EC2_HOST 'pm2 logs $PM2_NAME'" -ForegroundColor Yellow
