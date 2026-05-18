@@ -44,6 +44,14 @@ export class GodownController {
     return this.godownService.removeInward(id);
   }
 
+  // Inward Auto Number
+  @Get('inward/generate/next-inward-number')
+  @Permissions('godown', 'read')
+  async getNextInwardNumber() {
+    const nextInwardNumber = await this.godownService.generateNextInwardNumber();
+    return { nextInwardNumber };
+  }
+
   // Sales
   @Get('sales/generate/next-sale-number')
   @Permissions('godown', 'read')

@@ -29,6 +29,10 @@ export class GodownService {
   async createInward(data: any) {
     const { cageIds, godownInwardWeight, actualWeight, weightLoss, ...entryData } = data;
 
+    if (!entryData.inwardNo) {
+      entryData.inwardNo = await this.generateInwardNumber();
+    }
+
     if (actualWeight) entryData.actualWeight = parseFloat(actualWeight);
     if (weightLoss) entryData.weightLoss = parseFloat(weightLoss);
     // If godownInwardWeight is provided, it's the final stock weight
@@ -52,7 +56,7 @@ export class GodownService {
 
     if (search) {
       query.andWhere(
-        '(inward.farmerName ILIKE :search OR inward.vehicleNumber ILIKE :search OR inward.farmHouseName ILIKE :search)',
+        '(inward.farmerName ILIKE :search OR inward.vehicleNumber ILIKE :search OR inward.farmHouseName ILIKE :search OR inward.inwardNo ILIKE :search)',
         { search: `%${search}%` }
       );
     }
@@ -79,6 +83,31 @@ export class GodownService {
 
   async removeInward(id: string) {
     await this.inwardRepo.delete(id);
+  }
+
+  private async generateInwardNumber(): Promise<string> {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const prefix = `GDI-${year}-${month}-`;
+
+    const lastInward = await this.inwardRepo
+      .createQueryBuilder('inward')
+      .where('inward.inwardNo LIKE :prefix', { prefix: `${prefix}%` })
+      .orderBy('inward.id', 'DESC')
+      .limit(1)
+      .getOne();
+
+    if (lastInward && lastInward.inwardNo) {
+      const lastNumber = parseInt(lastInward.inwardNo.split('-').pop() || '0');
+      return `${prefix}${String(lastNumber + 1).padStart(4, '0')}`;
+    }
+
+    return `${prefix}0001`;
+  }
+
+  async generateNextInwardNumber(): Promise<string> {
+    return this.generateInwardNumber();
   }
 
   // ─── Sales ────────────────────────────────────────────────────────────────

@@ -8,8 +8,12 @@ export class GodownInwardEntry {
   @Column({ name: 'entry_date', type: 'date' })
   entryDate!: string;
 
+  @Column({ name: 'inward_no', type: 'varchar', length: 50, nullable: true })
+  inwardNo?: string;
+
   @Column({ name: 'purchase_invoice_no', type: 'varchar', length: 50, nullable: true })
   purchaseInvoiceNo?: string;
+
 
   @Column({ name: 'supplier_name', type: 'varchar', length: 150, nullable: true })
   supplierName?: string;
