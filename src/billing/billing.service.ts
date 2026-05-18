@@ -238,46 +238,81 @@ export class BillingService {
     // Get direct ledger entries (e.g. Opening Balance, paid PaymentVouchers)
     const directEntries = await this.ledgerRepo.find({ where: { partyId }, order: { date: 'ASC', createdAt: 'ASC' } });
 
-    if (party.type !== 'Farm') {
-      return directEntries;
-    }
-
-    // For a Farm (farmer), load their PurchaseOrders and PurchaseOrderPayments dynamically
-    const purchaseOrders = await this.purchaseRepo.find({
-      where: { supplierName: party.name },
-      relations: ['payments'],
-    });
-
     const dynamicEntries: any[] = [];
 
-    for (const po of purchaseOrders) {
-      // 1. Add Purchase Order as a CREDIT entry (what we owe them increases)
-      dynamicEntries.push({
-        id: `po-${po.id}`,
-        partyId,
-        referenceType: 'Purchase',
-        referenceId: po.orderNumber,
-        debit: 0,
-        credit: Number(po.netAmount || po.totalAmount || 0),
-        balance: 0,
-        date: po.orderDate,
-        createdAt: po.createdAt,
+    if (party.type === 'Farm') {
+      // For a Farm (farmer), load their PurchaseOrders and PurchaseOrderPayments dynamically
+      const purchaseOrders = await this.purchaseRepo.find({
+        where: { supplierName: party.name },
+        relations: ['payments'],
       });
 
-      // 2. Add each Purchase Order Payment as a DEBIT entry (what we owe them decreases)
-      for (const pay of po.payments || []) {
-        const payDate = pay.createdAt ? new Date(pay.createdAt).toISOString().split('T')[0] : po.orderDate;
+      for (const po of purchaseOrders) {
+        // 1. Add Purchase Order as a CREDIT entry (what we owe them increases)
         dynamicEntries.push({
-          id: `pay-${pay.id}`,
+          id: `po-${po.id}`,
           partyId,
-          referenceType: 'Payment',
-          referenceId: `${po.orderNumber}-P`,
-          debit: Number(pay.amount),
+          referenceType: 'Purchase',
+          referenceId: po.orderNumber,
+          debit: 0,
+          credit: Number(po.netAmount || po.totalAmount || 0),
+          balance: 0,
+          date: po.orderDate,
+          createdAt: po.createdAt,
+        });
+
+        // 2. Add each Purchase Order Payment as a DEBIT entry (what we owe them decreases)
+        for (const pay of po.payments || []) {
+          const payDate = pay.createdAt ? new Date(pay.createdAt).toISOString().split('T')[0] : po.orderDate;
+          dynamicEntries.push({
+            id: `pay-${pay.id}`,
+            partyId,
+            referenceType: 'Payment',
+            referenceId: `${po.orderNumber}-P`,
+            debit: Number(pay.amount),
+            credit: 0,
+            balance: 0,
+            date: payDate,
+            createdAt: pay.createdAt,
+          });
+        }
+      }
+    } else if (party.type === 'Retailer') {
+      // For a Retailer, load their Sales and SalePayments dynamically
+      const sales = await this.mainSaleRepo.find({
+        where: { customerName: party.name },
+        relations: ['payments'],
+      });
+
+      for (const sale of sales) {
+        // 1. Add Sale as a DEBIT entry (what they owe us increases)
+        dynamicEntries.push({
+          id: `sale-${sale.id}`,
+          partyId,
+          referenceType: 'Sale',
+          referenceId: sale.invoiceNumber || sale.saleNo || `INV-${sale.id}`,
+          debit: Number(sale.netAmount || sale.totalAmount || 0),
           credit: 0,
           balance: 0,
-          date: payDate,
-          createdAt: pay.createdAt,
+          date: sale.saleDate,
+          createdAt: sale.createdAt,
         });
+
+        // 2. Add each Sale Payment as a CREDIT entry (what they owe us decreases)
+        for (const pay of sale.payments || []) {
+          const payDate = pay.createdAt ? new Date(pay.createdAt).toISOString().split('T')[0] : sale.saleDate;
+          dynamicEntries.push({
+            id: `pay-${pay.id}`,
+            partyId,
+            referenceType: 'Payment',
+            referenceId: `${sale.invoiceNumber || sale.saleNo || `INV-${sale.id}`}-P`,
+            debit: 0,
+            credit: Number(pay.amount),
+            balance: 0,
+            date: payDate,
+            createdAt: pay.createdAt,
+          });
+        }
       }
     }
 
