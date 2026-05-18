@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
-import { BillingParty } from './entities/billing-party.entity';
+import { BillingParty, PartyType } from './entities/billing-party.entity';
 import { BillingPayment } from './entities/billing-payment.entity';
 import { BillingLedger, LedgerReferenceType } from './entities/billing-ledger.entity';
 import { Expense } from '../expenses/expense.entity';
@@ -10,6 +10,7 @@ import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { Sale } from '../sales/sale.entity';
 import { BillingSale } from './entities/billing-sale.entity';
 import { getTodayIST } from '../common/date-utils';
+import { Farmer } from '../farmers/farmer.entity';
 
 @Injectable()
 export class BillingService {
@@ -22,6 +23,7 @@ export class BillingService {
     @InjectRepository(PurchaseOrder) private purchaseRepo: Repository<PurchaseOrder>,
     @InjectRepository(BillingSale) private saleRepo: Repository<BillingSale>,
     @InjectRepository(Sale) private mainSaleRepo: Repository<Sale>,
+    @InjectRepository(Farmer) private farmerRepo: Repository<Farmer>,
   ) { }
 
   // ─── Parties ──────────────────────────────────────────────────────────────
@@ -171,8 +173,102 @@ export class BillingService {
     await this.recalculatePartyBalance(partyId);
   }
 
+  async recordTransaction(data: {
+    partyType: string;
+    partyId: number;
+    partyName: string;
+    transactionType: string;
+    transactionDate: string;
+    amount: number;
+    referenceType: string;
+    referenceId: number;
+    referenceNumber: string;
+    description: string;
+    notes?: string;
+  }) {
+    // Find or create billing party by name
+    const party = await this.findOrCreatePartyByName(
+      data.partyName,
+      data.partyType === 'farmer' ? 'Farm' : 'Retailer'
+    );
+
+    // For a return, we credit the customer (we owe them, or they owe us less)
+    const debit = data.transactionType === 'return' ? 0 : data.amount;
+    const credit = data.transactionType === 'return' ? data.amount : 0;
+
+    await this.addLedgerEntry(party.id, 'Voucher', data.referenceNumber, debit, credit, data.transactionDate);
+    await this.recalculatePartyBalance(party.id);
+  }
+
   async getLedger(partyId: string): Promise<BillingLedger[]> {
-    return this.ledgerRepo.find({ where: { partyId }, order: { date: 'ASC', createdAt: 'ASC' } });
+    const party = await this.partyRepo.findOne({ where: { id: partyId } });
+    if (!party) return [];
+
+    // Get direct ledger entries (e.g. Opening Balance, paid PaymentVouchers)
+    const directEntries = await this.ledgerRepo.find({ where: { partyId }, order: { date: 'ASC', createdAt: 'ASC' } });
+
+    if (party.type !== 'Farm') {
+      return directEntries;
+    }
+
+    // For a Farm (farmer), load their PurchaseOrders and PurchaseOrderPayments dynamically
+    const purchaseOrders = await this.purchaseRepo.find({
+      where: { supplierName: party.name },
+      relations: ['payments'],
+    });
+
+    const dynamicEntries: any[] = [];
+
+    for (const po of purchaseOrders) {
+      // 1. Add Purchase Order as a CREDIT entry (what we owe them increases)
+      dynamicEntries.push({
+        id: `po-${po.id}`,
+        partyId,
+        referenceType: 'Purchase',
+        referenceId: po.orderNumber,
+        debit: 0,
+        credit: Number(po.netAmount || po.totalAmount || 0),
+        balance: 0,
+        date: po.orderDate,
+        createdAt: po.createdAt,
+      });
+
+      // 2. Add each Purchase Order Payment as a DEBIT entry (what we owe them decreases)
+      for (const pay of po.payments || []) {
+        const payDate = pay.createdAt ? new Date(pay.createdAt).toISOString().split('T')[0] : po.orderDate;
+        dynamicEntries.push({
+          id: `pay-${pay.id}`,
+          partyId,
+          referenceType: 'Payment',
+          referenceId: `${po.orderNumber}-P`,
+          debit: Number(pay.amount),
+          credit: 0,
+          balance: 0,
+          date: payDate,
+          createdAt: pay.createdAt,
+        });
+      }
+    }
+
+    // Combine all entries
+    const allEntries = [...directEntries, ...dynamicEntries];
+
+    // Sort by date ASC, then by createdAt ASC
+    allEntries.sort((a, b) => {
+      if (a.date !== b.date) {
+        return a.date.localeCompare(b.date);
+      }
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+
+    // Recalculate balances sequentially
+    let balance = 0;
+    for (const entry of allEntries) {
+      balance += Number(entry.debit || 0) - Number(entry.credit || 0);
+      entry.balance = balance;
+    }
+
+    return allEntries as BillingLedger[];
   }
 
   // Helper: Find or create billing party by name
@@ -184,15 +280,32 @@ export class BillingService {
       .getOne();
     
     if (existing) {
+      // If the existing party has type 'Retailer' but they are actually a farmer, let's update their type to 'Farm'
+      const isFarmer = await this.farmerRepo
+        .createQueryBuilder('farmer')
+        .where('LOWER(farmer.name) = LOWER(:name)', { name })
+        .getOne();
+      
+      if (isFarmer && existing.type !== 'Farm') {
+        existing.type = 'Farm';
+        await this.partyRepo.save(existing);
+      }
       return existing;
     }
+
+    const isFarmer = await this.farmerRepo
+      .createQueryBuilder('farmer')
+      .where('LOWER(farmer.name) = LOWER(:name)', { name })
+      .getOne();
+
+    const calculatedType: PartyType = isFarmer ? 'Farm' : type;
 
     // Create new party
     const party = this.partyRepo.create({
       name,
-      type,
-      phone: phone || null,
-      address: address || null,
+      type: calculatedType,
+      phone: phone || undefined,
+      address: address || undefined,
       openingBalance: 0,
       currentBalance: 0,
       creditLimit: 0,
@@ -212,14 +325,22 @@ export class BillingService {
     const party = await this.partyRepo.findOne({ where: { id: partyId } });
     if (!party) return;
 
-    const ledgerEntries = await this.ledgerRepo.find({ where: { partyId }, order: { date: 'ASC', createdAt: 'ASC' } });
+    if (party.type !== 'Farm') {
+      const ledgerEntries = await this.ledgerRepo.find({ where: { partyId }, order: { date: 'ASC', createdAt: 'ASC' } });
 
-    let balance = 0;
-    for (const entry of ledgerEntries) {
-      balance += Number(entry.debit) - Number(entry.credit);
-      await this.ledgerRepo.update(entry.id, { balance });
+      let balance = 0;
+      for (const entry of ledgerEntries) {
+        balance += Number(entry.debit) - Number(entry.credit);
+        await this.ledgerRepo.update(entry.id, { balance });
+      }
+
+      await this.partyRepo.update(partyId, { currentBalance: balance, updatedAt: new Date() });
+      return;
     }
 
+    // For a Farm party, get combined ledger entries to update current balance
+    const ledgerEntries = await this.getLedger(partyId);
+    const balance = ledgerEntries.length > 0 ? ledgerEntries[ledgerEntries.length - 1].balance : 0;
     await this.partyRepo.update(partyId, { currentBalance: balance, updatedAt: new Date() });
   }
 

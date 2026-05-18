@@ -45,6 +45,13 @@ UPDATE expenses SET category_id = (SELECT id FROM expense_categories WHERE name 
 UPDATE expenses SET category_id = (SELECT id FROM expense_categories WHERE name = 'Transportation') WHERE category = 'transportation' AND category_id IS NULL;
 UPDATE expenses SET category_id = (SELECT id FROM expense_categories WHERE name = 'Other') WHERE category = 'other' AND category_id IS NULL;
 
+-- 7. Add missing columns to godown_inward_entries
+ALTER TABLE godown_inward_entries
+ADD COLUMN IF NOT EXISTS actual_weight NUMERIC(10,2);
+
+ALTER TABLE godown_inward_entries
+ADD COLUMN IF NOT EXISTS weight_loss NUMERIC(10,2) NOT NULL DEFAULT 0;
+
 -- 6. Verify migrations
 SELECT 'godown_sales.sale_no column' as migration, 
        CASE WHEN EXISTS (
