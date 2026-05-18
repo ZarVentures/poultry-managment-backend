@@ -276,7 +276,7 @@ export class GodownService {
     return this.expenseRepo.save(expense);
   }
 
-  async findAllExpenses(page?: number, limit?: number, search?: string) {
+  async findAllExpenses(page?: number, limit?: number, search?: string, startDate?: string, endDate?: string) {
     const query = this.expenseRepo.createQueryBuilder('expense')
       .orderBy('expense.expenseDate', 'DESC');
 
@@ -285,6 +285,13 @@ export class GodownService {
         '(expense.expenseCategory ILIKE :search OR expense.description ILIKE :search OR expense.paidTo ILIKE :search)',
         { search: `%${search}%` }
       );
+    }
+
+    if (startDate) {
+      query.andWhere('expense.expenseDate >= :startDate', { startDate });
+    }
+    if (endDate) {
+      query.andWhere('expense.expenseDate <= :endDate', { endDate });
     }
 
     if (page && limit) {

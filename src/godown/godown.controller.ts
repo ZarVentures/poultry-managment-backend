@@ -134,8 +134,10 @@ export class GodownController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('search') search?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
-    return this.godownService.findAllExpenses(page, limit, search);
+    return this.godownService.findAllExpenses(page, limit, search, startDate, endDate);
   }
 
   @Get('expenses/:id')
