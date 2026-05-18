@@ -40,7 +40,7 @@ export class ExpenseCategoriesService {
   }
 
   async findOne(id: number): Promise<ExpenseCategory> {
-    const category = await this.categoryRepository.findOne({ where: { id } });
+    const category = await this.categoryRepository.findOne({ where: { id: id as any } });
     if (!category) {
       throw new NotFoundException(`Expense category with ID ${id} not found`);
     }

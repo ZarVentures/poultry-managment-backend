@@ -21,6 +21,12 @@ export class ExpenseCategory {
   @Column({ name: 'is_system', type: 'boolean', default: false })
   isSystem!: boolean;
 
+  @Column({ name: 'is_default', type: 'boolean', default: false })
+  isDefault!: boolean;
+
+  @Column({ name: 'sort_order', type: 'integer', default: 0 })
+  sortOrder!: number;
+
   @OneToMany(() => Expense, (expense) => expense.expenseCategory)
   expenses?: Expense[];
 
