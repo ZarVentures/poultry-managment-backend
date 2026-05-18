@@ -14,16 +14,98 @@ async function runCheck() {
 
   console.log('🔍 === DATABASE INSPECTION SCRIPT === 🔍\n');
 
+  // Auto-create billing tables in staging if missing
+  const checkBillingParties = await stage.query(`SELECT 1 FROM information_schema.tables WHERE table_name = 'billing_parties'`);
+  if (checkBillingParties.rows.length === 0) {
+    console.log('🛠️ Staging database is missing billing tables. Creating them automatically...');
+    try {
+      await stage.query(`
+        CREATE TABLE IF NOT EXISTS billing_parties (
+          id BIGSERIAL PRIMARY KEY,
+          name VARCHAR(150) NOT NULL,
+          type VARCHAR(20) NOT NULL DEFAULT 'Retailer',
+          phone VARCHAR(20),
+          address TEXT,
+          opening_balance NUMERIC(14, 2) NOT NULL DEFAULT 0,
+          current_balance NUMERIC(14, 2) NOT NULL DEFAULT 0,
+          credit_limit NUMERIC(14, 2) NOT NULL DEFAULT 0,
+          payment_terms INTEGER NOT NULL DEFAULT 30,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
+
+      await stage.query(`
+        CREATE TABLE IF NOT EXISTS billing_sales (
+          id BIGSERIAL PRIMARY KEY,
+          party_id BIGINT NOT NULL REFERENCES billing_parties(id) ON DELETE CASCADE,
+          date DATE NOT NULL,
+          birds INTEGER NOT NULL DEFAULT 0,
+          net_weight NUMERIC(10, 2) NOT NULL DEFAULT 0,
+          avg_weight NUMERIC(10, 2) NOT NULL DEFAULT 0,
+          rate NUMERIC(10, 2) NOT NULL DEFAULT 0,
+          discount NUMERIC(14, 2) NOT NULL DEFAULT 0,
+          total_amount NUMERIC(14, 2) NOT NULL DEFAULT 0,
+          vehicle_no VARCHAR(50),
+          remarks TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
+
+      await stage.query(`
+        CREATE TABLE IF NOT EXISTS billing_payments (
+          id BIGSERIAL PRIMARY KEY,
+          party_id BIGINT NOT NULL REFERENCES billing_parties(id) ON DELETE CASCADE,
+          date DATE NOT NULL,
+          mode VARCHAR(20) NOT NULL DEFAULT 'Cash',
+          amount NUMERIC(14, 2) NOT NULL DEFAULT 0,
+          reference VARCHAR(100),
+          remarks TEXT,
+          status VARCHAR(20) NOT NULL DEFAULT 'Pending',
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
+
+      await stage.query(`
+        CREATE TABLE IF NOT EXISTS billing_ledger (
+          id BIGSERIAL PRIMARY KEY,
+          party_id BIGINT NOT NULL REFERENCES billing_parties(id) ON DELETE CASCADE,
+          reference_type VARCHAR(20) NOT NULL,
+          reference_id VARCHAR(50),
+          debit NUMERIC(14, 2) NOT NULL DEFAULT 0,
+          credit NUMERIC(14, 2) NOT NULL DEFAULT 0,
+          balance NUMERIC(14, 2) NOT NULL DEFAULT 0,
+          date DATE NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
+
+      console.log('✅ Billing tables successfully created in staging database!\n');
+    } catch (err) {
+      console.log(`❌ Error auto-creating billing tables: ${err.message}\n`);
+    }
+  } else {
+    console.log('✅ Billing tables already exist in staging.\n');
+  }
+
   // 1. Table Counts Comparison
   console.log('📊 --- TABLE ROW COUNTS COMPARISON ---');
-  const tables = ['farmers', 'purchase_orders', 'purchase_order_payments', 'cages', 'sales', 'sale_payments'];
+  const tables = ['farmers', 'purchase_orders', 'purchase_order_payments', 'cages', 'sales', 'sale_payments', 'billing_parties', 'billing_sales', 'billing_payments', 'billing_ledger'];
   for (const table of tables) {
     try {
       const prodRes = await prod.query(`SELECT COUNT(*) FROM "${table}"`);
       const stageRes = await stage.query(`SELECT COUNT(*) FROM "${table}"`);
       console.log(`   📦 ${table.padEnd(25)}: PROD = ${prodRes.rows[0].count.padStart(5)} rows | STAGE = ${stageRes.rows[0].count.padStart(5)} rows`);
     } catch (e) {
-      console.log(`   📦 ${table.padEnd(25)}: ERROR checking count: ${e.message}`);
+      // If table is not in prod, just show staging count
+      try {
+        const stageRes = await stage.query(`SELECT COUNT(*) FROM "${table}"`);
+        console.log(`   📦 ${table.padEnd(25)}: PROD = (no table) | STAGE = ${stageRes.rows[0].count.padStart(5)} rows`);
+      } catch (e2) {
+        console.log(`   📦 ${table.padEnd(25)}: ERROR checking count: ${e.message}`);
+      }
     }
   }
 
