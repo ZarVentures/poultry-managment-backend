@@ -245,7 +245,7 @@ export class BillingService {
       const purchaseOrders = await this.purchaseRepo
         .createQueryBuilder('po')
         .leftJoinAndSelect('po.payments', 'payments')
-        .where('LOWER(po.supplierName) = LOWER(:name)', { name: party.name })
+        .where('TRIM(LOWER(po.supplierName)) = TRIM(LOWER(:name))', { name: party.name })
         .getMany();
 
       for (const po of purchaseOrders) {
@@ -283,7 +283,7 @@ export class BillingService {
       const sales = await this.mainSaleRepo
         .createQueryBuilder('sale')
         .leftJoinAndSelect('sale.payments', 'payments')
-        .where('LOWER(sale.customerName) = LOWER(:name)', { name: party.name })
+        .where('TRIM(LOWER(sale.customerName)) = TRIM(LOWER(:name))', { name: party.name })
         .getMany();
 
       for (const sale of sales) {
@@ -341,17 +341,17 @@ export class BillingService {
 
   // Helper: Find or create billing party by name
   async findOrCreatePartyByName(name: string, type: PartyType = 'Retailer', phone?: string, address?: string): Promise<BillingParty> {
-    // Try to find existing party by name (case-insensitive)
+    // Try to find existing party by name (case-insensitive & trimmed)
     const existing = await this.partyRepo
       .createQueryBuilder('party')
-      .where('LOWER(party.name) = LOWER(:name)', { name })
+      .where('TRIM(LOWER(party.name)) = TRIM(LOWER(:name))', { name })
       .getOne();
     
     if (existing) {
       // If the existing party has type 'Retailer' but they are actually a farmer, let's update their type to 'Farm'
       const isFarmer = await this.farmerRepo
         .createQueryBuilder('farmer')
-        .where('LOWER(farmer.name) = LOWER(:name)', { name })
+        .where('TRIM(LOWER(farmer.name)) = TRIM(LOWER(:name))', { name })
         .getOne();
       
       if (isFarmer && existing.type !== 'Farm') {
@@ -363,7 +363,7 @@ export class BillingService {
 
     const isFarmer = await this.farmerRepo
       .createQueryBuilder('farmer')
-      .where('LOWER(farmer.name) = LOWER(:name)', { name })
+      .where('TRIM(LOWER(farmer.name)) = TRIM(LOWER(:name))', { name })
       .getOne();
 
     const calculatedType: PartyType = isFarmer ? 'Farm' : type;
