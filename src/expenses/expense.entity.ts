@@ -1,5 +1,5 @@
 import { Column, Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { ExpenseCategory } from './entities/expense-category.entity';
+import { ExpenseCategory } from '../expense-categories/expense-category.entity';
 
 export type ExpenseCategoryType = 'feed' | 'labor' | 'medicine' | 'utilities' | 'equipment' | 'maintenance' | 'transportation' | 'other';
 export type PaymentMethodType = 'cash' | 'bank_transfer' | 'check' | 'credit_card';
