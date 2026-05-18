@@ -39,6 +39,20 @@ export class CagesService {
     return query.orderBy('cage.cageId', 'ASC').getMany();
   }
 
+  // Get cages by godown inward entry ID, optionally filtered by status
+  async getByGodownInwardId(godownInwardId: string, status?: CageStatus): Promise<Cage[]> {
+    const query = this.cageRepo.createQueryBuilder('cage')
+      .leftJoinAndSelect('cage.purchaseOrder', 'po')
+      .where('cage.godownInwardId = :godownInwardId', { godownInwardId });
+
+    if (status) {
+      query.andWhere('cage.status = :status', { status });
+    }
+
+    return query.orderBy('cage.cageId', 'ASC').getMany();
+  }
+
+
   // Get cages by purchase order ID
   async getByPurchaseOrderId(purchaseOrderId: string, status?: CageStatus): Promise<Cage[]> {
     const where: any = { purchaseOrderId };

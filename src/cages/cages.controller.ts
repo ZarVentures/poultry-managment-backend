@@ -14,6 +14,16 @@ export class CagesController {
     return this.cagesService.getByPurchaseOrderNumber(orderNumber, status as any);
   }
 
+  // Get cages by godown inward entry ID (for godown sales)
+  @Get('by-inward/:godownInwardId')
+  getByGodownInwardId(
+    @Param('godownInwardId') godownInwardId: string,
+    @Query('status') status?: string,
+  ) {
+    return this.cagesService.getByGodownInwardId(godownInwardId, status as any);
+  }
+
+
   // Get cage journey (weight loss tracking)
   @Get('journey/:orderNumber')
   getCageJourney(@Param('orderNumber') orderNumber: string) {
