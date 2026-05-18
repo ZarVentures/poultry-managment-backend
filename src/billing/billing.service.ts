@@ -241,11 +241,12 @@ export class BillingService {
     const dynamicEntries: any[] = [];
 
     if (party.type === 'Farm') {
-      // For a Farm (farmer), load their PurchaseOrders and PurchaseOrderPayments dynamically
-      const purchaseOrders = await this.purchaseRepo.find({
-        where: { supplierName: party.name },
-        relations: ['payments'],
-      });
+      // For a Farm (farmer), load their PurchaseOrders and PurchaseOrderPayments dynamically (case-insensitive)
+      const purchaseOrders = await this.purchaseRepo
+        .createQueryBuilder('po')
+        .leftJoinAndSelect('po.payments', 'payments')
+        .where('LOWER(po.supplierName) = LOWER(:name)', { name: party.name })
+        .getMany();
 
       for (const po of purchaseOrders) {
         // 1. Add Purchase Order as a CREDIT entry (what we owe them increases)
@@ -278,11 +279,12 @@ export class BillingService {
         }
       }
     } else if (party.type === 'Retailer') {
-      // For a Retailer, load their Sales and SalePayments dynamically
-      const sales = await this.mainSaleRepo.find({
-        where: { customerName: party.name },
-        relations: ['payments'],
-      });
+      // For a Retailer, load their Sales and SalePayments dynamically (case-insensitive)
+      const sales = await this.mainSaleRepo
+        .createQueryBuilder('sale')
+        .leftJoinAndSelect('sale.payments', 'payments')
+        .where('LOWER(sale.customerName) = LOWER(:name)', { name: party.name })
+        .getMany();
 
       for (const sale of sales) {
         // 1. Add Sale as a DEBIT entry (what they owe us increases)
