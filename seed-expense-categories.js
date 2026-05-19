@@ -23,6 +23,23 @@ async function seed() {
         await client.connect();
         console.log('Connected to database. Seeding expense categories...');
 
+        // 0. Alter godown_expenses category column to varchar to allow custom categories
+        console.log('Altering godown_expenses category column type to varchar...');
+        await client.query(`
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'godown_expenses' 
+                      AND column_name = 'category' 
+                      AND data_type = 'USER-DEFINED'
+                ) THEN
+                    ALTER TABLE godown_expenses ALTER COLUMN category TYPE varchar(100);
+                END IF;
+            END $$;
+        `);
+
         // 1. Insert new categories and collect their IDs
         const categoryIds = {};
         for (const cat of categories) {

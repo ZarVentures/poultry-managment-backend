@@ -8,7 +8,7 @@ export class GodownExpense {
   @Column({ name: 'expense_date', type: 'date' })
   expenseDate!: string;
 
-  @Column({ name: 'category', type: 'enum', enum: ['feed', 'labor', 'medicine', 'utilities', 'equipment', 'maintenance', 'transportation', 'other'] })
+  @Column({ name: 'category', type: 'varchar', length: 100 })
   category!: string;
 
   @Column({ type: 'text' })
