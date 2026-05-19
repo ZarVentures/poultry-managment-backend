@@ -6,6 +6,7 @@ import { Sale } from './sale.entity';
 import { CreateBirdReturnDto } from './dto/create-bird-return.dto';
 import { UpdateBirdReturnDto } from './dto/update-bird-return.dto';
 import { BillingService } from '../billing/billing.service';
+import { GodownMortality } from '../godown/godown-mortality.entity';
 
 @Injectable()
 export class BirdReturnsService {
@@ -14,6 +15,8 @@ export class BirdReturnsService {
     private readonly birdReturnRepository: Repository<BirdReturn>,
     @InjectRepository(Sale)
     private readonly saleRepository: Repository<Sale>,
+    @InjectRepository(GodownMortality)
+    private readonly godownMortalityRepository: Repository<GodownMortality>,
     private readonly billingService: BillingService,
   ) {}
 
@@ -289,6 +292,22 @@ export class BirdReturnsService {
         } catch (error) {
           console.error('Failed to create billing entry for return:', error);
         }
+      }
+    }
+
+    // If the return reason is 'dead', automatically record in Godown Mortality
+    if (birdReturn.returnReason === 'dead') {
+      try {
+        const godownMortality = this.godownMortalityRepository.create({
+          mortalityDate: birdReturn.returnDate,
+          numberOfBirdsDied: birdReturn.numberOfBirdsReturned,
+          weightOfDeadBirds: birdReturn.weightReturned,
+          reason: `Dead on Return (Ref: ${birdReturn.returnNumber})`,
+          notes: `Automatically created from processed Bird Return ${birdReturn.returnNumber}. Details: ${birdReturn.reasonDescription || 'None'}`,
+        });
+        await this.godownMortalityRepository.save(godownMortality);
+      } catch (error) {
+        console.error('Failed to automatically record Godown Mortality for dead return:', error);
       }
     }
 

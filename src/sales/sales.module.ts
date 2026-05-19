@@ -7,12 +7,13 @@ import { SalePayment } from './sale-payment.entity';
 import { BirdReturn } from './entities/bird-return.entity';
 import { BirdReturnsService } from './bird-returns.service';
 import { BirdReturnsController } from './bird-returns.controller';
+import { GodownMortality } from '../godown/godown-mortality.entity';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { BillingModule } from '../billing/billing.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Sale, SalePayment, BirdReturn]),
+    TypeOrmModule.forFeature([Sale, SalePayment, BirdReturn, GodownMortality]),
     PermissionsModule,
     BillingModule,
   ],

@@ -151,6 +151,7 @@ export class SalesService {
     const sales = await this.saleRepository
       .createQueryBuilder('sale')
       .select(['sale.id', 'sale.invoiceNumber', 'sale.saleDate', 'sale.customerName'])
+      .where('sale.saleMode = :saleMode', { saleMode: 'from_godown' })
       .orderBy('sale.saleDate', 'DESC')
       .limit(100)
       .getMany();
