@@ -139,7 +139,7 @@ export class GodownService {
   }
 
   async createSale(data: any) {
-    const { cageIds, godownSaleWeight, payments, weightLoss, ...saleData } = data;
+    const { cages, payments, weightLoss, ...saleData } = data;
 
     // Auto-generate sale number if not provided
     if (!saleData.saleNo) {
@@ -157,6 +157,19 @@ export class GodownService {
     const sale = this.saleRepo.create(saleData);
     const savedResult = await this.saleRepo.save(sale);
     const savedId: string = (savedResult as any).id ?? (savedResult as any)[0]?.id;
+
+    // Process cages if provided
+    if (cages && cages.length > 0) {
+      for (const cage of cages) {
+        await this.cagesService.partialGodownSale(
+          cage.cageId,
+          savedId,
+          Number(cage.soldBirds),
+          Number(cage.soldWeight),
+          Number(cage.weightLoss || 0),
+        );
+      }
+    }
 
     // Save payments if provided
     if (payments && payments.length > 0) {
@@ -207,6 +220,25 @@ export class GodownService {
     // Filter out fields that don't exist in the entity
     const { cages, payments, ...validData } = data;
 
+    // Process cages if provided
+    if (cages !== undefined) {
+      // Revert existing cages first
+      await this.cagesService.revertGodownSaleCages(id);
+
+      // Apply new cages
+      if (cages && cages.length > 0) {
+        for (const cage of cages) {
+          await this.cagesService.partialGodownSale(
+            cage.cageId,
+            id,
+            Number(cage.soldBirds),
+            Number(cage.soldWeight),
+            Number(cage.weightLoss || 0),
+          );
+        }
+      }
+    }
+
     // Handle payments update
     if (payments !== undefined) {
       // Delete existing payments
@@ -235,6 +267,11 @@ export class GodownService {
   }
 
   async removeSale(id: string) {
+    // Revert cages first
+    await this.cagesService.revertGodownSaleCages(id);
+    // Delete payments
+    await this.salePaymentRepo.delete({ godownSaleId: id });
+    // Delete sale
     await this.saleRepo.delete(id);
   }
 

@@ -225,4 +225,18 @@ export class CagesService {
     await this.deleteByPurchaseOrderId(purchaseOrderId);
     return this.createFromPurchase(purchaseOrderId, cageData);
   }
+
+  // Revert cages associated with a godown sale
+  async revertGodownSaleCages(godownSaleId: string): Promise<void> {
+    await this.cageRepo.createQueryBuilder()
+      .update()
+      .set({
+        status: 'in_godown' as any,
+        godownSaleId: null as any,
+        godownSaleWeight: null as any,
+        updatedAt: new Date(),
+      })
+      .where('godownSaleId = :godownSaleId', { godownSaleId })
+      .execute();
+  }
 }
