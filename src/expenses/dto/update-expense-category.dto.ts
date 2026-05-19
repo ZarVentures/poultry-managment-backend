@@ -1,4 +1,27 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateExpenseCategoryDto } from './create-expense-category.dto';
+import { IsString, IsOptional, IsBoolean, IsInt } from 'class-validator';
 
-export class UpdateExpenseCategoryDto extends PartialType(CreateExpenseCategoryDto) {}
+export class UpdateExpenseCategoryDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  sortOrder?: number;
+
+  @IsOptional()
+  @IsString()
+  appliesTo?: 'main' | 'godown' | 'both';
+
+  @IsOptional()
+  @IsString()
+  icon?: string;
+}
