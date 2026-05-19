@@ -1,9 +1,20 @@
-import { Controller, Post, Body, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Query, Body, HttpException, HttpStatus } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
+import { CommunicationLog } from './communication-log.entity';
 
 @Controller('notifications')
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
+
+  @Get('logs')
+  async getLogs(@Query('limit') limit?: number): Promise<CommunicationLog[]> {
+    return this.notificationsService.getLogs(limit ? Number(limit) : 50);
+  }
+
+  @Get('counts')
+  async getCounts(): Promise<{ emailCount: number; smsCount: number }> {
+    return this.notificationsService.getCounts();
+  }
 
   @Post('test-email')
   async testEmail(@Body() body: { email: string }): Promise<{ success: boolean; message: string }> {
@@ -22,7 +33,8 @@ export class NotificationsController {
         <hr style="border: 0; border-top: 1px solid #eee;" />
         <p style="font-size: 11px; color: #666;">Generated on ${new Date().toLocaleString()}</p>
       </div>
-      `
+      `,
+      'test',
     );
 
     if (success) {
@@ -39,7 +51,8 @@ export class NotificationsController {
     }
     const success = await this.notificationsService.sendSMS(
       body.phone,
-      `AWS SNS Test Alert: Your SMS notifications are 100% operational! - Aziz Poultry Farm`
+      `AWS SNS Test Alert: Your SMS notifications are 100% operational! - Aziz Poultry Farm`,
+      'test',
     );
 
     if (success) {

@@ -1,56 +1,50 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SettingsService } from '../settings/settings.service';
+import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
+import { CommunicationLog } from './communication-log.entity';
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
+  private sesClient: SESClient | null = null;
+  private snsClient: SNSClient | null = null;
 
-  constructor(private readonly settingsService: SettingsService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    @InjectRepository(CommunicationLog)
+    private readonly logRepository: Repository<CommunicationLog>,
+  ) {
+    const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
+    const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
+    const region = this.configService.get<string>('AWS_REGION') || 'us-east-1';
 
-  private async getAwsClients(): Promise<{
-    sesClient: SESClient | null;
-    snsClient: SNSClient | null;
-    senderEmail: string;
-    emailEnabled: boolean;
-    smsEnabled: boolean;
-  }> {
-    const settings = await this.settingsService.findAll();
-    const map = new Map(settings.map(s => [s.key, s.value]));
-
-    const accessKeyId = map.get('awsAccessKeyId') || '';
-    const secretAccessKey = map.get('awsSecretAccessKey') || '';
-    const region = map.get('awsRegion') || 'us-east-1';
-    const senderEmail = map.get('sesSenderEmail') || '';
-    const emailEnabled = map.get('emailEnabled') !== 'false';
-    const smsEnabled = map.get('smsEnabled') !== 'false';
-
-    if (!accessKeyId || !secretAccessKey) {
-      this.logger.warn('AWS Credentials are not fully configured in settings.');
-      return { sesClient: null, snsClient: null, senderEmail, emailEnabled, smsEnabled };
+    if (accessKeyId && secretAccessKey) {
+      const credentials = { accessKeyId, secretAccessKey };
+      this.sesClient = new SESClient({ region, credentials });
+      this.snsClient = new SNSClient({ region, credentials });
+      this.logger.log('AWS Communication clients initialized successfully from secure environment.');
+    } else {
+      this.logger.warn('AWS Credentials are missing in secure backend environment variables (.env).');
     }
-
-    const credentials = { accessKeyId, secretAccessKey };
-
-    const sesClient = new SESClient({ region, credentials });
-    const snsClient = new SNSClient({ region, credentials });
-
-    return { sesClient, snsClient, senderEmail, emailEnabled, smsEnabled };
   }
 
-  async sendEmail(to: string, subject: string, htmlContent: string): Promise<boolean> {
-    try {
-      const { sesClient, senderEmail, emailEnabled } = await this.getAwsClients();
-      if (!emailEnabled) {
-        this.logger.log('Email notifications are globally disabled in settings.');
-        return false;
-      }
-      if (!sesClient || !senderEmail) {
-        this.logger.error('Cannot send email: AWS SES is not configured.');
-        return false;
-      }
+  async sendEmail(
+    to: string,
+    subject: string,
+    htmlContent: string,
+    messageType: string = 'test',
+  ): Promise<boolean> {
+    const senderEmail = this.configService.get<string>('SES_SENDER_EMAIL');
+    if (!this.sesClient || !senderEmail) {
+      this.logger.error('Cannot send email: AWS SES is not configured in backend env variables.');
+      await this.saveLog(to, 'email', messageType, htmlContent.substring(0, 500), 'failed', 'AWS SES credentials or Sender Email missing in backend.');
+      return false;
+    }
 
+    try {
       const command = new SendEmailCommand({
         Source: senderEmail,
         Destination: { ToAddresses: [to] },
@@ -60,28 +54,30 @@ export class NotificationsService {
         },
       });
 
-      await sesClient.send(command);
+      await this.sesClient.send(command);
       this.logger.log(`Email sent successfully to ${to}`);
+      await this.saveLog(to, 'email', messageType, htmlContent.substring(0, 500), 'sent');
       return true;
     } catch (error) {
-      this.logger.error(`Failed to send email to ${to}:`, error.stack || error.message);
+      const errMsg = error.stack || error.message;
+      this.logger.error(`Failed to send email to ${to}:`, errMsg);
+      await this.saveLog(to, 'email', messageType, htmlContent.substring(0, 500), 'failed', errMsg);
       return false;
     }
   }
 
-  async sendSMS(phoneNumber: string, message: string): Promise<boolean> {
-    try {
-      const { snsClient, smsEnabled } = await this.getAwsClients();
-      if (!smsEnabled) {
-        this.logger.log('SMS notifications are globally disabled in settings.');
-        return false;
-      }
-      if (!snsClient) {
-        this.logger.error('Cannot send SMS: AWS SNS is not configured.');
-        return false;
-      }
+  async sendSMS(
+    phoneNumber: string,
+    message: string,
+    messageType: string = 'test',
+  ): Promise<boolean> {
+    if (!this.snsClient) {
+      this.logger.error('Cannot send SMS: AWS SNS is not configured in backend env variables.');
+      await this.saveLog(phoneNumber, 'sms', messageType, message, 'failed', 'AWS SNS credentials missing in backend.');
+      return false;
+    }
 
-      // Format phone number to E.164 if needed, e.g. ensuring '+' prefix
+    try {
       let formattedPhone = phoneNumber.trim();
       if (!formattedPhone.startsWith('+')) {
         formattedPhone = '+' + formattedPhone;
@@ -92,12 +88,51 @@ export class NotificationsService {
         Message: message,
       });
 
-      await snsClient.send(command);
+      await this.snsClient.send(command);
       this.logger.log(`SMS sent successfully to ${formattedPhone}`);
+      await this.saveLog(formattedPhone, 'sms', messageType, message, 'sent');
       return true;
     } catch (error) {
-      this.logger.error(`Failed to send SMS to ${phoneNumber}:`, error.stack || error.message);
+      const errMsg = error.stack || error.message;
+      this.logger.error(`Failed to send SMS to ${phoneNumber}:`, errMsg);
+      await this.saveLog(phoneNumber, 'sms', messageType, message, 'failed', errMsg);
       return false;
     }
+  }
+
+  private async saveLog(
+    recipient: string,
+    channel: 'email' | 'sms',
+    messageType: string,
+    contentPreview: string,
+    status: 'sent' | 'failed',
+    errorMessage?: string,
+  ): Promise<void> {
+    try {
+      const log = this.logRepository.create({
+        recipient,
+        channel,
+        messageType,
+        contentPreview,
+        status,
+        errorMessage,
+      });
+      await this.logRepository.save(log);
+    } catch (err) {
+      this.logger.error('Failed to write database communication log:', err.stack || err.message);
+    }
+  }
+
+  async getLogs(limit: number = 50): Promise<CommunicationLog[]> {
+    return this.logRepository.find({
+      order: { sentAt: 'DESC' },
+      take: limit,
+    });
+  }
+
+  async getCounts(): Promise<{ emailCount: number; smsCount: number }> {
+    const emailCount = await this.logRepository.count({ where: { channel: 'email', status: 'sent' } });
+    const smsCount = await this.logRepository.count({ where: { channel: 'sms', status: 'sent' } });
+    return { emailCount, smsCount };
   }
 }
