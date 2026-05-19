@@ -27,6 +27,9 @@ export class ExpenseCategory {
   @Column({ name: 'sort_order', type: 'integer', default: 0 })
   sortOrder!: number;
 
+  @Column({ name: 'applies_to', type: 'varchar', length: 50, default: 'both' })
+  appliesTo!: 'main' | 'godown' | 'both';
+
   @OneToMany(() => Expense, (expense) => expense.expenseCategory)
   expenses?: Expense[];
 

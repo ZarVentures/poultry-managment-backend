@@ -15,4 +15,8 @@ export class CreateExpenseCategoryDto {
   @IsOptional()
   @IsInt()
   sortOrder?: number;
+
+  @IsOptional()
+  @IsString()
+  appliesTo?: 'main' | 'godown' | 'both';
 }

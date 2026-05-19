@@ -32,7 +32,17 @@ export class ExpenseCategoriesService {
     });
   }
 
-  async findActive(): Promise<ExpenseCategory[]> {
+  async findActive(type?: 'main' | 'godown'): Promise<ExpenseCategory[]> {
+    if (type) {
+      return await this.categoryRepository.find({
+        where: [
+          { isActive: true, appliesTo: type },
+          { isActive: true, appliesTo: 'both' }
+        ],
+        order: { sortOrder: 'ASC', name: 'ASC' },
+      });
+    }
+
     return await this.categoryRepository.find({
       where: { isActive: true },
       order: { sortOrder: 'ASC', name: 'ASC' },
@@ -77,14 +87,14 @@ export class ExpenseCategoriesService {
 
   async seedDefaultCategories(): Promise<void> {
     const defaultCategories = [
-      { name: 'Feed', description: 'Animal feed expenses', sortOrder: 1 },
-      { name: 'Labor', description: 'Employee salaries and wages', sortOrder: 2 },
-      { name: 'Medicine', description: 'Medicine and treatment', sortOrder: 3 },
-      { name: 'Utilities', description: 'Utility bills', sortOrder: 4 },
-      { name: 'Equipment', description: 'Farm equipment and tools', sortOrder: 5 },
-      { name: 'Maintenance', description: 'Farm maintenance and repairs', sortOrder: 6 },
-      { name: 'Transportation', description: 'Transportation and logistics', sortOrder: 7 },
-      { name: 'Other', description: 'Other expenses', sortOrder: 8 },
+      { name: 'Feed', description: 'Animal feed expenses', sortOrder: 1, appliesTo: 'both' as const },
+      { name: 'Labor', description: 'Employee salaries and wages', sortOrder: 2, appliesTo: 'both' as const },
+      { name: 'Medicine', description: 'Medicine and treatment', sortOrder: 3, appliesTo: 'both' as const },
+      { name: 'Utilities', description: 'Utility bills', sortOrder: 4, appliesTo: 'both' as const },
+      { name: 'Equipment', description: 'Farm equipment and tools', sortOrder: 5, appliesTo: 'both' as const },
+      { name: 'Maintenance', description: 'Farm maintenance and repairs', sortOrder: 6, appliesTo: 'both' as const },
+      { name: 'Transportation', description: 'Transportation and logistics', sortOrder: 7, appliesTo: 'both' as const },
+      { name: 'Other', description: 'Other expenses', sortOrder: 8, appliesTo: 'both' as const },
     ];
 
     for (const cat of defaultCategories) {

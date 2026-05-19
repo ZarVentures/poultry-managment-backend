@@ -23,8 +23,8 @@ async function seed() {
         await client.connect();
         console.log('Connected to database. Seeding expense categories...');
 
-        // 0. Alter godown_expenses category column to varchar to allow custom categories
-        console.log('Altering godown_expenses category column type to varchar...');
+        // 0. Alter tables to support dynamic/custom categories and scoping
+        console.log('Running schema migrations...');
         await client.query(`
             DO $$
             BEGIN
@@ -40,12 +40,17 @@ async function seed() {
             END $$;
         `);
 
+        // Ensure applies_to column exists on expense_categories
+        await client.query(`
+            ALTER TABLE expense_categories ADD COLUMN IF NOT EXISTS applies_to varchar(50) DEFAULT 'both';
+        `);
+
         // 1. Insert new categories and collect their IDs
         const categoryIds = {};
         for (const cat of categories) {
             const res = await client.query(
-                `INSERT INTO expense_categories (name, icon, description, is_active, is_system, is_default) 
-                 VALUES ($1, $2, $3, true, true, true) 
+                `INSERT INTO expense_categories (name, icon, description, is_active, is_system, is_default, applies_to) 
+                 VALUES ($1, $2, $3, true, true, true, 'both') 
                  ON CONFLICT (name) DO UPDATE SET icon = $2, description = $3
                  RETURNING id`,
                 [cat.name, cat.icon, cat.description]

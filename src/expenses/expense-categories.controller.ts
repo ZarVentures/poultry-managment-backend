@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ExpenseCategoriesService } from './expense-categories.service';
 import { CreateExpenseCategoryDto } from './dto/create-expense-category.dto';
@@ -20,8 +20,8 @@ export class ExpenseCategoriesController {
   }
 
   @Get('active')
-  findActive() {
-    return this.categoriesService.findActive();
+  findActive(@Query('type') type?: 'main' | 'godown') {
+    return this.categoriesService.findActive(type);
   }
 
   @Get(':id')
