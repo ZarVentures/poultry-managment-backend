@@ -172,25 +172,6 @@ export class GodownService {
       }
     }
 
-    // Mark selected cages as godown_sold in master cages table
-    // Support either simple cageIds array or detailed cages array with partials
-    const { cages: cageDetails } = data;
-    if (cageDetails && Array.isArray(cageDetails) && cageDetails.length > 0) {
-      for (const cage of cageDetails) {
-        if (cage.id && (cage.soldBirds || cage.numberOfBirds)) {
-          await this.cagesService.partialGodownSale(
-            cage.id,
-            savedId,
-            cage.soldBirds || cage.numberOfBirds,
-            cage.soldWeight || cage.cageWeight || 0,
-            cage.weightLoss || 0
-          );
-        }
-      }
-    } else if (cageIds && cageIds.length > 0) {
-      await this.cagesService.markGodownSold(cageIds, savedId, godownSaleWeight);
-    }
-
     return this.findOneSale(savedId);
   }
 
