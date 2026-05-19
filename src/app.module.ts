@@ -54,6 +54,7 @@ import { ProductsModule } from './products/products.module';
 import { PaymentVouchersModule } from './payment-vouchers/payment-vouchers.module';
 import { PaymentVoucher } from './payment-vouchers/payment-voucher.entity';
 import { Product } from './products/product.entity';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -118,6 +119,7 @@ import { Product } from './products/product.entity';
     MortalityModule,
     ProductsModule,
     PaymentVouchersModule,
+    NotificationsModule,
   ],
 })
 export class AppModule implements NestModule {

@@ -11,6 +11,8 @@
     "lint": "echo \"No linter configured\""
   },
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.1049.0",
+    "@aws-sdk/client-sns": "^3.1049.0",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.0",
