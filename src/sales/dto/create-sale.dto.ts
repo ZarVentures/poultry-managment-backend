@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsDateString, IsEnum, MaxLength, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsEnum, MaxLength, IsArray, ValidateNested, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 import { SaleProductType, PaymentStatusType, SaleModeType } from '../sale.entity';
 
@@ -8,6 +8,23 @@ export class CreateSalePaymentDto {
 
   @IsString()
   amount!: string;
+}
+
+export class CreateSaleCageDto {
+  @IsString()
+  cageId!: string;
+
+  @IsOptional()
+  @IsNumber()
+  soldBirds?: number;
+
+  @IsOptional()
+  @IsNumber()
+  soldWeight?: number;
+
+  @IsOptional()
+  @IsNumber()
+  weightLoss?: number;
 }
 
 export class CreateSaleDto {
@@ -105,6 +122,12 @@ export class CreateSaleDto {
   @ValidateNested({ each: true })
   @Type(() => CreateSalePaymentDto)
   payments?: CreateSalePaymentDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateSaleCageDto)
+  cages?: CreateSaleCageDto[];
 
   // Extra fields from frontend (not stored directly)
   @IsOptional()
