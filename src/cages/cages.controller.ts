@@ -95,4 +95,15 @@ export class CagesController {
   ) {
     return this.cagesService.partialGodownSale(cageId, godownSaleId, soldBirds, soldWeight);
   }
+
+  // Handle partial vehicle sale
+  @Patch('partial-vehicle-sale')
+  partialVehicleSale(
+    @Body('cageId') cageId: string,
+    @Body('saleId') saleId: string,
+    @Body('soldBirds') soldBirds: number,
+    @Body('soldWeight') soldWeight: number,
+  ) {
+    return this.cagesService.partialVehicleSale(cageId, saleId, soldBirds, soldWeight);
+  }
 }

@@ -11,12 +11,14 @@ import { GodownMortality } from '../godown/godown-mortality.entity';
 import { GodownSale } from '../godown/entities/godown-sale.entity';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { BillingModule } from '../billing/billing.module';
+import { CagesModule } from '../cages/cages.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Sale, SalePayment, BirdReturn, GodownMortality, GodownSale]),
     PermissionsModule,
     BillingModule,
+    CagesModule,
   ],
   controllers: [SalesController, BirdReturnsController],
   providers: [SalesService, BirdReturnsService],

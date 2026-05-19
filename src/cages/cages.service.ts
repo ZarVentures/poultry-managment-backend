@@ -239,4 +239,63 @@ export class CagesService {
       .where('godownSaleId = :godownSaleId', { godownSaleId })
       .execute();
   }
+
+  // Handle partial vehicle sale by splitting the record
+  async partialVehicleSale(
+    cageId: string,
+    saleId: string,
+    soldBirds: number,
+    soldWeight: number,
+    weightLoss: number = 0
+  ): Promise<void> {
+    const cage = await this.cageRepo.findOne({ where: { id: cageId } });
+    if (!cage) throw new NotFoundException(`Cage ${cageId} not found`);
+
+    if (soldBirds >= cage.numberOfBirds) {
+      // Full sale
+      await this.markSold([cageId], saleId, soldWeight);
+      return;
+    }
+
+    // Partial sale: Split the record
+    const remainingBirds = cage.numberOfBirds - soldBirds;
+    const originalWeight = Number(cage.purchaseWeight || 0);
+
+    // The portion we are selling originally weighed (soldWeight + weightLoss)
+    const weightOfSoldPortion = Number(soldWeight) + Number(weightLoss);
+    const remainingWeight = Math.max(0, originalWeight - weightOfSoldPortion);
+
+    // 1. Create a new record for the SOLD portion
+    const soldCage = this.cageRepo.create({
+      ...cage,
+      id: undefined, // Let DB generate new ID
+      numberOfBirds: soldBirds,
+      purchaseWeight: weightOfSoldPortion,
+      saleWeight: soldWeight,
+      status: 'sold',
+      saleId,
+      updatedAt: new Date(),
+    });
+
+    // 2. Update the existing record with the REMAINING portion
+    cage.numberOfBirds = remainingBirds;
+    cage.purchaseWeight = remainingWeight;
+    cage.updatedAt = new Date();
+
+    await this.cageRepo.save([soldCage, cage]);
+  }
+
+  // Revert cages associated with a vehicle sale
+  async revertVehicleSaleCages(saleId: string): Promise<void> {
+    await this.cageRepo.createQueryBuilder()
+      .update()
+      .set({
+        status: 'on_vehicle' as any,
+        saleId: null as any,
+        saleWeight: null as any,
+        updatedAt: new Date(),
+      })
+      .where('saleId = :saleId', { saleId })
+      .execute();
+  }
 }
