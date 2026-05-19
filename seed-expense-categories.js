@@ -45,6 +45,11 @@ async function seed() {
             ALTER TABLE expense_categories ADD COLUMN IF NOT EXISTS applies_to varchar(50) DEFAULT 'both';
         `);
 
+        // Update any existing records where applies_to is null or empty to 'both'
+        await client.query(`
+            UPDATE expense_categories SET applies_to = 'both' WHERE applies_to IS NULL OR applies_to = '';
+        `);
+
         // 1. Insert new categories and collect their IDs
         const categoryIds = {};
         for (const cat of categories) {

@@ -19,4 +19,8 @@ export class CreateExpenseCategoryDto {
   @IsOptional()
   @IsString()
   appliesTo?: 'main' | 'godown' | 'both';
+
+  @IsOptional()
+  @IsString()
+  icon?: string;
 }
