@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BirdReturn } from './entities/bird-return.entity';
-import { Sale } from './sale.entity';
+import { GodownSale } from '../godown/entities/godown-sale.entity';
 import { CreateBirdReturnDto } from './dto/create-bird-return.dto';
 import { UpdateBirdReturnDto } from './dto/update-bird-return.dto';
 import { BillingService } from '../billing/billing.service';
@@ -13,8 +13,8 @@ export class BirdReturnsService {
   constructor(
     @InjectRepository(BirdReturn)
     private readonly birdReturnRepository: Repository<BirdReturn>,
-    @InjectRepository(Sale)
-    private readonly saleRepository: Repository<Sale>,
+    @InjectRepository(GodownSale)
+    private readonly godownSaleRepository: Repository<GodownSale>,
     @InjectRepository(GodownMortality)
     private readonly godownMortalityRepository: Repository<GodownMortality>,
     private readonly billingService: BillingService,
@@ -43,9 +43,8 @@ export class BirdReturnsService {
 
   async create(dto: CreateBirdReturnDto, createdBy?: string): Promise<BirdReturn> {
     // Verify sale exists
-    const sale = await this.saleRepository.findOne({ 
-      where: { id: dto.saleId },
-      relations: ['retailer']
+    const sale = await this.godownSaleRepository.findOne({ 
+      where: { id: dto.saleId }
     });
     if (!sale) {
       throw new NotFoundException(`Sale ${dto.saleId} not found`);
@@ -53,7 +52,7 @@ export class BirdReturnsService {
 
     // Validate number of birds returned doesn't exceed sale quantity
     const totalReturned = await this.getTotalBirdsReturnedForSale(dto.saleId);
-    const saleQuantity = Number(sale.numberOfBirds || sale.quantity || 0);
+    const saleQuantity = Number(sale.numberOfBirds || 0);
     
     if (totalReturned + dto.numberOfBirdsReturned > saleQuantity) {
       throw new BadRequestException(
@@ -179,8 +178,8 @@ export class BirdReturnsService {
       const currentReturnBirds = birdReturn.numberOfBirdsReturned;
       const newTotal = totalReturned - currentReturnBirds + dto.numberOfBirdsReturned;
 
-      const sale = await this.saleRepository.findOne({ where: { id: birdReturn.saleId } });
-      const saleQuantity = Number(sale?.numberOfBirds || sale?.quantity || 0);
+      const sale = await this.godownSaleRepository.findOne({ where: { id: birdReturn.saleId } });
+      const saleQuantity = Number(sale?.numberOfBirds || 0);
 
       if (newTotal > saleQuantity) {
         throw new BadRequestException(
@@ -250,7 +249,7 @@ export class BirdReturnsService {
     }
 
     // Update sale record - reduce quantity and adjust amounts
-    const sale = await this.saleRepository.findOne({ where: { id: birdReturn.saleId } });
+    const sale = await this.godownSaleRepository.findOne({ where: { id: birdReturn.saleId } });
     if (sale) {
       // Reduce bird count
       if (sale.numberOfBirds) {
@@ -259,19 +258,21 @@ export class BirdReturnsService {
 
       // Adjust financial amounts
       if (birdReturn.refundAmount > 0) {
-        sale.netAmount = Number(sale.netAmount) - birdReturn.refundAmount;
-        sale.amountReceived = Math.max(0, Number(sale.amountReceived) - birdReturn.refundAmount);
+        sale.totalAmount = Math.max(0, Number(sale.totalAmount || 0) - birdReturn.refundAmount);
+        sale.amountReceived = Math.max(0, Number(sale.amountReceived || 0) - birdReturn.refundAmount);
         
         // Update payment status
         if (sale.amountReceived === 0) {
           sale.paymentStatus = 'pending';
-        } else if (sale.amountReceived < sale.netAmount) {
+        } else if (sale.amountReceived < (sale.totalAmount || 0)) {
           sale.paymentStatus = 'partial';
+        } else {
+          sale.paymentStatus = 'paid';
         }
       }
 
       sale.updatedAt = new Date();
-      await this.saleRepository.save(sale);
+      await this.godownSaleRepository.save(sale);
 
       // Create billing ledger entry for the return (CREDIT - increases what we owe them)
       if (birdReturn.refundAmount > 0 && sale.retailerId) {
@@ -285,7 +286,7 @@ export class BirdReturnsService {
             amount: birdReturn.refundAmount,
             referenceType: 'sale',
             referenceId: parseInt(sale.id),
-            referenceNumber: sale.invoiceNumber,
+            referenceNumber: sale.invoiceNumber || sale.saleNo || '',
             description: `Bird return: ${birdReturn.returnNumber} - ${birdReturn.numberOfBirdsReturned} birds`,
             notes: birdReturn.notes,
           });

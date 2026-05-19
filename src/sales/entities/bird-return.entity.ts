@@ -1,5 +1,5 @@
 import { Column, Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { Sale } from '../sale.entity';
+import { GodownSale } from '../../godown/entities/godown-sale.entity';
 import { Retailer } from '../../retailers/retailer.entity';
 
 export type ReturnReasonType = 'dead' | 'sick' | 'underweight' | 'quality_issue' | 'customer_request' | 'other';
@@ -20,9 +20,9 @@ export class BirdReturn {
   @Column({ name: 'sale_id', type: 'bigint' })
   saleId!: string;
 
-  @ManyToOne(() => Sale)
+  @ManyToOne(() => GodownSale)
   @JoinColumn({ name: 'sale_id' })
-  sale!: Sale;
+  sale!: GodownSale;
 
   // Customer/Retailer info
   @Column({ name: 'customer_name', type: 'varchar', length: 150 })
