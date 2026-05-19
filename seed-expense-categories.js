@@ -1,5 +1,6 @@
 const { Client } = require('pg');
-require('dotenv').config({ path: 'BackEnd/.env.staging' });
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env.staging') });
 
 const categories = [
     { name: 'Feed', icon: 'wheat', description: 'Poultry feed and supplements' },
