@@ -77,17 +77,14 @@ export class ExpenseCategoriesService {
 
   async seedDefaultCategories(): Promise<void> {
     const defaultCategories = [
-      { name: 'Diesel (For Big Vehicle)', description: 'Fuel for large vehicles', sortOrder: 1 },
-      { name: 'Feed', description: 'Animal feed expenses', sortOrder: 2 },
-      { name: 'Worker Salary', description: 'Employee salaries and wages', sortOrder: 3 },
-      { name: 'Shop Rent', description: 'Rental expenses', sortOrder: 4 },
-      { name: 'Electricity Bill', description: 'Utility - Electricity', sortOrder: 5 },
-      { name: 'Petrol (For Two Wheelers)', description: 'Fuel for small vehicles', sortOrder: 6 },
-      { name: 'Worker Incentive', description: 'Employee bonuses and incentives', sortOrder: 7 },
-      { name: 'Stationary', description: 'Office supplies', sortOrder: 8 },
-      { name: 'Cleaning', description: 'Cleaning and maintenance', sortOrder: 9 },
-      { name: 'Snacks (Chai, Samosa, etc.)', description: 'Refreshments and snacks', sortOrder: 10 },
-      { name: 'Misc Expenses', description: 'Miscellaneous expenses', sortOrder: 11 },
+      { name: 'Feed', description: 'Animal feed expenses', sortOrder: 1 },
+      { name: 'Labor', description: 'Employee salaries and wages', sortOrder: 2 },
+      { name: 'Medicine', description: 'Medicine and treatment', sortOrder: 3 },
+      { name: 'Utilities', description: 'Utility bills', sortOrder: 4 },
+      { name: 'Equipment', description: 'Farm equipment and tools', sortOrder: 5 },
+      { name: 'Maintenance', description: 'Farm maintenance and repairs', sortOrder: 6 },
+      { name: 'Transportation', description: 'Transportation and logistics', sortOrder: 7 },
+      { name: 'Other', description: 'Other expenses', sortOrder: 8 },
     ];
 
     for (const cat of defaultCategories) {
