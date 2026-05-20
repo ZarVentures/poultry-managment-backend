@@ -153,7 +153,8 @@ export class SalesService {
       // but without skip/take
       const allFiltered = await query.getMany();
       const summary = {
-        totalBirds: allFiltered.reduce((s, x) => s + Number(x.quantity || 0), 0),
+        totalBirds: allFiltered.reduce((s, x) => s + Number((x as any).numberOfBirds || 0), 0),
+        totalWeight: allFiltered.reduce((s, x) => s + Number(x.quantity || 0), 0),
         totalRevenue: allFiltered.reduce((s, x) => s + Number(x.netAmount || x.totalAmount || 0), 0),
         totalReceived: allFiltered.reduce((s, x) => s + Number(x.amountReceived || 0), 0),
         totalPending: allFiltered.reduce((s, x) => s + Math.max(0, Number(x.netAmount || x.totalAmount || 0) - Number(x.amountReceived || 0)), 0),
