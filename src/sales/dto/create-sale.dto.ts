@@ -47,6 +47,10 @@ export class CreateSaleDto {
   @MaxLength(100)
   cageNo?: string;
 
+  @IsOptional()
+  @IsNumber()
+  numberOfBirds?: number;
+
   @IsString()
   @MaxLength(150)
   customerName!: string;
