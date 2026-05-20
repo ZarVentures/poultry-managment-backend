@@ -135,9 +135,11 @@ export class CreateSaleDto {
 
   // Extra fields from frontend (not stored directly)
   @IsOptional()
+  @IsNumber()
   totalBirds?: number;
 
   @IsOptional()
+  @IsNumber()
   totalWeight?: number;
 
   @IsOptional()
