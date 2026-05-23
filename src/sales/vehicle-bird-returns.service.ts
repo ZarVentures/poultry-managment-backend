@@ -338,7 +338,7 @@ export class VehicleBirdReturnsService {
             supplierName: `${birdReturn.customerName} (Vehicle Return)`,
             numberOfBirds: birdReturn.numberOfBirdsReturned,
             totalWeight: birdReturn.weightReturned || 0,
-            notes: `Automatically created from processed Vehicle Bird Return ${birdReturn.returnNumber}. Stocked at: ${birdReturn.inventoryLocation || 'Godown'}`,
+            notes: `Automatically created from processed Vehicle Bird Return ${birdReturn.returnNumber}. Reason: ${birdReturn.returnReason.toUpperCase()}. Stocked at: ${birdReturn.inventoryLocation || 'Godown'}`,
             averageWeight: birdReturn.weightReturned && birdReturn.numberOfBirdsReturned > 0 
               ? birdReturn.weightReturned / birdReturn.numberOfBirdsReturned
               : undefined,
