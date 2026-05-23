@@ -8,6 +8,8 @@ import { UpdateVehicleBirdReturnDto } from './dto/update-vehicle-bird-return.dto
 import { BillingService } from '../billing/billing.service';
 import { GodownInwardEntry } from '../godown/godown-inward.entity';
 import { GodownMortality } from '../godown/godown-mortality.entity';
+import { Mortality } from '../mortality/mortality.entity';
+import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 
 @Injectable()
 export class VehicleBirdReturnsService {
@@ -20,6 +22,10 @@ export class VehicleBirdReturnsService {
     private readonly godownInwardRepository: Repository<GodownInwardEntry>,
     @InjectRepository(GodownMortality)
     private readonly godownMortalityRepository: Repository<GodownMortality>,
+    @InjectRepository(Mortality)
+    private readonly mortalityRepository: Repository<Mortality>,
+    @InjectRepository(PurchaseOrder)
+    private readonly purchaseOrderRepository: Repository<PurchaseOrder>,
     private readonly billingService: BillingService,
   ) {}
 
@@ -348,20 +354,53 @@ export class VehicleBirdReturnsService {
         }
       }
 
-      // === NEW: Log dead returns to Godown Mortality ===
+      // === NEW: Log dead returns to Mortality Tracking (mortalities table) ===
       if (!birdReturn.returnedToInventory && birdReturn.returnReason === 'dead') {
         try {
-          const godownMortality = this.godownMortalityRepository.create({
-            mortalityDate: birdReturn.returnDate,
+          // 1. Generate unique record number MOR-YYYY-MM-XXXX
+          const today = new Date();
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          const prefix = `MOR-${year}-${month}-`;
+
+          const lastMortality = await this.mortalityRepository
+            .createQueryBuilder('mor')
+            .where('mor.recordNumber LIKE :prefix', { prefix: `${prefix}%` })
+            .orderBy('mor.id', 'DESC')
+            .limit(1)
+            .getOne();
+
+          let recordNumber = `${prefix}0001`;
+          if (lastMortality && lastMortality.recordNumber) {
+            const lastNumber = parseInt(lastMortality.recordNumber.split('-').pop() || '0');
+            recordNumber = `${prefix}${String(lastNumber + 1).padStart(4, '0')}`;
+          }
+
+          // 2. Fetch parent PurchaseOrder if available to pull supplier and invoice information
+          let purchaseOrder: PurchaseOrder | null = null;
+          if (sale.purchaseBillNo) {
+            purchaseOrder = await this.purchaseOrderRepository.findOne({
+              where: { orderNumber: sale.purchaseBillNo }
+            });
+          }
+
+          const mortality = this.mortalityRepository.create({
+            recordNumber,
+            purchaseOrderId: purchaseOrder?.id ? purchaseOrder.id : undefined,
+            purchaseInvoiceNo: sale.purchaseBillNo || 'UNKNOWN',
+            purchaseDate: purchaseOrder?.orderDate || sale.saleDate,
+            farmerName: purchaseOrder?.supplierName || 'UNKNOWN',
+            farmLocation: purchaseOrder?.farmLocation || '',
             numberOfBirdsDied: birdReturn.numberOfBirdsReturned,
             weightOfDeadBirds: birdReturn.weightReturned,
-            reason: `Dead on Vehicle Return (Ref: ${birdReturn.returnNumber})`,
+            cause: `Dead on Vehicle Return (Ref: ${birdReturn.returnNumber})`,
             notes: `Automatically created from processed Vehicle Bird Return ${birdReturn.returnNumber}. Details: ${birdReturn.reasonDescription || 'None'}`,
           });
-          await this.godownMortalityRepository.save(godownMortality);
-          console.log(`\nSuccessfully logged dead returned birds to Godown Mortality\n`);
+
+          await this.mortalityRepository.save(mortality);
+          console.log(`\nSuccessfully logged dead returned birds to general Mortality Tracking (Record: ${recordNumber})\n`);
         } catch (error) {
-          console.error('Failed to automatically record Godown Mortality for dead vehicle return:', error);
+          console.error('Failed to automatically record general Mortality Tracking for dead vehicle return:', error);
         }
       }
     }

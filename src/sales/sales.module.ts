@@ -13,13 +13,15 @@ import { VehicleBirdReturnsController } from './vehicle-bird-returns.controller'
 import { GodownMortality } from '../godown/godown-mortality.entity';
 import { GodownSale } from '../godown/entities/godown-sale.entity';
 import { GodownInwardEntry } from '../godown/godown-inward.entity';
+import { Mortality } from '../mortality/mortality.entity';
+import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { BillingModule } from '../billing/billing.module';
 import { CagesModule } from '../cages/cages.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Sale, SalePayment, BirdReturn, VehicleBirdReturn, GodownMortality, GodownSale, GodownInwardEntry]),
+    TypeOrmModule.forFeature([Sale, SalePayment, BirdReturn, VehicleBirdReturn, GodownMortality, GodownSale, GodownInwardEntry, Mortality, PurchaseOrder]),
     PermissionsModule,
     BillingModule,
     CagesModule,
