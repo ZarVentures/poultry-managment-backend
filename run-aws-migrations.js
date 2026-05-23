@@ -266,6 +266,36 @@ const migrations = [
   { name: 'sales.net_amount',          sql: `ALTER TABLE sales ADD COLUMN IF NOT EXISTS net_amount NUMERIC(14,2) DEFAULT 0` },
   { name: 'sales.retailer_id',         sql: `ALTER TABLE sales ADD COLUMN IF NOT EXISTS retailer_id BIGINT` },
   { name: 'sales.sale_attachment',     sql: `ALTER TABLE sales ADD COLUMN IF NOT EXISTS sale_attachment TEXT` },
+
+  // ── vehicle_bird_returns ──────────────────────────────────────
+  {
+    name: 'create vehicle_bird_returns',
+    sql: `CREATE TABLE IF NOT EXISTS vehicle_bird_returns (
+      id BIGSERIAL PRIMARY KEY,
+      return_number VARCHAR(50) UNIQUE NOT NULL,
+      return_date DATE NOT NULL,
+      sale_id BIGINT NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+      customer_name VARCHAR(150) NOT NULL,
+      retailer_id BIGINT REFERENCES retailers(id) ON DELETE SET NULL,
+      number_of_birds_returned INTEGER NOT NULL,
+      weight_returned NUMERIC(10, 2),
+      return_reason return_reason_type NOT NULL,
+      reason_description TEXT,
+      refund_amount NUMERIC(14, 2) DEFAULT 0,
+      adjustment_amount NUMERIC(14, 2) DEFAULT 0,
+      status return_status_type DEFAULT 'pending',
+      returned_to_inventory BOOLEAN DEFAULT false,
+      inventory_location VARCHAR(100),
+      approved_by VARCHAR(150),
+      approved_at TIMESTAMPTZ,
+      processed_by VARCHAR(150),
+      processed_at TIMESTAMPTZ,
+      notes TEXT,
+      attachment_url TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+  },
 ]
 
 async function run() {
