@@ -4,7 +4,7 @@
 Write-Host "🚀 Deploying Backend to EC2 Staging..." -ForegroundColor Green
 
 # EC2 connection details
-$EC2_HOST = "13.233.113.30"
+$EC2_HOST = "13.234.140.190"
 $EC2_USER = "ubuntu"
 $APP_DIR = "chickenbackend"
 $PM2_NAME = "poultry-backend-stage"
