@@ -6,6 +6,8 @@ import { Sale } from './sale.entity';
 import { CreateVehicleBirdReturnDto } from './dto/create-vehicle-bird-return.dto';
 import { UpdateVehicleBirdReturnDto } from './dto/update-vehicle-bird-return.dto';
 import { BillingService } from '../billing/billing.service';
+import { GodownInwardEntry } from '../godown/godown-inward.entity';
+import { GodownMortality } from '../godown/godown-mortality.entity';
 
 @Injectable()
 export class VehicleBirdReturnsService {
@@ -14,6 +16,10 @@ export class VehicleBirdReturnsService {
     private readonly vehicleBirdReturnRepository: Repository<VehicleBirdReturn>,
     @InjectRepository(Sale)
     private readonly saleRepository: Repository<Sale>,
+    @InjectRepository(GodownInwardEntry)
+    private readonly godownInwardRepository: Repository<GodownInwardEntry>,
+    @InjectRepository(GodownMortality)
+    private readonly godownMortalityRepository: Repository<GodownMortality>,
     private readonly billingService: BillingService,
   ) {}
 
@@ -295,6 +301,67 @@ export class VehicleBirdReturnsService {
           });
         } catch (error) {
           console.error('Failed to create billing entry for vehicle return:', error);
+        }
+      }
+
+      // === NEW: Physical restock to Godown Inventory ===
+      if (birdReturn.returnedToInventory) {
+        try {
+          // Generate a new inward number (e.g., GDI-2026-05-XXXX)
+          const today = new Date();
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          const prefix = `GDI-${year}-${month}-`;
+
+          const lastInward = await this.godownInwardRepository
+            .createQueryBuilder('inward')
+            .where('inward.inwardNo LIKE :prefix', { prefix: `${prefix}%` })
+            .orderBy('inward.id', 'DESC')
+            .limit(1)
+            .getOne();
+
+          let inwardNo = `${prefix}0001`;
+          if (lastInward && lastInward.inwardNo) {
+            const lastNumber = parseInt(lastInward.inwardNo.split('-').pop() || '0');
+            inwardNo = `${prefix}${String(lastNumber + 1).padStart(4, '0')}`;
+          }
+
+          const inwardEntry = this.godownInwardRepository.create({
+            entryDate: birdReturn.returnDate,
+            inwardNo,
+            supplierName: `${birdReturn.customerName} (Vehicle Return)`,
+            numberOfBirds: birdReturn.numberOfBirdsReturned,
+            totalWeight: birdReturn.weightReturned || 0,
+            notes: `Automatically created from processed Vehicle Bird Return ${birdReturn.returnNumber}. Stocked at: ${birdReturn.inventoryLocation || 'Godown'}`,
+            averageWeight: birdReturn.weightReturned && birdReturn.numberOfBirdsReturned > 0 
+              ? birdReturn.weightReturned / birdReturn.numberOfBirdsReturned
+              : undefined,
+            weightLoss: 0,
+            totalAmount: 0,
+            ratePerKg: 0,
+          });
+
+          await this.godownInwardRepository.save(inwardEntry);
+          console.log(`\nSuccessfully restocked returned birds from Vehicle Sale into Godown Inward Entry: ${inwardNo}\n`);
+        } catch (error) {
+          console.error('Failed to automatically restock vehicle returned birds to Godown:', error);
+        }
+      }
+
+      // === NEW: Log dead returns to Godown Mortality ===
+      if (!birdReturn.returnedToInventory && birdReturn.returnReason === 'dead') {
+        try {
+          const godownMortality = this.godownMortalityRepository.create({
+            mortalityDate: birdReturn.returnDate,
+            numberOfBirdsDied: birdReturn.numberOfBirdsReturned,
+            weightOfDeadBirds: birdReturn.weightReturned,
+            reason: `Dead on Vehicle Return (Ref: ${birdReturn.returnNumber})`,
+            notes: `Automatically created from processed Vehicle Bird Return ${birdReturn.returnNumber}. Details: ${birdReturn.reasonDescription || 'None'}`,
+          });
+          await this.godownMortalityRepository.save(godownMortality);
+          console.log(`\nSuccessfully logged dead returned birds to Godown Mortality\n`);
+        } catch (error) {
+          console.error('Failed to automatically record Godown Mortality for dead vehicle return:', error);
         }
       }
     }
