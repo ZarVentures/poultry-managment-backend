@@ -21,7 +21,7 @@ export class CreateUserDto {
   password!: string;
 
   @IsOptional()
-  @IsEnum(['admin', 'manager', 'staff'] as const)
+  @IsString()
   role?: UserRole;
 
   @IsOptional()
