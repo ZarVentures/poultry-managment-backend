@@ -564,6 +564,28 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_vehicle_returns_return_number ON vehicle_bird_returns(return_number);
     END $$;`,
   },
+
+  // ── Extra Staging Gaps ────────────────────────────────────────
+  {
+    name: 'godown_sales.weight_loss column',
+    sql: `ALTER TABLE godown_sales ADD COLUMN IF NOT EXISTS weight_loss NUMERIC(10,2) DEFAULT 0`,
+  },
+  {
+    name: 'godown_inward_entries.inward_no column',
+    sql: `ALTER TABLE godown_inward_entries ADD COLUMN IF NOT EXISTS inward_no VARCHAR(50)`,
+  },
+  {
+    name: 'expense_categories.is_default column',
+    sql: `ALTER TABLE expense_categories ADD COLUMN IF NOT EXISTS is_default BOOLEAN DEFAULT false`,
+  },
+  {
+    name: 'expense_categories.sort_order column',
+    sql: `ALTER TABLE expense_categories ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`,
+  },
+  {
+    name: 'expense_categories.applies_to column',
+    sql: `ALTER TABLE expense_categories ADD COLUMN IF NOT EXISTS applies_to VARCHAR(50) DEFAULT 'both'`,
+  },
 ]
 
 async function run() {
