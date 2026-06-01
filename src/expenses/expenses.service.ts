@@ -5,6 +5,7 @@ import { Expense } from './expense.entity';
 import { ExpenseCategory } from '../expense-categories/expense-category.entity';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
+import { AccountingService } from '../modules/accounting/accounting.service';
 
 @Injectable()
 export class ExpensesService {
@@ -13,6 +14,7 @@ export class ExpensesService {
     private readonly expenseRepository: Repository<Expense>,
     @InjectRepository(ExpenseCategory)
     private readonly categoryRepository: Repository<ExpenseCategory>,
+    private readonly accountingService: AccountingService,
   ) { }
 
   async create(createExpenseDto: CreateExpenseDto): Promise<Expense> {
@@ -26,7 +28,6 @@ export class ExpensesService {
       category: legacyCategory as any,
       amount: parseFloat(createExpenseDto.amount),
     });
-
     // If a categoryId was provided, resolve and attach the category entity
     if (createExpenseDto.categoryId) {
       try {
@@ -38,7 +39,12 @@ export class ExpensesService {
     }
 
     const saved = await this.expenseRepository.save(expense);
-    return this.findOne(saved.id);
+    const fullExpense = await this.findOne(saved.id);
+    this.accountingService.syncExpense(fullExpense).catch((err) => {
+      console.error('Failed to trigger accounting sync for expense:', err);
+    });
+
+    return fullExpense;
   }
 
   async findAll(
@@ -98,7 +104,17 @@ export class ExpensesService {
       }
     }
     expense.updatedAt = new Date();
-    return this.expenseRepository.save(expense);
+    const saved = await this.expenseRepository.save(expense);
+
+    this.findOne(saved.id).then(fullExpense => {
+      this.accountingService.syncExpense(fullExpense).catch((err) => {
+        console.error('Failed to trigger accounting sync for expense update:', err);
+      });
+    }).catch(err => {
+      console.error('Failed to load full expense for sync update:', err);
+    });
+
+    return saved;
   }
 
   async remove(id: string): Promise<void> {

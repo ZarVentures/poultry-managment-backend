@@ -9,7 +9,6 @@ import { InventoryItem } from '../inventory/entities/inventory-item.entity';
 import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { Sale } from '../sales/sale.entity';
 import { BillingSale } from './entities/billing-sale.entity';
-import { getTodayIST } from '../common/date-utils';
 import { Farmer } from '../farmers/farmer.entity';
 import { Retailer } from '../retailers/retailer.entity';
 import { GodownSale } from '../godown/entities/godown-sale.entity';
@@ -397,6 +396,28 @@ export class BillingService {
     }
 
     return allEntries as BillingLedger[];
+    try {
+      return await this.ledgerRepo.find({ where: { partyId }, order: { date: 'ASC', createdAt: 'ASC' } });
+    } catch (err) {
+      console.error(`getLedger error for partyId=${partyId}:`, err);
+      return [];
+    }
+  }
+
+  // ── Ledger by Farmer ID ───────────────────────────────────────────────────
+  async getLedgerByFarmerId(farmerId: string): Promise<BillingLedger[]> {
+    const farmer = await this.farmerRepo.findOne({ where: { id: farmerId } });
+    if (!farmer) throw new NotFoundException(`Farmer ${farmerId} not found`);
+    const party = await this.findOrCreatePartyByName(farmer.name, 'Farm', farmer.phone, farmer.address);
+    return this.getLedger(party.id);
+  }
+
+  // ── Ledger by Retailer ID ─────────────────────────────────────────────────
+  async getLedgerByRetailerId(retailerId: string): Promise<BillingLedger[]> {
+    const retailer = await this.retailerRepo.findOne({ where: { id: retailerId } });
+    if (!retailer) throw new NotFoundException(`Retailer ${retailerId} not found`);
+    const party = await this.findOrCreatePartyByName(retailer.name, 'Retailer', retailer.phone, retailer.address);
+    return this.getLedger(party.id);
   }
 
   // Helper: Find or create billing party by name

@@ -21,11 +21,36 @@ import { UpdateSaleDto } from './dto/update-sale.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
+import { AccountingService } from '../modules/accounting/accounting.service';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('sales')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class SalesController {
-  constructor(private readonly salesService: SalesService) { }
+  constructor(
+    private readonly salesService: SalesService,
+    private readonly accountingService: AccountingService,
+  ) { }
+
+  @Public()
+  @Get('sync-all')
+  async syncAll() {
+    try {
+      const result = await this.salesService.findAll();
+      const sales = Array.isArray(result) ? result : result.data || [];
+      const synced: string[] = [];
+      const failed: string[] = [];
+      for (const sale of sales) {
+        try {
+          await this.accountingService.syncSale(sale);
+          synced.push(sale.id || sale.invoiceNumber);
+        } catch { failed.push(sale.id || sale.invoiceNumber); }
+      }
+      return { synced: synced.length, failed: failed.length, details: { synced, failed } };
+    } catch (err: any) {
+      return { synced: 0, failed: 0, error: err.message };
+    }
+  }
 
   @Get('generate/next-invoice-number')
   @Permissions('sales', 'read')
