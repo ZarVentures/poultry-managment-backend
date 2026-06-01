@@ -5,6 +5,7 @@ import { PaymentVoucher } from './payment-voucher.entity';
 import { CreatePaymentVoucherDto } from './dto/create-payment-voucher.dto';
 import { UpdatePaymentVoucherDto } from './dto/update-payment-voucher.dto';
 import { BillingService } from '../billing/billing.service';
+import { AccountingService } from '../modules/accounting/accounting.service';
 
 @Injectable()
 export class PaymentVouchersService {
@@ -12,6 +13,7 @@ export class PaymentVouchersService {
     @InjectRepository(PaymentVoucher)
     private paymentVoucherRepository: Repository<PaymentVoucher>,
     private billingService: BillingService,
+    private accountingService: AccountingService,
   ) { }
 
   async create(createDto: CreatePaymentVoucherDto, userId: number): Promise<PaymentVoucher> {
@@ -192,5 +194,9 @@ export class PaymentVouchersService {
     } catch (error) {
       console.error('Failed to integrate voucher with ledger:', error);
     }
+
+    this.accountingService.syncPayment(voucher).catch((err) => {
+      console.error('Failed to trigger accounting sync for payment voucher:', err);
+    });
   }
 }

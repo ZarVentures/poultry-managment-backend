@@ -5,7 +5,7 @@ import { Sale } from './sale.entity';
 import { SalePayment } from './sale-payment.entity';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
-import { CagesService } from '../cages/cages.service';
+import { AccountingService } from '../modules/accounting/accounting.service';
 
 @Injectable()
 export class SalesService {
@@ -14,7 +14,7 @@ export class SalesService {
     private readonly saleRepository: Repository<Sale>,
     @InjectRepository(SalePayment)
     private readonly salePaymentRepository: Repository<SalePayment>,
-    private readonly cagesService: CagesService,
+    private readonly accountingService: AccountingService,
   ) { }
 
   private calcAmounts(dto: {
@@ -63,61 +63,49 @@ export class SalesService {
   }
 
   async create(dto: CreateSaleDto): Promise<Sale> {
-    const { cages, ...dtoData } = dto as any;
-
     // Auto-generate invoice number if not provided
-    const invoiceNumber = dtoData.invoiceNumber || await this.generateInvoiceNumber();
+    const invoiceNumber = dto.invoiceNumber || await this.generateInvoiceNumber();
 
     const existing = await this.saleRepository.findOne({ where: { invoiceNumber } });
     if (existing) throw new BadRequestException(`Sale ${invoiceNumber} already exists`);
 
-    const amounts = this.calcAmounts(dtoData);
-    const totalPaymentMade = (dtoData.payments || []).reduce((s: number, p: any) => s + parseFloat(p.amount || '0'), 0);
+    const amounts = this.calcAmounts(dto);
+    const totalPaymentMade = (dto.payments || []).reduce((s, p) => s + parseFloat(p.amount || '0'), 0);
 
     const sale = this.saleRepository.create({
       invoiceNumber,
-      saleNo: dtoData.saleNo,
-      purchaseBillNo: dtoData.purchaseBillNo,
-      cageNo: dtoData.cageNo,
-      numberOfBirds: dtoData.numberOfBirds ?? dtoData.totalBirds ?? 0,
-      customerName: dtoData.customerName,
-      saleDate: dtoData.saleDate,
-      saleMode: dtoData.saleMode,
-      productType: dtoData.productType,
-      quantity: parseFloat(dtoData.quantity || '0'),
-      unit: dtoData.unit,
-      unitPrice: parseFloat(dtoData.unitPrice || '0'),
+      saleNo: dto.saleNo,
+      purchaseBillNo: dto.purchaseBillNo,
+      cageNo: dto.cageNo,
+      customerName: dto.customerName,
+      saleDate: dto.saleDate,
+      saleMode: dto.saleMode,
+      productType: dto.productType,
+      quantity: parseFloat(dto.quantity || '0'),
+      unit: dto.unit,
+      unitPrice: parseFloat(dto.unitPrice || '0'),
       ...amounts,
-      paymentStatus: dtoData.paymentStatus || 'pending',
-      amountReceived: totalPaymentMade || parseFloat(dtoData.amountReceived || '0'),
-      notes: dtoData.notes,
-      retailerId: dtoData.retailerId,
+      paymentStatus: dto.paymentStatus || 'pending',
+      amountReceived: totalPaymentMade || parseFloat(dto.amountReceived || '0'),
+      notes: dto.notes,
+      retailerId: dto.retailerId,
     });
 
     const savedResult = await this.saleRepository.save(sale);
     const savedId: string = (savedResult as any).id ?? (savedResult as any)[0]?.id;
 
-    // Process Cages
-    if (cages && cages.length > 0) {
-      for (const cage of cages) {
-        await this.cagesService.partialVehicleSale(
-          cage.cageId,
-          savedId,
-          Number(cage.soldBirds),
-          Number(cage.soldWeight),
-          Number(cage.weightLoss || 0),
-        );
-      }
-    }
-
-    if (dtoData.payments && dtoData.payments.length > 0) {
-      const payments = dtoData.payments
-        .filter((p: any) => parseFloat(p.amount || '0') > 0)
-        .map((p: any) => this.salePaymentRepository.create({ paymentMode: p.paymentMode, amount: parseFloat(p.amount), saleId: savedId }));
+    if (dto.payments && dto.payments.length > 0) {
+      const payments = dto.payments
+        .filter(p => parseFloat(p.amount || '0') > 0)
+        .map(p => this.salePaymentRepository.create({ paymentMode: p.paymentMode, amount: parseFloat(p.amount), saleId: savedId }));
       if (payments.length > 0) await this.salePaymentRepository.save(payments);
     }
 
-    return this.findOne(savedId);
+    const fullSale = await this.findOne(savedId);
+    this.accountingService.syncSale(fullSale).catch((err) => {
+      console.error('Failed to trigger accounting sync for sale:', err);
+    });
+    return fullSale;
   }
 
   async findAll(
@@ -153,8 +141,7 @@ export class SalesService {
       // but without skip/take
       const allFiltered = await query.getMany();
       const summary = {
-        totalBirds: allFiltered.reduce((s, x) => s + Number((x as any).numberOfBirds || 0), 0),
-        totalWeight: allFiltered.reduce((s, x) => s + Number(x.quantity || 0), 0),
+        totalBirds: allFiltered.reduce((s, x) => s + Number(x.quantity || 0), 0),
         totalRevenue: allFiltered.reduce((s, x) => s + Number(x.netAmount || x.totalAmount || 0), 0),
         totalReceived: allFiltered.reduce((s, x) => s + Number(x.amountReceived || 0), 0),
         totalPending: allFiltered.reduce((s, x) => s + Math.max(0, Number(x.netAmount || x.totalAmount || 0) - Number(x.amountReceived || 0)), 0),
@@ -170,7 +157,6 @@ export class SalesService {
     const sales = await this.saleRepository
       .createQueryBuilder('sale')
       .select(['sale.id', 'sale.invoiceNumber', 'sale.saleDate', 'sale.customerName'])
-      .where('sale.saleMode = :saleMode', { saleMode: 'from_godown' })
       .orderBy('sale.saleDate', 'DESC')
       .limit(100)
       .getMany();
@@ -184,28 +170,11 @@ export class SalesService {
   }
 
   async update(id: string, dto: UpdateSaleDto): Promise<Sale> {
-    const { cages, ...dtoData } = dto as any;
     const sale = await this.findOne(id);
 
-    if (dtoData.invoiceNumber && dtoData.invoiceNumber !== sale.invoiceNumber) {
-      const existing = await this.saleRepository.findOne({ where: { invoiceNumber: dtoData.invoiceNumber } });
-      if (existing) throw new BadRequestException(`Sale ${dtoData.invoiceNumber} already exists`);
-    }
-
-    // Process Cages
-    if (cages !== undefined) {
-      await this.cagesService.revertVehicleSaleCages(id);
-      if (cages && cages.length > 0) {
-        for (const cage of cages) {
-          await this.cagesService.partialVehicleSale(
-            cage.cageId,
-            id,
-            Number(cage.soldBirds),
-            Number(cage.soldWeight),
-            Number(cage.weightLoss || 0),
-          );
-        }
-      }
+    if (dto.invoiceNumber && dto.invoiceNumber !== sale.invoiceNumber) {
+      const existing = await this.saleRepository.findOne({ where: { invoiceNumber: dto.invoiceNumber } });
+      if (existing) throw new BadRequestException(`Sale ${dto.invoiceNumber} already exists`);
     }
 
     const quantity = dto.quantity ? parseFloat(dto.quantity) : sale.quantity;
@@ -239,7 +208,6 @@ export class SalesService {
       saleNo: dto.saleNo ?? sale.saleNo,
       purchaseBillNo: dto.purchaseBillNo ?? sale.purchaseBillNo,
       cageNo: dto.cageNo ?? sale.cageNo,
-      numberOfBirds: dto.numberOfBirds ?? dto.totalBirds ?? sale.numberOfBirds,
       customerName: dto.customerName ?? sale.customerName,
       saleDate: dto.saleDate ?? sale.saleDate,
       saleMode: dto.saleMode ?? sale.saleMode,
@@ -282,13 +250,15 @@ export class SalesService {
       retailerId: sale.retailerId,
       updatedAt: sale.updatedAt,
     });
-    return this.findOne(id);
+    const updatedSale = await this.findOne(id);
+    this.accountingService.syncSale(updatedSale).catch((err) => {
+      console.error('Failed to trigger accounting sync for sale update:', err);
+    });
+    return updatedSale;
   }
 
   async remove(id: string): Promise<void> {
-    await this.cagesService.revertVehicleSaleCages(id);
     const sale = await this.findOne(id);
-    await this.salePaymentRepository.delete({ saleId: id });
     await this.saleRepository.remove(sale);
   }
 
@@ -304,6 +274,10 @@ export class SalesService {
     sale.paymentStatus = paymentStatus;
     if (amountReceived !== undefined) sale.amountReceived = amountReceived;
     sale.updatedAt = new Date();
-    return this.saleRepository.save(sale);
+    const saved = await this.saleRepository.save(sale);
+    this.accountingService.syncSale(saved).catch((err) => {
+      console.error('Failed to trigger accounting sync for sale payment status update:', err);
+    });
+    return saved;
   }
 }

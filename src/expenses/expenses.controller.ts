@@ -11,10 +11,32 @@ import {
 import { ExpensesService } from './expenses.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
+import { AccountingService } from '../modules/accounting/accounting.service';
 
 @Controller('expenses')
 export class ExpensesController {
-  constructor(private readonly expensesService: ExpensesService) {}
+  constructor(
+    private readonly expensesService: ExpensesService,
+    private readonly accountingService: AccountingService,
+  ) {}
+
+  @Get('sync-all')
+  async syncAll() {
+    try {
+      const items = await this.expensesService.findAll();
+      const synced: string[] = [];
+      const failed: string[] = [];
+      for (const item of items) {
+        try {
+          await this.accountingService.syncExpense(item);
+          synced.push(item.id);
+        } catch { failed.push(item.id); }
+      }
+      return { synced: synced.length, failed: failed.length, details: { synced, failed } };
+    } catch (err: any) {
+      return { synced: 0, failed: 0, error: err.message };
+    }
+  }
 
   @Post()
   create(@Body() createExpenseDto: CreateExpenseDto) {

@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common';
 import { BillingService } from './billing.service';
+import { PartyType } from './entities/billing-party.entity';
 
 @Controller('billing')
 export class BillingController {
@@ -59,12 +60,28 @@ export class BillingController {
   deletePayment(@Param('id') id: string) { return this.billingService.deletePayment(id); }
 
   // Ledger
+  @Get('ledger/by-farmer/:farmerId')
+  getLedgerByFarmerId(@Param('farmerId') farmerId: string) {
+    return this.billingService.getLedgerByFarmerId(farmerId);
+  }
+
+  @Get('ledger/by-retailer/:retailerId')
+  getLedgerByRetailerId(@Param('retailerId') retailerId: string) {
+    return this.billingService.getLedgerByRetailerId(retailerId);
+  }
+
   @Get('ledger/:partyId')
   getLedger(@Param('partyId') partyId: string) { return this.billingService.getLedger(partyId); }
 
   @Get('ledger-by-name/:name')
-  async getLedgerByName(@Param('name') name: string) {
-    const party = await this.billingService.findOrCreatePartyByName(name);
+  async getLedgerByName(
+    @Param('name') name: string,
+    @Query('type') type?: PartyType,
+  ) {
+    const party = await this.billingService.findOrCreatePartyByName(
+      decodeURIComponent(name),
+      type || 'Retailer',
+    );
     return this.billingService.getLedger(party.id);
   }
 }
