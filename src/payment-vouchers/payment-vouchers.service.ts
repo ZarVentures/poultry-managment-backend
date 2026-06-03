@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { PaymentVoucher } from './payment-voucher.entity';
 import { CreatePaymentVoucherDto } from './dto/create-payment-voucher.dto';
 import { UpdatePaymentVoucherDto } from './dto/update-payment-voucher.dto';
 import { BillingService } from '../billing/billing.service';
+import { RetailersService } from '../retailers/retailers.service';
+import { FarmersService } from '../farmers/farmers.service';
 
 @Injectable()
 export class PaymentVouchersService {
@@ -12,9 +14,26 @@ export class PaymentVouchersService {
     @InjectRepository(PaymentVoucher)
     private paymentVoucherRepository: Repository<PaymentVoucher>,
     private billingService: BillingService,
+    private retailersService: RetailersService,
+    private farmersService: FarmersService,
   ) { }
 
   async create(createDto: CreatePaymentVoucherDto, userId: number): Promise<PaymentVoucher> {
+    // Validate payeeId and payeeType
+    if (createDto.payeeType === 'retailer') {
+      if (!createDto.payeeId) {
+        throw new BadRequestException('payeeId is required for retailer payee type');
+      }
+      const retailer = await this.retailersService.findOne(String(createDto.payeeId));
+      createDto.payeeName = retailer.name; // Keep name synced
+    } else if (createDto.payeeType === 'farmer') {
+      if (!createDto.payeeId) {
+        throw new BadRequestException('payeeId is required for farmer payee type');
+      }
+      const farmer = await this.farmersService.findOne(String(createDto.payeeId));
+      createDto.payeeName = farmer.name; // Keep name synced
+    }
+
     // Generate voucher number
     const voucherNumber = await this.generateVoucherNumber();
 
@@ -76,6 +95,25 @@ export class PaymentVouchersService {
 
   async update(id: number, updateDto: UpdatePaymentVoucherDto): Promise<PaymentVoucher> {
     const voucher = await this.findOne(id);
+
+    // Check type if updated or use existing
+    const payeeType = updateDto.payeeType || voucher.payeeType;
+    const payeeId = updateDto.payeeId || voucher.payeeId;
+
+    if (payeeType === 'retailer') {
+      if (!payeeId) {
+        throw new BadRequestException('payeeId is required for retailer payee type');
+      }
+      const retailer = await this.retailersService.findOne(String(payeeId));
+      updateDto.payeeName = retailer.name;
+    } else if (payeeType === 'farmer') {
+      if (!payeeId) {
+        throw new BadRequestException('payeeId is required for farmer payee type');
+      }
+      const farmer = await this.farmersService.findOne(String(payeeId));
+      updateDto.payeeName = farmer.name;
+    }
+
     Object.assign(voucher, updateDto);
     const saved = await this.paymentVoucherRepository.save(voucher);
     if (saved.status === 'paid') {
@@ -170,27 +208,54 @@ export class PaymentVouchersService {
     if (voucher.status !== 'paid') return;
 
     try {
+      let payeeName = voucher.payeeName;
+
+      if (voucher.payeeId) {
+        if (voucher.payeeType === 'retailer') {
+          const retailer = await this.retailersService.findOne(String(voucher.payeeId));
+          if (retailer) {
+            payeeName = retailer.name;
+          }
+        } else if (voucher.payeeType === 'farmer') {
+          const farmer = await this.farmersService.findOne(String(voucher.payeeId));
+          if (farmer) {
+            payeeName = farmer.name;
+          }
+        }
+      }
+
       // Find or create billing party for this payee
       const party = await this.billingService.findOrCreatePartyByName(
-        voucher.payeeName,
+        payeeName,
         voucher.payeeType === 'retailer' ? 'Retailer' : 
         voucher.payeeType === 'farmer' ? 'Farm' : 'Trader'
       );
 
-      // Payment Voucher is typically 'money going out'
-      // In the ledger of a party:
-      // Debit increases their balance (they owe us more / we owe them less)
-      // If we pay them, we owe them less, so DEBIT.
+      // Payment Voucher integration type based on VOUCHER DIRECTION:
+      // IN Voucher (money received from retailer): CREDIT - reduces their outstanding balance
+      // OUT Voucher (money paid to farmer): DEBIT - reduces what we owe them
+      // Use voucherType first, fall back to payeeType for backward compatibility
+      let entryType: 'credit' | 'debit';
+      if (voucher.voucherType) {
+        entryType = voucher.voucherType === 'in' ? 'credit' : 'debit';
+      } else {
+        // Fallback: retailer payments are credits, farmer payments are debits
+        entryType = voucher.payeeType === 'retailer' ? 'credit' : 'debit';
+      }
+
+      console.log(`📋 Voucher ${voucher.voucherNumber} - voucherType: "${voucher.voucherType}", payeeType: "${voucher.payeeType}", resolved entryType: "${entryType}"`);
+
       await this.billingService.recordVoucher(
         party.id,
         voucher.voucherNumber,
         Number(voucher.amount),
         new Date(voucher.voucherDate).toISOString().split('T')[0],
-        'debit'
+        entryType
       );
-      console.log(`✅ Voucher ${voucher.voucherNumber} integrated with billing ledger for party ${party.name} (ID: ${party.id})`);
+      console.log(`✅ Voucher ${voucher.voucherNumber} integrated as ${entryType.toUpperCase()} for party ${party.name} (ID: ${party.id}) - Amount: ₹${voucher.amount}`);
     } catch (error) {
       console.error('Failed to integrate voucher with ledger:', error);
     }
   }
 }
+
