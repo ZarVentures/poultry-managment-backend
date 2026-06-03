@@ -12,6 +12,9 @@ export class PaymentVoucher {
   @Column({ name: 'voucher_date', type: 'date' })
   voucherDate: Date;
 
+  @Column({ name: 'voucher_type', length: 10, default: 'out' })
+  voucherType: 'in' | 'out';
+
   @Column({ name: 'payee_type', length: 20 })
   payeeType: 'farmer' | 'retailer' | 'supplier' | 'employee' | 'other';
 

@@ -200,7 +200,21 @@ export class BillingService {
   async recordVoucher(partyId: string, refId: string, amount: number, date: string, type: 'debit' | 'credit' = 'credit') {
     const debit = type === 'debit' ? Number(amount) : 0;
     const credit = type === 'credit' ? Number(amount) : 0;
-    await this.addLedgerEntry(partyId, 'Voucher', refId, debit, credit, date);
+
+    const existing = await this.ledgerRepo.findOne({
+      where: { referenceType: 'Voucher', referenceId: refId }
+    });
+
+    if (existing) {
+      existing.partyId = partyId;
+      existing.debit = debit;
+      existing.credit = credit;
+      existing.date = date;
+      await this.ledgerRepo.save(existing);
+    } else {
+      await this.addLedgerEntry(partyId, 'Voucher', refId, debit, credit, date);
+    }
+
     await this.recalculatePartyBalance(partyId);
   }
 
