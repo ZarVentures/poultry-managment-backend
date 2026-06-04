@@ -36,6 +36,7 @@ export class PermissionsGuard implements CanActivate {
         const permissions = await this.permissionsService.getUserPermissions(
             user.userId,
             resource,
+            user.role,  // ← pass role for role-based fallback
         );
 
         switch (action) {

@@ -24,7 +24,7 @@ export class PermissionsService {
    * Get permissions for a user on a specific resource
    * First checks user-specific permissions, then falls back to role-based permissions
    */
-  async getUserPermissions(userId: string, resource: string): Promise<PermissionCheck> {
+  async getUserPermissions(userId: string, resource: string, userRole?: string): Promise<PermissionCheck> {
     // Check for user-specific permissions first
     const userPerm = await this.userPermissionRepository.findOne({
       where: { userId, resource },
@@ -39,11 +39,15 @@ export class PermissionsService {
       };
     }
 
-    // Fall back to role-based permissions
-    // We need to get the user's role - this should be passed or fetched
+    // Fall back to role-based permissions if role is available
+    if (userRole) {
+      return this.getRolePermissions(userRole, resource);
+    }
+
+    // Default deny-all if no role info available
     return {
       canCreate: false,
-      canRead: true,
+      canRead: false,
       canUpdate: false,
       canDelete: false,
     };
