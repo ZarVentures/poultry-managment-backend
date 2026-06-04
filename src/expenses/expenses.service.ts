@@ -13,8 +13,14 @@ export class ExpensesService {
   ) { }
 
   async create(createExpenseDto: CreateExpenseDto): Promise<Expense> {
+    // The legacy `category` column is NOT NULL in production DB.
+    // When only categoryId is sent (new flow), we fall back to 'other' so the
+    // constraint is never violated. The real category name comes from the relation.
+    const legacyCategory = createExpenseDto.category || 'other';
+
     const expense = this.expenseRepository.create({
       ...createExpenseDto,
+      category: legacyCategory as any,
       amount: parseFloat(createExpenseDto.amount),
     });
     return this.expenseRepository.save(expense);
