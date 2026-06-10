@@ -6,6 +6,10 @@ export class CreatePaymentVoucherDto {
   voucherDate: string;
 
   @IsNotEmpty()
+  @IsEnum(['in', 'out'])
+  voucherType: 'in' | 'out';
+
+  @IsNotEmpty()
   @IsEnum(['farmer', 'retailer', 'supplier', 'employee', 'other'])
   payeeType: 'farmer' | 'retailer' | 'supplier' | 'employee' | 'other';
 
