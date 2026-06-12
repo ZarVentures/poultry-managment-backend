@@ -3,11 +3,35 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PaymentVouchersService } from './payment-vouchers.service';
 import { CreatePaymentVoucherDto } from './dto/create-payment-voucher.dto';
 import { UpdatePaymentVoucherDto } from './dto/update-payment-voucher.dto';
+import { AccountingService } from '../modules/accounting/accounting.service';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('payment-vouchers')
 @UseGuards(JwtAuthGuard)
 export class PaymentVouchersController {
-  constructor(private readonly paymentVouchersService: PaymentVouchersService) {}
+  constructor(
+    private readonly paymentVouchersService: PaymentVouchersService,
+    private readonly accountingService: AccountingService,
+  ) {}
+
+  @Public()
+  @Get('sync-all')
+  async syncAll() {
+    try {
+      const items = await this.paymentVouchersService.findAll({});
+      const synced: string[] = [];
+      const failed: string[] = [];
+      for (const item of items) {
+        try {
+          await this.accountingService.syncPayment(item);
+          synced.push(String(item.id));
+        } catch { failed.push(String(item.id)); }
+      }
+      return { synced: synced.length, failed: failed.length, details: { synced, failed } };
+    } catch (err: any) {
+      return { synced: 0, failed: 0, error: err.message };
+    }
+  }
 
   @Post()
   create(@Body() createDto: CreatePaymentVoucherDto, @Request() req: any) {

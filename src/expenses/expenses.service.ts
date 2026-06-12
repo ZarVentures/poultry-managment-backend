@@ -4,12 +4,14 @@ import { Repository } from 'typeorm';
 import { Expense } from './expense.entity';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
+import { AccountingService } from '../modules/accounting/accounting.service';
 
 @Injectable()
 export class ExpensesService {
   constructor(
     @InjectRepository(Expense)
     private readonly expenseRepository: Repository<Expense>,
+    private readonly accountingService: AccountingService,
   ) { }
 
   async create(createExpenseDto: CreateExpenseDto): Promise<Expense> {
@@ -17,7 +19,17 @@ export class ExpensesService {
       ...createExpenseDto,
       amount: parseFloat(createExpenseDto.amount),
     });
-    return this.expenseRepository.save(expense);
+    const saved = await this.expenseRepository.save(expense);
+
+    this.findOne(saved.id).then(fullExpense => {
+      this.accountingService.syncExpense(fullExpense).catch((err) => {
+        console.error('Failed to trigger accounting sync for expense:', err);
+      });
+    }).catch(err => {
+      console.error('Failed to load full expense for sync:', err);
+    });
+
+    return saved;
   }
 
   async findAll(
@@ -69,7 +81,17 @@ export class ExpensesService {
 
     Object.assign(expense, updateData);
     expense.updatedAt = new Date();
-    return this.expenseRepository.save(expense);
+    const saved = await this.expenseRepository.save(expense);
+
+    this.findOne(saved.id).then(fullExpense => {
+      this.accountingService.syncExpense(fullExpense).catch((err) => {
+        console.error('Failed to trigger accounting sync for expense update:', err);
+      });
+    }).catch(err => {
+      console.error('Failed to load full expense for sync update:', err);
+    });
+
+    return saved;
   }
 
   async remove(id: string): Promise<void> {
