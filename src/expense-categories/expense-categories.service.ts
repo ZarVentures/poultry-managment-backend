@@ -30,6 +30,22 @@ export class ExpenseCategoriesService {
     return this.categoryRepo.save(category);
   }
 
+  async findActive(type?: string): Promise<ExpenseCategory[]> {
+    if (type) {
+      return this.categoryRepo.find({
+        where: [
+          { isActive: true, appliesTo: type as 'main' | 'godown' | 'both' },
+          { isActive: true, appliesTo: 'both' },
+        ],
+        order: { sortOrder: 'ASC', name: 'ASC' },
+      });
+    }
+    return this.categoryRepo.find({
+      where: { isActive: true },
+      order: { sortOrder: 'ASC', name: 'ASC' },
+    });
+  }
+
   async findAll(includeInactive = false): Promise<ExpenseCategory[]> {
     const query = this.categoryRepo.createQueryBuilder('category');
 
