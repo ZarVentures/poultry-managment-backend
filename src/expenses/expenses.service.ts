@@ -27,6 +27,7 @@ export class ExpensesService {
       ...createExpenseDto,
       category: legacyCategory as any,
       amount: parseFloat(createExpenseDto.amount),
+      expenseCategory: createExpenseDto.categoryId ? { id: createExpenseDto.categoryId } as any : undefined,
     });
     // If a categoryId was provided, resolve and attach the category entity
     if (createExpenseDto.categoryId) {
@@ -89,9 +90,10 @@ export class ExpensesService {
   async update(id: string, updateExpenseDto: UpdateExpenseDto): Promise<Expense> {
     const expense = await this.findOne(id);
 
-    const updateData = {
+    const updateData: any = {
       ...updateExpenseDto,
       amount: updateExpenseDto.amount ? parseFloat(updateExpenseDto.amount) : expense.amount,
+      expenseCategory: updateExpenseDto.categoryId ? { id: updateExpenseDto.categoryId } : undefined,
     };
 
     Object.assign(expense, updateData);
