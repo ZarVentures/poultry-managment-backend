@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Expense } from './expense.entity';
+import { ExpenseCategory } from '../expense-categories/expense-category.entity';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
 import { AccountingService } from '../modules/accounting/accounting.service';
@@ -11,6 +12,8 @@ export class ExpensesService {
   constructor(
     @InjectRepository(Expense)
     private readonly expenseRepository: Repository<Expense>,
+    @InjectRepository(ExpenseCategory)
+    private readonly categoryRepository: Repository<ExpenseCategory>,
     private readonly accountingService: AccountingService,
   ) { }
 
@@ -18,19 +21,24 @@ export class ExpensesService {
     const expense = this.expenseRepository.create({
       ...createExpenseDto,
       amount: parseFloat(createExpenseDto.amount),
-      expenseCategory: createExpenseDto.categoryId ? { id: createExpenseDto.categoryId } as any : undefined,
     });
+    // If a categoryId was provided, resolve and attach the category entity
+    if (createExpenseDto.categoryId) {
+      try {
+        const cat = await this.categoryRepository.findOne({ where: { id: createExpenseDto.categoryId } });
+        if (cat) expense.expenseCategory = cat;
+      } catch (err) {
+        // ignore - we'll still save without relation if lookup fails
+      }
+    }
     const saved = await this.expenseRepository.save(expense);
 
-    this.findOne(saved.id).then(fullExpense => {
-      this.accountingService.syncExpense(fullExpense).catch((err) => {
-        console.error('Failed to trigger accounting sync for expense:', err);
-      });
-    }).catch(err => {
-      console.error('Failed to load full expense for sync:', err);
+    const fullExpense = await this.findOne(saved.id);
+    this.accountingService.syncExpense(fullExpense).catch((err) => {
+      console.error('Failed to trigger accounting sync for expense:', err);
     });
 
-    return saved;
+    return fullExpense;
   }
 
   async findAll(
@@ -75,13 +83,20 @@ export class ExpensesService {
   async update(id: string, updateExpenseDto: UpdateExpenseDto): Promise<Expense> {
     const expense = await this.findOne(id);
 
-    const updateData: any = {
+    const updateData = {
       ...updateExpenseDto,
       amount: updateExpenseDto.amount ? parseFloat(updateExpenseDto.amount) : expense.amount,
-      expenseCategory: updateExpenseDto.categoryId ? { id: updateExpenseDto.categoryId } : undefined,
     };
 
     Object.assign(expense, updateData);
+    if (updateExpenseDto.categoryId) {
+      try {
+        const cat = await this.categoryRepository.findOne({ where: { id: updateExpenseDto.categoryId } });
+        expense.expenseCategory = cat || undefined;
+      } catch (err) {
+        // ignore lookup errors
+      }
+    }
     expense.updatedAt = new Date();
     const saved = await this.expenseRepository.save(expense);
 
