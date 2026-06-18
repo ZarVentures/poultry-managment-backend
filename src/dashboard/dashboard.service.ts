@@ -82,6 +82,7 @@ export class DashboardService {
     // Godown (gowdan) sales revenue for the same period
     const godownQuery = this.godownSaleRepository.createQueryBuilder('gs')
       .select('COALESCE(SUM(gs.totalAmount), 0)', 'total')
+      .addSelect('COUNT(*)', 'count')
       .where('gs.saleDate >= :startDate AND gs.saleDate <= :endDate', dateFilter);
 
     const godownResult = await godownQuery.getRawOne();
@@ -105,8 +106,10 @@ export class DashboardService {
       where: { status: 'active' }
     });
 
-    // Total Sales Count MTD — already fetched above
-    const totalSales = parseInt(revenueResult.count) || 0;
+    // Total Sales Count MTD — poultry + godown
+    const poultrySalesCount = parseInt(revenueResult.count) || 0;
+    const godownSalesCount = parseInt(godownResult.count) || 0;
+    const totalSales = poultrySalesCount + godownSalesCount;
 
     return {
       totalRevenue,
