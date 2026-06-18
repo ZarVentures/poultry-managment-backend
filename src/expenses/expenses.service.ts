@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Expense } from './expense.entity';
+import { ExpenseCategory } from '../expense-categories/expense-category.entity';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
 
@@ -10,6 +11,8 @@ export class ExpensesService {
   constructor(
     @InjectRepository(Expense)
     private readonly expenseRepository: Repository<Expense>,
+    @InjectRepository(ExpenseCategory)
+    private readonly categoryRepository: Repository<ExpenseCategory>,
   ) { }
 
   async create(createExpenseDto: CreateExpenseDto): Promise<Expense> {
@@ -22,9 +25,20 @@ export class ExpensesService {
       ...createExpenseDto,
       category: legacyCategory as any,
       amount: parseFloat(createExpenseDto.amount),
-      expenseCategory: createExpenseDto.categoryId ? { id: createExpenseDto.categoryId } as any : undefined,
     });
-    return this.expenseRepository.save(expense);
+
+    // If a categoryId was provided, resolve and attach the category entity
+    if (createExpenseDto.categoryId) {
+      try {
+        const cat = await this.categoryRepository.findOne({ where: { id: createExpenseDto.categoryId } });
+        if (cat) expense.expenseCategory = cat;
+      } catch (err) {
+        // ignore - we'll still save without relation if lookup fails
+      }
+    }
+
+    const saved = await this.expenseRepository.save(expense);
+    return this.findOne(saved.id);
   }
 
   async findAll(
@@ -69,13 +83,20 @@ export class ExpensesService {
   async update(id: string, updateExpenseDto: UpdateExpenseDto): Promise<Expense> {
     const expense = await this.findOne(id);
 
-    const updateData: any = {
+    const updateData = {
       ...updateExpenseDto,
       amount: updateExpenseDto.amount ? parseFloat(updateExpenseDto.amount) : expense.amount,
-      expenseCategory: updateExpenseDto.categoryId ? { id: updateExpenseDto.categoryId } : undefined,
     };
 
     Object.assign(expense, updateData);
+    if (updateExpenseDto.categoryId) {
+      try {
+        const cat = await this.categoryRepository.findOne({ where: { id: updateExpenseDto.categoryId } });
+        expense.expenseCategory = cat || undefined;
+      } catch (err) {
+        // ignore lookup errors
+      }
+    }
     expense.updatedAt = new Date();
     return this.expenseRepository.save(expense);
   }

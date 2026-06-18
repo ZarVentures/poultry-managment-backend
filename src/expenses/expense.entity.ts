@@ -25,7 +25,7 @@ export class Expense {
   category?: ExpenseCategoryType;
 
   // New category relationship
-  @Column({ name: 'category_id', type: 'bigint', nullable: true, insert: false, update: false })
+  @Column({ name: 'category_id', type: 'bigint', nullable: true })
   categoryId?: string;
 
   @ManyToOne(() => ExpenseCategory, (category) => category.expenses, { eager: true })
