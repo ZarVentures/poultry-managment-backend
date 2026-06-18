@@ -10,7 +10,7 @@ import { AccountingModule } from '../modules/accounting/accounting.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Expense]),
+    TypeOrmModule.forFeature([Expense, ExpenseCategory]),
     AccountingModule,
   ],
   controllers: [ExpensesController],
