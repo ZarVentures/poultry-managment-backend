@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsDateString, IsEnum } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ExpenseCategoryType, PaymentMethodType } from '../expense.entity';
 
 export class CreateExpenseDto {
@@ -10,6 +11,7 @@ export class CreateExpenseDto {
   expenseOwner?: string;
 
   @IsOptional()
+  @Transform(({ value }) => (value === null || value === undefined ? undefined : String(value)))
   @IsString()
   categoryId?: string;
 
