@@ -137,9 +137,20 @@ export class SalesService {
         .take(take)
         .getManyAndCount();
 
-      // For summary stats, we need to run a separate count/sum on the same filtered query
-      // but without skip/take
-      const allFiltered = await query.getMany();
+      // For summary stats, build a fresh query without skip/take so totals reflect
+      // the entire filtered result (not just the current page)
+      const summaryQuery = this.saleRepository.createQueryBuilder('sale')
+        .leftJoinAndSelect('sale.retailer', 'retailer')
+        .leftJoinAndSelect('sale.payments', 'payments')
+        .orderBy('sale.saleDate', 'DESC');
+
+      if (startDate && endDate) summaryQuery.andWhere('sale.saleDate BETWEEN :startDate AND :endDate', { startDate, endDate });
+      if (customer) summaryQuery.andWhere('sale.customerName ILIKE :customer', { customer: `%${customer}%` });
+      if (productType) summaryQuery.andWhere('sale.productType = :productType', { productType });
+      if (paymentStatus) summaryQuery.andWhere('sale.paymentStatus = :paymentStatus', { paymentStatus });
+      if (retailerId) summaryQuery.andWhere('sale.retailerId = :retailerId', { retailerId });
+
+      const allFiltered = await summaryQuery.getMany();
       const summary = {
         totalBirds: allFiltered.reduce((s, x) => s + Number(x.quantity || 0), 0),
         totalRevenue: allFiltered.reduce((s, x) => s + Number(x.netAmount || x.totalAmount || 0), 0),
