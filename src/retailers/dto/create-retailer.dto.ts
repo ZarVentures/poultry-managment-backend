@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsEmail, MaxLength, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsEmail, MaxLength, IsEnum, IsNumber } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateRetailerDto {
   @IsString()
@@ -30,4 +31,9 @@ export class CreateRetailerDto {
   @IsOptional()
   @IsEnum(['active', 'inactive'])
   status?: 'active' | 'inactive';
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  openingBalance?: number;
 }
