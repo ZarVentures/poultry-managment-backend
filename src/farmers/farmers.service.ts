@@ -84,7 +84,19 @@ export class FarmersService {
     const farmer = await this.findOne(id);
     Object.assign(farmer, updateFarmerDto);
     farmer.updatedAt = new Date();
-    return this.farmerRepository.save(farmer);
+    const saved = await this.farmerRepository.save(farmer);
+
+    if (updateFarmerDto.openingBalance !== undefined) {
+      await this.billingService.syncFarmerOpeningBalance(
+        saved.id,
+        saved.name,
+        saved.phone,
+        saved.address,
+        Number(updateFarmerDto.openingBalance),
+      );
+    }
+
+    return saved;
   }
 
   async remove(id: string): Promise<void> {

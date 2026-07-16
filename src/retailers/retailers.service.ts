@@ -70,7 +70,19 @@ export class RetailersService {
     const retailer = await this.findOne(id);
     Object.assign(retailer, updateRetailerDto);
     retailer.updatedAt = new Date();
-    return this.retailerRepository.save(retailer);
+    const saved = await this.retailerRepository.save(retailer);
+
+    if (updateRetailerDto.openingBalance !== undefined) {
+      await this.billingService.syncRetailerOpeningBalance(
+        saved.id,
+        saved.name,
+        saved.phone,
+        saved.address,
+        Number(updateRetailerDto.openingBalance),
+      );
+    }
+
+    return saved;
   }
 
   async remove(id: string): Promise<void> {
