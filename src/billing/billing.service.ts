@@ -394,6 +394,21 @@ export class BillingService {
     return await this.partyRepo.save(party);
   }
 
+  // ─── Opening Balance Sync ──────────────────────────────────────────────────
+  async syncFarmerOpeningBalance(farmerId: string, name: string, phone?: string, address?: string, openingBalance?: number) {
+    const party = await this.findOrCreatePartyByName(name, 'Farm', phone, address);
+    if (openingBalance !== undefined) {
+      await this.updateParty(party.id, { openingBalance });
+    }
+  }
+
+  async syncRetailerOpeningBalance(retailerId: string, name: string, phone?: string, address?: string, openingBalance?: number) {
+    const party = await this.findOrCreatePartyByName(name, 'Retailer', phone, address);
+    if (openingBalance !== undefined) {
+      await this.updateParty(party.id, { openingBalance });
+    }
+  }
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   private async addLedgerEntry(partyId: string, type: LedgerReferenceType, refId: string, debit: number, credit: number, date: string) {
