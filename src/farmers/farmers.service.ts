@@ -4,17 +4,31 @@ import { Repository } from 'typeorm';
 import { Farmer } from './farmer.entity';
 import { CreateFarmerDto } from './dto/create-farmer.dto';
 import { UpdateFarmerDto } from './dto/update-farmer.dto';
+import { BillingService } from '../billing/billing.service';
 
 @Injectable()
 export class FarmersService {
   constructor(
     @InjectRepository(Farmer)
     private readonly farmerRepository: Repository<Farmer>,
+    private readonly billingService: BillingService,
   ) {}
 
   async create(createFarmerDto: CreateFarmerDto): Promise<Farmer> {
     const farmer = this.farmerRepository.create(createFarmerDto);
-    return this.farmerRepository.save(farmer);
+    const saved = await this.farmerRepository.save(farmer);
+
+    if (createFarmerDto.openingBalance && Number(createFarmerDto.openingBalance) !== 0) {
+      await this.billingService.syncFarmerOpeningBalance(
+        saved.id,
+        saved.name,
+        saved.phone,
+        saved.address,
+        Number(createFarmerDto.openingBalance),
+      );
+    }
+
+    return saved;
   }
 
   async findAll(page: number = 1, limit: number = 100, search?: string, status?: string) {
@@ -70,7 +84,19 @@ export class FarmersService {
     const farmer = await this.findOne(id);
     Object.assign(farmer, updateFarmerDto);
     farmer.updatedAt = new Date();
-    return this.farmerRepository.save(farmer);
+    const saved = await this.farmerRepository.save(farmer);
+
+    if (updateFarmerDto.openingBalance !== undefined) {
+      await this.billingService.syncFarmerOpeningBalance(
+        saved.id,
+        saved.name,
+        saved.phone,
+        saved.address,
+        Number(updateFarmerDto.openingBalance),
+      );
+    }
+
+    return saved;
   }
 
   async remove(id: string): Promise<void> {
