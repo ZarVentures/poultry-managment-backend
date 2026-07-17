@@ -57,6 +57,9 @@ export class BillingService {
       }));
     }
 
+    // Recalculate balance so currentBalance reflects opening balance
+    await this.recalculatePartyBalance(savedId);
+
     return this.partyRepo.findOne({ where: { id: savedId } }) as Promise<BillingParty>;
   }
 
@@ -92,6 +95,7 @@ export class BillingService {
     }
 
     await this.partyRepo.update(id, { ...data, updatedAt: new Date() });
+    await this.recalculatePartyBalance(id);
     return this.getParty(id);
   }
 
@@ -395,6 +399,21 @@ export class BillingService {
     });
 
     return await this.partyRepo.save(party);
+  }
+
+  // ─── Opening Balance Sync ──────────────────────────────────────────────────
+  async syncFarmerOpeningBalance(farmerId: string, name: string, phone?: string, address?: string, openingBalance?: number) {
+    const party = await this.findOrCreatePartyByName(name, 'Farm', phone, address);
+    if (openingBalance !== undefined) {
+      await this.updateParty(party.id, { openingBalance });
+    }
+  }
+
+  async syncRetailerOpeningBalance(retailerId: string, name: string, phone?: string, address?: string, openingBalance?: number) {
+    const party = await this.findOrCreatePartyByName(name, 'Retailer', phone, address);
+    if (openingBalance !== undefined) {
+      await this.updateParty(party.id, { openingBalance });
+    }
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
