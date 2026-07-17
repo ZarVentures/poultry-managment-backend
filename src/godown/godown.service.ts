@@ -401,31 +401,53 @@ export class GodownService {
   // ─── Summary ──────────────────────────────────────────────────────────────
 
   async getSummary() {
-    const totalInward = await this.inwardRepo
+    const inward = await this.inwardRepo
       .createQueryBuilder('entry')
-      .select('SUM(entry.numberOfBirds)', 'total')
+      .select([
+        'SUM(entry.numberOfBirds) AS birds',
+        'SUM(entry.totalWeight) AS weight',
+        'SUM(entry.totalAmount) AS value',
+      ])
       .getRawOne();
 
-    const totalSold = await this.saleRepo
+    const sold = await this.saleRepo
       .createQueryBuilder('sale')
-      .select('SUM(sale.numberOfBirds)', 'total')
+      .select([
+        'SUM(sale.numberOfBirds) AS birds',
+        'SUM(sale.totalWeight) AS weight',
+        'SUM(sale.totalAmount) AS value',
+      ])
       .getRawOne();
 
-    const totalMortality = await this.mortalityRepo
+    const mortality = await this.mortalityRepo
       .createQueryBuilder('mortality')
-      .select('SUM(mortality.numberOfBirdsDied)', 'total')
+      .select([
+        'SUM(mortality.numberOfBirdsDied) AS birds',
+        'SUM(mortality.weightOfDeadBirds) AS weight',
+      ])
       .getRawOne();
 
-    const currentStock =
-      (parseInt(totalInward.total) || 0) -
-      (parseInt(totalSold.total) || 0) -
-      (parseInt(totalMortality.total) || 0);
+    const totalInwardBirds = parseFloat(inward.birds) || 0;
+    const totalInwardWeight = parseFloat(inward.weight) || 0;
+    const totalInwardValue = parseFloat(inward.value) || 0;
+    const totalSoldBirds = parseFloat(sold.birds) || 0;
+    const totalSoldWeight = parseFloat(sold.weight) || 0;
+    const totalSoldValue = parseFloat(sold.value) || 0;
+    const totalMortalityBirds = parseFloat(mortality.birds) || 0;
+    const totalMortalityWeight = parseFloat(mortality.weight) || 0;
 
     return {
-      totalInward: parseInt(totalInward.total) || 0,
-      totalSold: parseInt(totalSold.total) || 0,
-      totalMortality: parseInt(totalMortality.total) || 0,
-      currentStock,
+      totalInward: totalInwardBirds,
+      totalSold: totalSoldBirds,
+      totalMortality: totalMortalityBirds,
+      currentStock: totalInwardBirds - totalSoldBirds - totalMortalityBirds,
+      totalInwardWeight,
+      totalSoldWeight,
+      totalMortalityWeight,
+      currentWeight: totalInwardWeight - totalSoldWeight - totalMortalityWeight,
+      totalInwardValue,
+      totalSoldValue,
+      currentValue: totalInwardValue - totalSoldValue,
     };
   }
 
