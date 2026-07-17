@@ -26,9 +26,6 @@ export class Farmer {
   @Column({ type: 'varchar', length: 20, default: 'active' })
   status!: string;
 
-  @Column({ name: 'opening_balance', type: 'numeric', precision: 14, scale: 2, default: 0 })
-  openingBalance!: number;
-
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'NOW()' })
   createdAt!: Date;
 

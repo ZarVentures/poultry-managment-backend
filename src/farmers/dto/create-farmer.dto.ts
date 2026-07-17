@@ -1,5 +1,4 @@
-import { IsString, IsOptional, IsEmail, MaxLength, IsEnum, IsNumber } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsString, IsOptional, IsEmail, MaxLength, IsEnum } from 'class-validator';
 
 export class CreateFarmerDto {
   @IsString()
@@ -31,9 +30,4 @@ export class CreateFarmerDto {
   @IsOptional()
   @IsEnum(['active', 'inactive'])
   status?: 'active' | 'inactive';
-
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  openingBalance?: number;
 }

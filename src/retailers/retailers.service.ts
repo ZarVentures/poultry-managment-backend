@@ -4,31 +4,17 @@ import { Repository } from 'typeorm';
 import { Retailer } from './retailer.entity';
 import { CreateRetailerDto } from './dto/create-retailer.dto';
 import { UpdateRetailerDto } from './dto/update-retailer.dto';
-import { BillingService } from '../billing/billing.service';
 
 @Injectable()
 export class RetailersService {
   constructor(
     @InjectRepository(Retailer)
     private readonly retailerRepository: Repository<Retailer>,
-    private readonly billingService: BillingService,
   ) { }
 
   async create(createRetailerDto: CreateRetailerDto): Promise<Retailer> {
     const retailer = this.retailerRepository.create(createRetailerDto);
-    const saved = await this.retailerRepository.save(retailer);
-
-    if (createRetailerDto.openingBalance && Number(createRetailerDto.openingBalance) !== 0) {
-      await this.billingService.syncRetailerOpeningBalance(
-        saved.id,
-        saved.name,
-        saved.phone,
-        saved.address,
-        Number(createRetailerDto.openingBalance),
-      );
-    }
-
-    return saved;
+    return this.retailerRepository.save(retailer);
   }
 
   async findAll(page?: number, limit?: number, search?: string) {
@@ -70,19 +56,7 @@ export class RetailersService {
     const retailer = await this.findOne(id);
     Object.assign(retailer, updateRetailerDto);
     retailer.updatedAt = new Date();
-    const saved = await this.retailerRepository.save(retailer);
-
-    if (updateRetailerDto.openingBalance !== undefined) {
-      await this.billingService.syncRetailerOpeningBalance(
-        saved.id,
-        saved.name,
-        saved.phone,
-        saved.address,
-        Number(updateRetailerDto.openingBalance),
-      );
-    }
-
-    return saved;
+    return this.retailerRepository.save(retailer);
   }
 
   async remove(id: string): Promise<void> {
