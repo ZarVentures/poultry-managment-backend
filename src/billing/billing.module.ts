@@ -11,9 +11,10 @@ import { InventoryItem } from '../inventory/entities/inventory-item.entity';
 import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { Sale } from '../sales/sale.entity';
 import { Farmer } from '../farmers/farmer.entity';
+import { Retailer } from '../retailers/retailer.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([BillingParty, BillingSale, BillingPayment, BillingLedger, Expense, InventoryItem, PurchaseOrder, Sale, Farmer])],
+  imports: [TypeOrmModule.forFeature([BillingParty, BillingSale, BillingPayment, BillingLedger, Expense, InventoryItem, PurchaseOrder, Sale, Farmer, Retailer])],
   controllers: [BillingController],
   providers: [BillingService],
   exports: [BillingService],

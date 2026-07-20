@@ -59,6 +59,16 @@ export class BillingController {
   deletePayment(@Param('id') id: string) { return this.billingService.deletePayment(id); }
 
   // Ledger
+  @Get('ledger/by-farmer/:farmerId')
+  getLedgerByFarmerId(@Param('farmerId') farmerId: string) {
+    return this.billingService.getLedgerByFarmerId(farmerId);
+  }
+
+  @Get('ledger/by-retailer/:retailerId')
+  getLedgerByRetailerId(@Param('retailerId') retailerId: string) {
+    return this.billingService.getLedgerByRetailerId(retailerId);
+  }
+
   @Get('ledger/:partyId')
   getLedger(@Param('partyId') partyId: string) { return this.billingService.getLedger(partyId); }
 

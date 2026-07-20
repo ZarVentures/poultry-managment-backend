@@ -11,6 +11,7 @@ import { Sale } from '../sales/sale.entity';
 import { BillingSale } from './entities/billing-sale.entity';
 import { getTodayIST } from '../common/date-utils';
 import { Farmer } from '../farmers/farmer.entity';
+import { Retailer } from '../retailers/retailer.entity';
 
 @Injectable()
 export class BillingService {
@@ -24,6 +25,7 @@ export class BillingService {
     @InjectRepository(BillingSale) private saleRepo: Repository<BillingSale>,
     @InjectRepository(Sale) private mainSaleRepo: Repository<Sale>,
     @InjectRepository(Farmer) private farmerRepo: Repository<Farmer>,
+    @InjectRepository(Retailer) private retailerRepo: Repository<Retailer>,
   ) { }
 
   // ─── Parties ──────────────────────────────────────────────────────────────
@@ -414,6 +416,22 @@ export class BillingService {
     if (openingBalance !== undefined) {
       await this.updateParty(party.id, { openingBalance });
     }
+  }
+
+  // ── Ledger by Farmer ID ───────────────────────────────────────────────────
+  async getLedgerByFarmerId(farmerId: string): Promise<BillingLedger[]> {
+    const farmer = await this.farmerRepo.findOne({ where: { id: farmerId } });
+    if (!farmer) throw new NotFoundException(`Farmer ${farmerId} not found`);
+    const party = await this.findOrCreatePartyByName(farmer.name, 'Farm', farmer.phone, farmer.address);
+    return this.getLedger(party.id);
+  }
+
+  // ── Ledger by Retailer ID ─────────────────────────────────────────────────
+  async getLedgerByRetailerId(retailerId: string): Promise<BillingLedger[]> {
+    const retailer = await this.retailerRepo.findOne({ where: { id: retailerId } });
+    if (!retailer) throw new NotFoundException(`Retailer ${retailerId} not found`);
+    const party = await this.findOrCreatePartyByName(retailer.name, 'Retailer', retailer.phone, retailer.address);
+    return this.getLedger(party.id);
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
