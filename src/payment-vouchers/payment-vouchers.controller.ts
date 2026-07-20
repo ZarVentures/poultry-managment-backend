@@ -20,8 +20,9 @@ export class PaymentVouchersController {
     @Query('endDate') endDate?: string,
     @Query('status') status?: string,
     @Query('payeeType') payeeType?: string,
+    @Query('voucherType') voucherType?: string,
   ) {
-    return this.paymentVouchersService.findAll({ startDate, endDate, status, payeeType });
+    return this.paymentVouchersService.findAll({ startDate, endDate, status, payeeType, voucherType });
   }
 
   @Get('stats')
