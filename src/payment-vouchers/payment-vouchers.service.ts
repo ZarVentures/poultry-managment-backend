@@ -57,6 +57,7 @@ export class PaymentVouchersService {
     endDate?: string;
     status?: string;
     payeeType?: string;
+    voucherType?: string;
   }): Promise<PaymentVoucher[]> {
     const query = this.paymentVoucherRepository.createQueryBuilder('voucher')
       .leftJoinAndSelect('voucher.createdBy', 'createdBy')
@@ -77,6 +78,10 @@ export class PaymentVouchersService {
 
     if (filters?.payeeType) {
       query.andWhere('voucher.payeeType = :payeeType', { payeeType: filters.payeeType });
+    }
+
+    if (filters?.voucherType) {
+      query.andWhere('voucher.voucherType = :voucherType', { voucherType: filters.voucherType });
     }
 
     return await query.getMany();
