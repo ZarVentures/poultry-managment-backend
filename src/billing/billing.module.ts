@@ -12,9 +12,29 @@ import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { Sale } from '../sales/sale.entity';
 import { Farmer } from '../farmers/farmer.entity';
 import { Retailer } from '../retailers/retailer.entity';
+import { GodownSale } from '../godown/entities/godown-sale.entity';
+import { GodownSalePayment } from '../godown/entities/godown-sale-payment.entity';
 
 @Module({
+<<<<<<< HEAD
   imports: [TypeOrmModule.forFeature([BillingParty, BillingSale, BillingPayment, BillingLedger, Expense, InventoryItem, PurchaseOrder, Sale, Farmer, Retailer])],
+=======
+  imports: [
+    TypeOrmModule.forFeature([
+      BillingParty,
+      BillingPayment,
+      BillingLedger,
+      Expense,
+      InventoryItem,
+      PurchaseOrder,
+      Sale,
+      Farmer,
+      Retailer,
+      GodownSale,
+      GodownSalePayment,
+    ]),
+  ],
+>>>>>>> 53582c1 (fix: add godown sales to billing ledger and dashboard KPIs)
   controllers: [BillingController],
   providers: [BillingService],
   exports: [BillingService],

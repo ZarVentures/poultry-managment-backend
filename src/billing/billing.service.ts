@@ -12,6 +12,8 @@ import { BillingSale } from './entities/billing-sale.entity';
 import { getTodayIST } from '../common/date-utils';
 import { Farmer } from '../farmers/farmer.entity';
 import { Retailer } from '../retailers/retailer.entity';
+import { GodownSale } from '../godown/entities/godown-sale.entity';
+import { GodownSalePayment } from '../godown/entities/godown-sale-payment.entity';
 
 @Injectable()
 export class BillingService {
@@ -26,6 +28,8 @@ export class BillingService {
     @InjectRepository(Sale) private mainSaleRepo: Repository<Sale>,
     @InjectRepository(Farmer) private farmerRepo: Repository<Farmer>,
     @InjectRepository(Retailer) private retailerRepo: Repository<Retailer>,
+    @InjectRepository(GodownSale) private godownSaleRepo: Repository<GodownSale>,
+    @InjectRepository(GodownSalePayment) private godownSalePaymentRepo: Repository<GodownSalePayment>,
   ) { }
 
   // ─── Parties ──────────────────────────────────────────────────────────────
@@ -328,6 +332,42 @@ export class BillingService {
             partyId,
             referenceType: 'Payment',
             referenceId: `${sale.invoiceNumber || sale.saleNo || `INV-${sale.id}`}-P`,
+            debit: 0,
+            credit: Number(pay.amount),
+            balance: 0,
+            date: payDate,
+            createdAt: pay.createdAt,
+          });
+        }
+      }
+
+      // Also load Godown Sales for this Retailer
+      const godownSales = await this.godownSaleRepo
+        .createQueryBuilder('gs')
+        .leftJoinAndSelect('gs.payments', 'payments')
+        .where('TRIM(LOWER(gs.customerName)) = TRIM(LOWER(:name))', { name: party.name })
+        .getMany();
+
+      for (const gs of godownSales) {
+        dynamicEntries.push({
+          id: `gs-${gs.id}`,
+          partyId,
+          referenceType: 'Sale',
+          referenceId: gs.saleNo || `GS-${gs.id}`,
+          debit: Number(gs.totalAmount || 0),
+          credit: 0,
+          balance: 0,
+          date: gs.saleDate,
+          createdAt: gs.createdAt,
+        });
+
+        for (const pay of gs.payments || []) {
+          const payDate = pay.createdAt ? new Date(pay.createdAt).toISOString().split('T')[0] : gs.saleDate;
+          dynamicEntries.push({
+            id: `gspay-${pay.id}`,
+            partyId,
+            referenceType: 'Payment',
+            referenceId: `${gs.saleNo || `GS-${gs.id}`}-P`,
             debit: 0,
             credit: Number(pay.amount),
             balance: 0,
