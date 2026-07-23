@@ -77,6 +77,9 @@ export class Sale {
   @Column({ name: 'weight_shortage', type: 'numeric', precision: 10, scale: 2, default: 0 })
   weightShortage!: number;
 
+  @Column({ name: 'weight_shortage_kg', type: 'numeric', precision: 10, scale: 2, default: 0 })
+  weightShortageKg!: number;
+
   @Column({ name: 'mortality_deduction', type: 'numeric', precision: 10, scale: 2, default: 0 })
   mortalityDeduction!: number;
 

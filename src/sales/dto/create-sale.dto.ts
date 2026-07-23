@@ -107,6 +107,10 @@ export class CreateSaleDto {
 
   @IsOptional()
   @IsString()
+  weightShortageKg?: string;
+
+  @IsOptional()
+  @IsString()
   mortalityDeduction?: string;
 
   @IsOptional()
