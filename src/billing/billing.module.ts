@@ -11,6 +11,8 @@ import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { Sale } from '../sales/sale.entity';
 import { Farmer } from '../farmers/farmer.entity';
 import { Retailer } from '../retailers/retailer.entity';
+import { GodownSale } from '../godown/entities/godown-sale.entity';
+import { GodownSalePayment } from '../godown/entities/godown-sale-payment.entity';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { Retailer } from '../retailers/retailer.entity';
       Sale,
       Farmer,
       Retailer,
+      GodownSale,
+      GodownSalePayment,
     ]),
   ],
   controllers: [BillingController],
