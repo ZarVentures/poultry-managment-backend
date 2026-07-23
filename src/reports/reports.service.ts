@@ -75,6 +75,7 @@ export class ReportsService {
       totalAmount: sales.reduce((sum, s) => sum + parseFloat(s.totalAmount as any), 0),
       totalNetAmount: sales.reduce((sum, s) => sum + parseFloat(s.netAmount as any), 0),
       totalWeightShortage: sales.reduce((sum, s) => sum + parseFloat((s.weightShortage || 0) as any), 0),
+      totalWeightShortageKg: sales.reduce((sum, s) => sum + parseFloat((s.weightShortageKg || s.weightShortage || 0) as any), 0),
       totalMortalityDeduction: sales.reduce((sum, s) => sum + parseFloat((s.mortalityDeduction || 0) as any), 0),
       totalPaid: sales.filter(s => s.paymentStatus === 'paid').length,
       totalPending: sales.filter(s => s.paymentStatus === 'pending').length,

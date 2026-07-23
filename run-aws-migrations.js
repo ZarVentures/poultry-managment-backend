@@ -266,6 +266,7 @@ const migrations = [
   { name: 'sales.net_amount',          sql: `ALTER TABLE sales ADD COLUMN IF NOT EXISTS net_amount NUMERIC(14,2) DEFAULT 0` },
   { name: 'sales.retailer_id',         sql: `ALTER TABLE sales ADD COLUMN IF NOT EXISTS retailer_id BIGINT` },
   { name: 'sales.sale_attachment',     sql: `ALTER TABLE sales ADD COLUMN IF NOT EXISTS sale_attachment TEXT` },
+  { name: 'sales.weight_shortage_kg', sql: `ALTER TABLE sales ADD COLUMN IF NOT EXISTS weight_shortage_kg NUMERIC(10,2) DEFAULT 0` },
 
   // ── PG extensions ─────────────────────────────────────────────
   {
