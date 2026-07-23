@@ -39,21 +39,29 @@ export class ReportsService {
 
     const purchases = await this.purchaseRepository.find({
       where: whereClause,
+      relations: ['cages'],
       order: { orderDate: 'DESC' },
     });
 
     const summary = {
       totalOrders: purchases.length,
+      totalBirds: purchases.reduce((sum, p) => {
+        const birds = (p.cages || []).reduce((s, c: any) => s + (parseInt(c.numberOfBirds) || 0), 0);
+        return sum + birds;
+      }, 0),
       totalAmount: purchases.reduce((sum, p) => sum + parseFloat(p.totalAmount as any), 0),
       totalNetAmount: purchases.reduce((sum, p) => sum + parseFloat(p.netAmount as any), 0),
       totalPaid: purchases.filter(p => p.purchasePaymentStatus === 'paid').length,
       totalPending: purchases.filter(p => p.purchasePaymentStatus === 'pending').length,
       totalPartial: purchases.filter(p => p.purchasePaymentStatus === 'partial').length,
-    };
+    };'
 
     return {
       summary,
-      purchases,
+      purchases: purchases.map(p => ({
+        ...p,
+        totalBirds: (p.cages || []).reduce((s, c: any) => s + (parseInt(c.numberOfBirds) || 0), 0),
+      })),
       dateRange: { startDate, endDate },
     };
   }
