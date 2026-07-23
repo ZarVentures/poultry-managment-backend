@@ -54,7 +54,7 @@ export class ReportsService {
       totalPaid: purchases.filter(p => p.purchasePaymentStatus === 'paid').length,
       totalPending: purchases.filter(p => p.purchasePaymentStatus === 'pending').length,
       totalPartial: purchases.filter(p => p.purchasePaymentStatus === 'partial').length,
-    };'
+    };
 
     return {
       summary,
