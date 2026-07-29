@@ -69,6 +69,9 @@ export class PurchaseOrder {
   @Column({ name: 'gross_amount', type: 'numeric', precision: 14, scale: 2, default: 0 })
   grossAmount!: number;
 
+  @Column({ name: 'mortality_deduction', type: 'numeric', precision: 10, scale: 2, default: 0 })
+  mortalityDeduction!: number;
+
   @Column({ name: 'net_amount', type: 'numeric', precision: 14, scale: 2, default: 0 })
   netAmount!: number;
 

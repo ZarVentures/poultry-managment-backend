@@ -49,6 +49,7 @@ export class ReportsService {
         const birds = (p.cages || []).reduce((s, c: any) => s + (parseInt(c.numberOfBirds) || 0), 0);
         return sum + birds;
       }, 0),
+      totalWeight: purchases.reduce((sum, p) => sum + parseFloat(p.totalWeight as any), 0),
       totalAmount: purchases.reduce((sum, p) => sum + parseFloat(p.totalAmount as any), 0),
       totalNetAmount: purchases.reduce((sum, p) => sum + parseFloat(p.netAmount as any), 0),
       totalPaid: purchases.filter(p => p.purchasePaymentStatus === 'paid').length,
@@ -80,6 +81,8 @@ export class ReportsService {
 
     const summary = {
       totalSales: sales.length,
+      totalBirds: sales.reduce((sum, s) => sum + (parseInt(s.numberOfBirds as any) || 0), 0),
+      totalQuantity: sales.reduce((sum, s) => sum + parseFloat(s.quantity as any), 0),
       totalAmount: sales.reduce((sum, s) => sum + parseFloat(s.totalAmount as any), 0),
       totalNetAmount: sales.reduce((sum, s) => sum + parseFloat(s.netAmount as any), 0),
       totalWeightShortage: sales.reduce((sum, s) => sum + parseFloat((s.weightShortage || 0) as any), 0),
@@ -117,10 +120,12 @@ export class ReportsService {
       .orderBy('purchase.orderDate', 'DESC')
       .getMany();
 
+    const totalDeduction = purchases.reduce((sum, p) => sum + parseFloat(p.mortalityDeduction as any || 0), 0);
+
     const summary = {
       totalOrders: purchases.length,
-      totalMortalityDeduction: 0,
-      averageMortalityPerOrder: 0,
+      totalMortalityDeduction: totalDeduction,
+      averageMortalityPerOrder: purchases.length > 0 ? totalDeduction / purchases.length : 0,
     };
 
     return {
@@ -130,7 +135,7 @@ export class ReportsService {
         orderDate: p.orderDate,
         supplierName: p.supplierName,
         totalWeight: p.totalWeight,
-        mortalityDeduction: 0,
+        mortalityDeduction: parseFloat(p.mortalityDeduction as any) || 0,
         netAmount: p.netAmount,
       })),
       dateRange: { startDate, endDate },
@@ -514,7 +519,13 @@ export class ReportsService {
 
     const unionQuery = `
       SELECT 
-        id, sale_id, invoice_number, customer_name, payment_mode, amount, created_at, 'Regular' as type
+        id, sale_id,
+        invoice_number as "invoiceNumber",
+        customer_name as "customerName",
+        payment_mode as "payment_mode",
+        amount, created_at,
+        'Completed' as status,
+        'Regular' as type
       FROM (
         SELECT p.id, p.sale_id, s.invoice_number, s.customer_name, p.payment_mode, p.amount, p.created_at
         FROM sale_payments p
@@ -522,7 +533,13 @@ export class ReportsService {
       ) t1
       UNION ALL
       SELECT 
-        id, godown_sale_id as sale_id, invoice_number, customer_name, payment_mode, amount, created_at, 'Godown' as type
+        id, godown_sale_id as sale_id,
+        invoice_number as "invoiceNumber",
+        customer_name as "customerName",
+        payment_mode as "payment_mode",
+        amount, created_at,
+        'Completed' as status,
+        'Godown' as type
       FROM (
         SELECT p.id, p.godown_sale_id, s.invoice_number, s.customer_name, p.payment_mode, p.amount, p.created_at
         FROM godown_sale_payments p
