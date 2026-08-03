@@ -2,14 +2,16 @@ import { IsString, IsOptional, IsDateString, IsInt, IsNumber, Min } from 'class-
 import { Type } from 'class-transformer';
 
 export class CreateMortalityDto {
+  @IsOptional()
   @IsString()
-  purchaseInvoiceNo!: string;
+  purchaseInvoiceNo?: string;
 
   @IsDateString()
   purchaseDate!: string;
 
+  @IsOptional()
   @IsString()
-  farmerName!: string;
+  farmerName?: string;
 
   @IsOptional()
   @IsString()
@@ -44,8 +46,9 @@ export class CreateMortalityDto {
   @IsNumber()
   amount?: number;
 
+  @IsOptional()
   @IsString()
-  cause!: string;
+  cause?: string;
 
   @IsOptional()
   @IsString()
