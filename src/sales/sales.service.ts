@@ -77,6 +77,7 @@ export class SalesService {
       saleNo: dto.saleNo,
       purchaseBillNo: dto.purchaseBillNo,
       cageNo: dto.cageNo,
+      numberOfBirds: Number(dto.numberOfBirds ?? dto.totalBirds ?? 0) || 0,
       customerName: dto.customerName,
       saleDate: dto.saleDate,
       saleMode: dto.saleMode,
@@ -108,6 +109,19 @@ export class SalesService {
     return fullSale;
   }
 
+  private getBirdsCount(sale: Sale): number {
+    const direct = Number(sale.numberOfBirds) || 0;
+    if (direct > 0) return direct;
+    // Older sales stored bird count inside notes JSON
+    try {
+      if (!sale.notes) return 0;
+      const parsed = JSON.parse(sale.notes);
+      return Number(parsed?.weightLoss?.totalBirds) || 0;
+    } catch {
+      return 0;
+    }
+  }
+
   async findAll(
     startDate?: string,
     endDate?: string,
@@ -124,7 +138,13 @@ export class SalesService {
       .orderBy('sale.saleDate', 'DESC');
 
     if (startDate && endDate) query.andWhere('sale.saleDate BETWEEN :startDate AND :endDate', { startDate, endDate });
-    if (customer) query.andWhere('sale.customerName ILIKE :customer', { customer: `%${customer}%` });
+    if (customer) {
+      const q = `%${customer.trim()}%`;
+      query.andWhere(
+        '(sale.customerName ILIKE :q OR sale.invoiceNumber ILIKE :q OR sale.saleNo ILIKE :q)',
+        { q },
+      );
+    }
     if (productType) query.andWhere('sale.productType = :productType', { productType });
     if (paymentStatus) query.andWhere('sale.paymentStatus = :paymentStatus', { paymentStatus });
     if (retailerId) query.andWhere('sale.retailerId = :retailerId', { retailerId });
@@ -145,14 +165,21 @@ export class SalesService {
         .orderBy('sale.saleDate', 'DESC');
 
       if (startDate && endDate) summaryQuery.andWhere('sale.saleDate BETWEEN :startDate AND :endDate', { startDate, endDate });
-      if (customer) summaryQuery.andWhere('sale.customerName ILIKE :customer', { customer: `%${customer}%` });
+      if (customer) {
+        const q = `%${customer.trim()}%`;
+        summaryQuery.andWhere(
+          '(sale.customerName ILIKE :q OR sale.invoiceNumber ILIKE :q OR sale.saleNo ILIKE :q)',
+          { q },
+        );
+      }
       if (productType) summaryQuery.andWhere('sale.productType = :productType', { productType });
       if (paymentStatus) summaryQuery.andWhere('sale.paymentStatus = :paymentStatus', { paymentStatus });
       if (retailerId) summaryQuery.andWhere('sale.retailerId = :retailerId', { retailerId });
 
       const allFiltered = await summaryQuery.getMany();
       const summary = {
-        totalBirds: allFiltered.reduce((s, x) => s + Number(x.quantity || 0), 0),
+        totalBirds: allFiltered.reduce((s, x) => s + this.getBirdsCount(x), 0),
+        totalWeight: allFiltered.reduce((s, x) => s + Number(x.quantity || 0), 0),
         totalRevenue: allFiltered.reduce((s, x) => s + Number(x.netAmount || x.totalAmount || 0), 0),
         totalReceived: allFiltered.reduce((s, x) => s + Number(x.amountReceived || 0), 0),
         totalPending: allFiltered.reduce((s, x) => s + Math.max(0, Number(x.netAmount || x.totalAmount || 0) - Number(x.amountReceived || 0)), 0),
@@ -219,6 +246,10 @@ export class SalesService {
       saleNo: dto.saleNo ?? sale.saleNo,
       purchaseBillNo: dto.purchaseBillNo ?? sale.purchaseBillNo,
       cageNo: dto.cageNo ?? sale.cageNo,
+      numberOfBirds:
+        dto.numberOfBirds !== undefined || dto.totalBirds !== undefined
+          ? Number(dto.numberOfBirds ?? dto.totalBirds ?? 0) || 0
+          : sale.numberOfBirds,
       customerName: dto.customerName ?? sale.customerName,
       saleDate: dto.saleDate ?? sale.saleDate,
       saleMode: dto.saleMode ?? sale.saleMode,
@@ -238,6 +269,7 @@ export class SalesService {
       saleNo: sale.saleNo,
       purchaseBillNo: sale.purchaseBillNo,
       cageNo: sale.cageNo,
+      numberOfBirds: sale.numberOfBirds,
       customerName: sale.customerName,
       saleDate: sale.saleDate,
       saleMode: sale.saleMode,
