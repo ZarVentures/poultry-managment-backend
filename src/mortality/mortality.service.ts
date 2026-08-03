@@ -23,11 +23,14 @@ export class MortalityService {
     const count = await this.mortalityRepository.count();
     const recordNumber = `MRT-${Date.now()}-${count + 1}`;
 
-    // Find purchase order by invoice number
-    const purchaseOrder = await this.purchaseOrderRepository.findOne({
-      where: { orderNumber: createMortalityDto.purchaseInvoiceNo },
-      relations: ['cages'],
-    });
+    const invoiceNo = (createMortalityDto.purchaseInvoiceNo || '').trim();
+    // Find purchase order by invoice number (optional)
+    const purchaseOrder = invoiceNo && invoiceNo !== 'N/A'
+      ? await this.purchaseOrderRepository.findOne({
+          where: { orderNumber: invoiceNo },
+          relations: ['cages'],
+        })
+      : null;
 
     const weight = Number(createMortalityDto.weightOfDeadBirds) || 0;
     const rate = Number(createMortalityDto.ratePerKg) || 0;
@@ -40,6 +43,10 @@ export class MortalityService {
 
     const mortality = this.mortalityRepository.create({
       ...createMortalityDto,
+      purchaseInvoiceNo: invoiceNo || 'N/A',
+      farmerName: createMortalityDto.farmerName || 'N/A',
+      cause: createMortalityDto.cause || '',
+      cageIdNumber: createMortalityDto.cageIdNumber || undefined,
       recordNumber,
       purchaseOrderId: purchaseOrder?.id,
       amount,
