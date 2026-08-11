@@ -58,19 +58,6 @@ export class GodownService {
         savedId,
         parseFloat(godownInwardWeight || entryData.totalWeight || 0) || undefined,
       );
-
-      // Apply per-cage godown weights when provided
-      if (Array.isArray(cages) && cages.length > 0) {
-        await this.cagesService.updateGodownInwardCages(
-          savedId,
-          cages.map((c: any) => ({
-            id: c.id,
-            cageId: c.cageId,
-            numberOfBirds: c.numberOfBirds,
-            godownInwardWeight: c.cageWeight ?? c.godownInwardWeight ?? c.godownWeight,
-          })),
-        );
-      }
     }
 
     return this.findOneInward(savedId);
@@ -132,21 +119,6 @@ export class GodownService {
         cageIds,
         id,
         parseFloat(godownInwardWeight || updateData.totalWeight || 0) || undefined,
-      );
-    }
-
-    // Persist per-cage edits (birds / godown weight) when provided
-    if (cageUpdates && Array.isArray(cageUpdates) && cageUpdates.length > 0) {
-      await this.cagesService.updateGodownInwardCages(id, cageUpdates);
-    } else if (cages && Array.isArray(cages) && cages.length > 0) {
-      await this.cagesService.updateGodownInwardCages(
-        id,
-        cages.map((c: any) => ({
-          id: c.id,
-          cageId: c.cageId,
-          numberOfBirds: c.numberOfBirds,
-          godownInwardWeight: c.cageWeight ?? c.godownInwardWeight,
-        })),
       );
     }
 
