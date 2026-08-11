@@ -7,6 +7,7 @@ import { GodownSale } from './entities/godown-sale.entity';
 import { GodownSalePayment } from './entities/godown-sale-payment.entity';
 import { GodownMortality } from './godown-mortality.entity';
 import { GodownExpense } from './godown-expense.entity';
+import { BirdReturn } from '../sales/entities/bird-return.entity';
 import { CagesModule } from '../cages/cages.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 
@@ -18,6 +19,7 @@ import { PermissionsModule } from '../permissions/permissions.module';
       GodownSalePayment,
       GodownMortality,
       GodownExpense,
+      BirdReturn,
     ]),
     CagesModule,
     PermissionsModule,
