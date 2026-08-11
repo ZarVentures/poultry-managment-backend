@@ -172,4 +172,16 @@ export class GodownController {
   getSummary() {
     return this.godownService.getSummary();
   }
+
+  // Stock Ledger — chronological bird/weight movements with running balance
+  @Get('stock-ledger')
+  @Permissions('godown', 'read')
+  getStockLedger(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('type') type?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.godownService.getStockLedger({ startDate, endDate, type, search });
+  }
 }
