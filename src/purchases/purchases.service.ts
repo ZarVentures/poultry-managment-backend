@@ -367,8 +367,12 @@ export class PurchasesService {
   }
 
   // Mark cages in godown — delegates to CagesService
-  async markCagesInGodown(cageIds: string[], godownInwardWeight?: number): Promise<void> {
-    return this.cagesService.markInGodown(cageIds, '', godownInwardWeight);
+  async markCagesInGodown(
+    cageIds: string[],
+    godownInwardId: string,
+    godownInwardWeight?: number,
+  ): Promise<void> {
+    return this.cagesService.markInGodown(cageIds, godownInwardId, godownInwardWeight);
   }
 
   // Get cage journey — delegates to CagesService

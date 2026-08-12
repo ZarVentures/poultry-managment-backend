@@ -87,8 +87,12 @@ export class PurchasesController {
   }
 
   @Patch('cages/mark-in-godown')
-  markCagesInGodown(@Body('cageIds') cageIds: string[], @Body('godownInwardWeight') godownInwardWeight?: number) {
-    return this.purchasesService.markCagesInGodown(cageIds, godownInwardWeight);
+  markCagesInGodown(
+    @Body('cageIds') cageIds: string[],
+    @Body('godownInwardId') godownInwardId: string,
+    @Body('godownInwardWeight') godownInwardWeight?: number,
+  ) {
+    return this.purchasesService.markCagesInGodown(cageIds, godownInwardId, godownInwardWeight);
   }
 
   @Get('cage-journey/:orderNumber')
