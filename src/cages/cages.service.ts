@@ -94,6 +94,41 @@ export class CagesService {
       .execute();
   }
 
+  // Update per-cage details for an existing godown inward entry (edit flow)
+  async updateGodownInwardCages(
+    godownInwardId: string,
+    cageUpdates: Array<{
+      id?: string;
+      cageId?: string;
+      numberOfBirds?: number;
+      godownInwardWeight?: number;
+    }>,
+  ): Promise<void> {
+    if (!cageUpdates?.length) return;
+
+    for (const update of cageUpdates) {
+      if (!update.id) continue;
+
+      const patch: Partial<Cage> = {
+        godownInwardId,
+        status: 'in_godown',
+        updatedAt: new Date(),
+      };
+
+      if (update.numberOfBirds !== undefined) {
+        patch.numberOfBirds = Number(update.numberOfBirds);
+      }
+      if (update.godownInwardWeight !== undefined && update.godownInwardWeight !== null) {
+        patch.godownInwardWeight = Number(update.godownInwardWeight);
+      }
+      if (update.cageId !== undefined) {
+        patch.cageId = update.cageId;
+      }
+
+      await this.cageRepo.update({ id: String(update.id) }, patch);
+    }
+  }
+
   // Mark cages as godown_sold
   async markGodownSold(cageIds: string[], godownSaleId: string, godownSaleWeight?: number): Promise<void> {
     if (!cageIds.length) return;
