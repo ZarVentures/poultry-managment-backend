@@ -447,22 +447,6 @@ export class BillingService {
     }
   }
 
-  // ── Ledger by Farmer ID ───────────────────────────────────────────────────
-  async getLedgerByFarmerId(farmerId: string): Promise<BillingLedger[]> {
-    const farmer = await this.farmerRepo.findOne({ where: { id: farmerId } });
-    if (!farmer) throw new NotFoundException(`Farmer ${farmerId} not found`);
-    const party = await this.findOrCreatePartyByName(farmer.name, 'Farm', farmer.phone, farmer.address);
-    return this.getLedger(party.id);
-  }
-
-  // ── Ledger by Retailer ID ─────────────────────────────────────────────────
-  async getLedgerByRetailerId(retailerId: string): Promise<BillingLedger[]> {
-    const retailer = await this.retailerRepo.findOne({ where: { id: retailerId } });
-    if (!retailer) throw new NotFoundException(`Retailer ${retailerId} not found`);
-    const party = await this.findOrCreatePartyByName(retailer.name, 'Retailer', retailer.phone, retailer.address);
-    return this.getLedger(party.id);
-  }
-
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   private async addLedgerEntry(partyId: string, type: LedgerReferenceType, refId: string, debit: number, credit: number, date: string) {
