@@ -29,6 +29,11 @@ export class ExpenseCategoriesController {
     return this.categoriesService.findAll(includeInactive === 'true');
   }
 
+  @Get('active')
+  findActive(@Query('type') type?: string) {
+    return this.categoriesService.findActive(type);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.categoriesService.findOne(id);

@@ -6,6 +6,7 @@ import { Expense } from '../expenses/expense.entity';
 import { Vehicle } from '../vehicles/vehicle.entity';
 import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { InventoryItem } from '../inventory/entities/inventory-item.entity';
+import { GodownSale } from '../godown/entities/godown-sale.entity';
 
 @Injectable()
 export class DashboardService {
@@ -20,6 +21,8 @@ export class DashboardService {
     private readonly purchaseRepository: Repository<PurchaseOrder>,
     @InjectRepository(InventoryItem)
     private readonly inventoryRepository: Repository<InventoryItem>,
+    @InjectRepository(GodownSale)
+    private readonly godownSaleRepository: Repository<GodownSale>,
   ) {}
 
   // IST-aware date helpers
@@ -73,8 +76,19 @@ export class DashboardService {
       .where('sale.saleDate >= :startDate AND sale.saleDate <= :endDate', dateFilter);
     
     const revenueResult = await revenueQuery.getRawOne();
-    const totalRevenue = parseFloat(revenueResult.total) || 0;
+    const saleRevenue = parseFloat(revenueResult.total) || 0;
     const totalBirdsSold = parseInt(revenueResult.totalBirds) || 0;
+
+    // Godown (gowdan) sales revenue for the same period
+    const godownQuery = this.godownSaleRepository.createQueryBuilder('gs')
+      .select('COALESCE(SUM(gs.totalAmount), 0)', 'total')
+      .addSelect('COUNT(*)', 'count')
+      .where('gs.saleDate >= :startDate AND gs.saleDate <= :endDate', dateFilter);
+
+    const godownResult = await godownQuery.getRawOne();
+    const godownRevenue = parseFloat(godownResult.total) || 0;
+
+    const totalRevenue = saleRevenue + godownRevenue;
 
     // Total Expenses MTD
     const expenseQuery = this.expenseRepository.createQueryBuilder('expense')
@@ -92,8 +106,10 @@ export class DashboardService {
       where: { status: 'active' }
     });
 
-    // Total Sales Count MTD — already fetched above
-    const totalSales = parseInt(revenueResult.count) || 0;
+    // Total Sales Count MTD — poultry + godown
+    const poultrySalesCount = parseInt(revenueResult.count) || 0;
+    const godownSalesCount = parseInt(godownResult.count) || 0;
+    const totalSales = poultrySalesCount + godownSalesCount;
 
     return {
       totalRevenue,
@@ -177,17 +193,26 @@ export class DashboardService {
         .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", { startDate, endDate })
         .getRawOne();
 
+      // Godown revenue for the month
+      const godownRevenueResult = await this.godownSaleRepository.createQueryBuilder('gs')
+        .select('COALESCE(SUM(gs.totalAmount), 0)', 'total')
+        .where("gs.saleDate >= :startDate AND gs.saleDate <= :endDate", { startDate, endDate })
+        .getRawOne();
+
       // Expenses for the month
       const expenseResult = await this.expenseRepository.createQueryBuilder('expense')
         .select('COALESCE(SUM(expense.amount), 0)', 'total')
         .where('expense.expenseDate >= :startDate AND expense.expenseDate <= :endDate', { startDate, endDate })
         .getRawOne();
 
+      const monthSaleRevenue = parseFloat(revenueResult.total) || 0;
+      const monthGodownRevenue = parseFloat(godownRevenueResult.total) || 0;
+      const monthTotalRevenue = monthSaleRevenue + monthGodownRevenue;
       monthlyData.push({
         month: targetDate.toLocaleString('default', { month: 'short', year: 'numeric' }),
-        revenue: parseFloat(revenueResult.total) || 0,
+        revenue: monthTotalRevenue,
         expenses: parseFloat(expenseResult.total) || 0,
-        profit: (parseFloat(revenueResult.total) || 0) - (parseFloat(expenseResult.total) || 0),
+        profit: monthTotalRevenue - (parseFloat(expenseResult.total) || 0),
       });
     }
 
@@ -212,12 +237,19 @@ export class DashboardService {
         .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", { startDate, endDate })
         .getRawOne();
 
+      const godownRevenueResult = await this.godownSaleRepository.createQueryBuilder('gs')
+        .select('COALESCE(SUM(gs.totalAmount), 0)', 'total')
+        .where("gs.saleDate >= :startDate AND gs.saleDate <= :endDate", { startDate, endDate })
+        .getRawOne();
+
       const expenseResult = await this.expenseRepository.createQueryBuilder('expense')
         .select('COALESCE(SUM(expense.amount), 0)', 'total')
         .where('expense.expenseDate >= :startDate AND expense.expenseDate <= :endDate', { startDate, endDate })
         .getRawOne();
 
-      const revenue = parseFloat(revenueResult.total) || 0;
+      const monthSaleRev = parseFloat(revenueResult.total) || 0;
+      const monthGodownRev = parseFloat(godownRevenueResult.total) || 0;
+      const revenue = monthSaleRev + monthGodownRev;
       const expenses = parseFloat(expenseResult.total) || 0;
       const profit = revenue - expenses;
 
@@ -244,7 +276,15 @@ export class DashboardService {
       .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
       .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", { startDate, endDate })
       .getRawOne();
-    const totalRevenue = parseFloat(revenueResult.total) || 0;
+    const saleRev = parseFloat(revenueResult.total) || 0;
+
+    const godownRevResult = await this.godownSaleRepository.createQueryBuilder('gs')
+      .select('COALESCE(SUM(gs.totalAmount), 0)', 'total')
+      .where("gs.saleDate >= :startDate AND gs.saleDate <= :endDate", { startDate, endDate })
+      .getRawOne();
+    const godownRev = parseFloat(godownRevResult.total) || 0;
+
+    const totalRevenue = saleRev + godownRev;
 
     // Total Expenses
     const expenseResult = await this.expenseRepository.createQueryBuilder('expense')

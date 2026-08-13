@@ -37,7 +37,7 @@ export class RetailersService {
 
     if (search) {
       query.andWhere(
-        '(retailer.name ILIKE :search OR retailer.phone ILIKE :search OR retailer.shopName ILIKE :search)',
+        '(retailer.name ILIKE :search OR retailer.phone ILIKE :search OR retailer.ownerName ILIKE :search)',
         { search: `%${search}%` }
       );
     }

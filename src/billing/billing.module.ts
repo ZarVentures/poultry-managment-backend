@@ -3,7 +3,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BillingService } from './billing.service';
 import { BillingController } from './billing.controller';
 import { BillingParty } from './entities/billing-party.entity';
-import { BillingSale } from './entities/billing-sale.entity';
 import { BillingPayment } from './entities/billing-payment.entity';
 import { BillingLedger } from './entities/billing-ledger.entity';
 import { Expense } from '../expenses/expense.entity';
@@ -19,7 +18,6 @@ import { GodownSalePayment } from '../godown/entities/godown-sale-payment.entity
   imports: [
     TypeOrmModule.forFeature([
       BillingParty,
-      BillingSale,
       BillingPayment,
       BillingLedger,
       Expense,

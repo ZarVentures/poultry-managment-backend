@@ -8,8 +8,6 @@ import { Expense } from '../expenses/expense.entity';
 import { InventoryItem } from '../inventory/entities/inventory-item.entity';
 import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { Sale } from '../sales/sale.entity';
-import { BillingSale } from './entities/billing-sale.entity';
-import { getTodayIST } from '../common/date-utils';
 import { Farmer } from '../farmers/farmer.entity';
 import { Retailer } from '../retailers/retailer.entity';
 import { GodownSale } from '../godown/entities/godown-sale.entity';
@@ -24,7 +22,6 @@ export class BillingService {
     @InjectRepository(Expense) private expenseRepo: Repository<Expense>,
     @InjectRepository(InventoryItem) private inventoryRepo: Repository<InventoryItem>,
     @InjectRepository(PurchaseOrder) private purchaseRepo: Repository<PurchaseOrder>,
-    @InjectRepository(BillingSale) private saleRepo: Repository<BillingSale>,
     @InjectRepository(Sale) private mainSaleRepo: Repository<Sale>,
     @InjectRepository(Farmer) private farmerRepo: Repository<Farmer>,
     @InjectRepository(Retailer) private retailerRepo: Repository<Retailer>,
@@ -110,49 +107,25 @@ export class BillingService {
     await this.partyRepo.remove(party);
   }
 
-  // ─── Sales ────────────────────────────────────────────────────────────────
+  // ─── Sales (redirected to main sales module) ──────────────────────────────
 
-  async getSales(partyId?: string): Promise<BillingSale[]> {
-    const where: any = {};
-    if (partyId) where.partyId = partyId;
-    return this.saleRepo.find({ where, order: { date: 'DESC' } });
-  }
-
-  async createSale(data: Partial<BillingSale>): Promise<BillingSale> {
-    const sale = this.saleRepo.create(data);
-    const saved = await this.saleRepo.save(sale);
-    const savedId: string = (saved as any).id ?? (saved as any)[0]?.id;
-
-    // Create ledger entry
-    await this.addLedgerEntry(data.partyId!, 'Sale', savedId, data.totalAmount || 0, 0, data.date!);
-
-    // Update party balance
-    await this.recalculatePartyBalance(data.partyId!);
-
-    return this.saleRepo.findOne({ where: { id: savedId } }) as Promise<BillingSale>;
-  }
-
-  async updateSale(id: string, data: Partial<BillingSale>): Promise<BillingSale> {
-    await this.saleRepo.update(id, { ...data, updatedAt: new Date() });
-
-    // Update ledger entry
-    const ledger = await this.ledgerRepo.findOne({ where: { referenceType: 'Sale', referenceId: id } });
-    if (ledger) {
-      await this.ledgerRepo.update(ledger.id, { debit: data.totalAmount || ledger.debit, date: data.date || ledger.date });
+  async getSales(partyId?: string): Promise<any[]> {
+    if (partyId) {
+      return this.mainSaleRepo.find({ where: { customerName: partyId } as any, order: { saleDate: 'DESC' } });
     }
+    return this.mainSaleRepo.find({ order: { saleDate: 'DESC' } });
+  }
 
-    const sale = await this.saleRepo.findOne({ where: { id } });
-    if (sale) await this.recalculatePartyBalance(sale.partyId);
+  async createSale(data: any): Promise<any> {
+    throw new NotFoundException('Use POST /api/sales to create sales. Billing sales table does not exist.');
+  }
 
-    return this.saleRepo.findOne({ where: { id } }) as Promise<BillingSale>;
+  async updateSale(id: string, data: any): Promise<any> {
+    throw new NotFoundException('Use PATCH /api/sales/:id to update sales. Billing sales table does not exist.');
   }
 
   async deleteSale(id: string): Promise<void> {
-    const sale = await this.saleRepo.findOne({ where: { id } });
-    if (!sale) throw new NotFoundException(`Sale ${id} not found`);
-    await this.ledgerRepo.delete({ referenceType: 'Sale', referenceId: id });
-    await this.saleRepo.remove(sale);
-    await this.recalculatePartyBalance(sale.partyId);
+    throw new NotFoundException('Use DELETE /api/sales/:id to delete sales. Billing sales table does not exist.');
   }
 
   // ─── Payments ─────────────────────────────────────────────────────────────
@@ -399,6 +372,22 @@ export class BillingService {
     return allEntries as BillingLedger[];
   }
 
+  // ── Ledger by Farmer ID ───────────────────────────────────────────────────
+  async getLedgerByFarmerId(farmerId: string): Promise<BillingLedger[]> {
+    const farmer = await this.farmerRepo.findOne({ where: { id: farmerId } });
+    if (!farmer) throw new NotFoundException(`Farmer ${farmerId} not found`);
+    const party = await this.findOrCreatePartyByName(farmer.name, 'Farm', farmer.phone, farmer.address);
+    return this.getLedger(party.id);
+  }
+
+  // ── Ledger by Retailer ID ─────────────────────────────────────────────────
+  async getLedgerByRetailerId(retailerId: string): Promise<BillingLedger[]> {
+    const retailer = await this.retailerRepo.findOne({ where: { id: retailerId } });
+    if (!retailer) throw new NotFoundException(`Retailer ${retailerId} not found`);
+    const party = await this.findOrCreatePartyByName(retailer.name, 'Retailer', retailer.phone, retailer.address);
+    return this.getLedger(party.id);
+  }
+
   // Helper: Find or create billing party by name
   async findOrCreatePartyByName(name: string, type: PartyType = 'Retailer', phone?: string, address?: string): Promise<BillingParty> {
     // Try to find existing party by name (case-insensitive & trimmed)
@@ -458,22 +447,6 @@ export class BillingService {
     }
   }
 
-  // ── Ledger by Farmer ID ───────────────────────────────────────────────────
-  async getLedgerByFarmerId(farmerId: string): Promise<BillingLedger[]> {
-    const farmer = await this.farmerRepo.findOne({ where: { id: farmerId } });
-    if (!farmer) throw new NotFoundException(`Farmer ${farmerId} not found`);
-    const party = await this.findOrCreatePartyByName(farmer.name, 'Farm', farmer.phone, farmer.address);
-    return this.getLedger(party.id);
-  }
-
-  // ── Ledger by Retailer ID ─────────────────────────────────────────────────
-  async getLedgerByRetailerId(retailerId: string): Promise<BillingLedger[]> {
-    const retailer = await this.retailerRepo.findOne({ where: { id: retailerId } });
-    if (!retailer) throw new NotFoundException(`Retailer ${retailerId} not found`);
-    const party = await this.findOrCreatePartyByName(retailer.name, 'Retailer', retailer.phone, retailer.address);
-    return this.getLedger(party.id);
-  }
-
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   private async addLedgerEntry(partyId: string, type: LedgerReferenceType, refId: string, debit: number, credit: number, date: string) {
@@ -507,12 +480,12 @@ export class BillingService {
 
   async getSummary() {
     const parties = await this.partyRepo.find();
-    const sales = await this.saleRepo.find();
     const payments = await this.paymentRepo.find({ where: { status: 'Completed' } as any });
+    const sales = await this.mainSaleRepo.find();
 
     return {
       totalParties: parties.length,
-      totalSales: sales.reduce((s, x) => s + Number(x.totalAmount), 0),
+      totalSales: sales.reduce((s, x) => s + Number(x.totalAmount || x.netAmount || 0), 0),
       pendingPayments: parties.reduce((s, p) => s + Math.max(0, Number(p.currentBalance)), 0),
       totalLedgers: parties.length,
     };

@@ -24,6 +24,25 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type, Authorization',
   });
 
+  // Fallback: ensure CORS headers are present even for error paths or upstream responses
+  app.use((req: { headers: { origin: string; }; method: string; }, res: { setHeader: (arg0: string, arg1: string) => void; statusCode: number; end: () => any; }, next: () => any) => {
+    const origin = req.headers.origin || '*';
+    try {
+      res.setHeader('Access-Control-Allow-Origin', origin as string);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+    } catch (err) {
+      // ignore header set errors
+    }
+
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      return res.end();
+    }
+    return next();
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

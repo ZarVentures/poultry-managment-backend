@@ -117,6 +117,9 @@ const migrations = [
     )`,
   },
   { name: 'mortalities.purchase_order_id col', sql: `ALTER TABLE mortalities ADD COLUMN IF NOT EXISTS purchase_order_id BIGINT` },
+  { name: 'mortalities.weight_of_dead_birds col', sql: `ALTER TABLE mortalities ADD COLUMN IF NOT EXISTS weight_of_dead_birds NUMERIC(10,2)` },
+  { name: 'mortalities.rate_per_kg col', sql: `ALTER TABLE mortalities ADD COLUMN IF NOT EXISTS rate_per_kg NUMERIC(10,2)` },
+  { name: 'mortalities.amount col', sql: `ALTER TABLE mortalities ADD COLUMN IF NOT EXISTS amount NUMERIC(14,2)` },
 
   // ── user_permissions ──────────────────────────────────────────
   {
@@ -268,6 +271,7 @@ const migrations = [
   { name: 'sales.sale_attachment',     sql: `ALTER TABLE sales ADD COLUMN IF NOT EXISTS sale_attachment TEXT` },
   { name: 'sales.weight_shortage_kg', sql: `ALTER TABLE sales ADD COLUMN IF NOT EXISTS weight_shortage_kg NUMERIC(10,2) DEFAULT 0` },
   { name: 'sales.backfill_weight_shortage_kg', sql: `UPDATE sales SET weight_shortage_kg = weight_shortage / NULLIF(unit_price, 0) WHERE (weight_shortage_kg IS NULL OR weight_shortage_kg = 0) AND weight_shortage > 0 AND unit_price > 0` },
+
 
   // ── PG extensions ─────────────────────────────────────────────
   {
@@ -526,6 +530,7 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_bird_returns_return_number ON bird_returns(return_number);
     END $$;`,
   },
+
 
   // ── vehicle_bird_returns ──────────────────────────────────────
   {
