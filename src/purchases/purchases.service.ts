@@ -7,7 +7,6 @@ import { PurchaseOrderPayment } from './entities/purchase-order-payment.entity';
 import { CagesService } from '../cages/cages.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
-import { AccountingService } from '../modules/accounting/accounting.service';
 
 @Injectable()
 export class PurchasesService {
@@ -19,7 +18,6 @@ export class PurchasesService {
     @InjectRepository(PurchaseOrderPayment)
     private readonly purchaseOrderPaymentRepository: Repository<PurchaseOrderPayment>,
     private readonly cagesService: CagesService,
-    private readonly accountingService: AccountingService,
   ) { }
 
   private calcAmounts(dto: { totalWeight?: string; ratePerKg?: string; transportCharges?: string; otherCharges?: string }) {
@@ -133,11 +131,7 @@ export class PurchasesService {
       await this.purchaseOrderPaymentRepository.save(payments);
     }
 
-    const fullOrder = await this.findOne(savedId);
-    this.accountingService.syncPurchase(fullOrder).catch((err) => {
-      console.error('Failed to trigger accounting sync for purchase order:', err);
-    });
-    return fullOrder;
+    return this.findOne(savedId);
   }
 
   async findAll(
@@ -316,11 +310,7 @@ export class PurchasesService {
       notes: order.notes,
       updatedAt: order.updatedAt,
     });
-    const updatedOrder = await this.findOne(id);
-    this.accountingService.syncPurchase(updatedOrder).catch((err) => {
-      console.error('Failed to trigger accounting sync for purchase order update:', err);
-    });
-    return updatedOrder;
+    return this.findOne(id);
   }
 
   async updateInvoiceAttachment(id: string, fileUrl: string): Promise<PurchaseOrder> {
@@ -340,11 +330,8 @@ export class PurchasesService {
     const order = await this.findOne(id);
     order.status = status;
     order.updatedAt = new Date();
-    const saved = await this.purchaseOrderRepository.save(order);
-    this.accountingService.syncPurchase(saved).catch((err) => {
-      console.error('Failed to trigger accounting sync for purchase order status update:', err);
-    });
-    return saved;
+    await this.purchaseOrderRepository.save(order);
+    return order;
   }
 
   async getInvoiceList(): Promise<Array<{ id: string; orderNumber: string; orderDate: string; supplierName: string }>> {

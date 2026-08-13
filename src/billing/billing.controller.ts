@@ -1,6 +1,5 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common';
 import { BillingService } from './billing.service';
-import { PartyType } from './entities/billing-party.entity';
 
 @Controller('billing')
 export class BillingController {
@@ -74,14 +73,8 @@ export class BillingController {
   getLedger(@Param('partyId') partyId: string) { return this.billingService.getLedger(partyId); }
 
   @Get('ledger-by-name/:name')
-  async getLedgerByName(
-    @Param('name') name: string,
-    @Query('type') type?: PartyType,
-  ) {
-    const party = await this.billingService.findOrCreatePartyByName(
-      decodeURIComponent(name),
-      type || 'Retailer',
-    );
+  async getLedgerByName(@Param('name') name: string) {
+    const party = await this.billingService.findOrCreatePartyByName(name);
     return this.billingService.getLedger(party.id);
   }
 }

@@ -18,7 +18,6 @@ import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { BillingModule } from '../billing/billing.module';
 import { CagesModule } from '../cages/cages.module';
-import { AccountingModule } from '../modules/accounting/accounting.module';
 
 @Module({
   imports: [
@@ -26,7 +25,6 @@ import { AccountingModule } from '../modules/accounting/accounting.module';
     PermissionsModule,
     BillingModule,
     CagesModule,
-    AccountingModule,
   ],
   controllers: [SalesController, BirdReturnsController, VehicleBirdReturnsController],
   providers: [SalesService, BirdReturnsService, VehicleBirdReturnsService],

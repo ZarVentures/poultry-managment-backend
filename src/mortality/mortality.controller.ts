@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { MortalityService } from './mortality.service';
 import { CreateMortalityDto } from './dto/create-mortality.dto';
 import { UpdateMortalityDto } from './dto/update-mortality.dto';
@@ -20,11 +20,8 @@ export class MortalityController {
   }
 
   @Get('stats')
-  getStats(
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.mortalityService.getStats(startDate, endDate);
+  getStats() {
+    return this.mortalityService.getStats();
   }
 
   @Get(':id')

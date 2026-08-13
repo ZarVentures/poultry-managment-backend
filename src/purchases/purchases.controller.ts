@@ -17,33 +17,10 @@ import { extname, join } from 'path';
 import { PurchasesService } from './purchases.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
-import { AccountingService } from '../modules/accounting/accounting.service';
 
 @Controller('purchases')
 export class PurchasesController {
-  constructor(
-    private readonly purchasesService: PurchasesService,
-    private readonly accountingService: AccountingService,
-  ) { }
-
-  @Get('sync-all')
-  async syncAll() {
-    try {
-      const result = await this.purchasesService.findAll();
-      const items = Array.isArray(result) ? result : result.data || [];
-      const synced: string[] = [];
-      const failed: string[] = [];
-      for (const item of items) {
-        try {
-          await this.accountingService.syncPurchase(item);
-          synced.push(item.id || item.orderNumber);
-        } catch { failed.push(item.id || item.orderNumber); }
-      }
-      return { synced: synced.length, failed: failed.length, details: { synced, failed } };
-    } catch (err: any) {
-      return { synced: 0, failed: 0, error: err.message };
-    }
-  }
+  constructor(private readonly purchasesService: PurchasesService) { }
 
   @Get('generate/next-order-number')
   async getNextOrderNumber() {

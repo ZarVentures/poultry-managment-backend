@@ -7,10 +7,9 @@ import { Expense } from '../expenses/expense.entity';
 import { Vehicle } from '../vehicles/vehicle.entity';
 import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { InventoryItem } from '../inventory/entities/inventory-item.entity';
-import { GodownSale } from '../godown/entities/godown-sale.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Sale, Expense, Vehicle, PurchaseOrder, InventoryItem, GodownSale])],
+  imports: [TypeOrmModule.forFeature([Sale, Expense, Vehicle, PurchaseOrder, InventoryItem])],
   controllers: [DashboardController],
   providers: [DashboardService],
   exports: [DashboardService],

@@ -1,17 +1,14 @@
-import { IsString, IsOptional, IsDateString, IsInt, IsNumber, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsString, IsOptional, IsDateString, IsInt, Min } from 'class-validator';
 
 export class CreateMortalityDto {
-  @IsOptional()
   @IsString()
-  purchaseInvoiceNo?: string;
+  purchaseInvoiceNo!: string;
 
   @IsDateString()
   purchaseDate!: string;
 
-  @IsOptional()
   @IsString()
-  farmerName?: string;
+  farmerName!: string;
 
   @IsOptional()
   @IsString()
@@ -21,34 +18,19 @@ export class CreateMortalityDto {
   @IsString()
   cageIdNumber?: string;
 
-  @Type(() => Number)
   @IsInt()
   @Min(0)
   totalBirdsPurchased!: number;
 
-  @Type(() => Number)
   @IsInt()
   @Min(1)
   numberOfBirdsDied!: number;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
   weightOfDeadBirds?: number;
 
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  ratePerKg?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  amount?: number;
-
-  @IsOptional()
   @IsString()
-  cause?: string;
+  cause!: string;
 
   @IsOptional()
   @IsString()

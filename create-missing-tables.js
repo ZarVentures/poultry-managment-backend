@@ -71,20 +71,7 @@ async function createMissingTables() {
         UNIQUE(name)
       );
     `);
-    // Create failed_accounting_jobs table
-    console.log('📋 Creating failed_accounting_jobs table...');
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS failed_accounting_jobs (
-        id BIGSERIAL PRIMARY KEY,
-        payload TEXT NOT NULL,
-        error_message TEXT,
-        retry_count INTEGER DEFAULT 0,
-        status VARCHAR(20) DEFAULT 'pending',
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW()
-      );
-    `);
-    console.log('✅ failed_accounting_jobs table created\n');
+    console.log('✅ products table created\n');
 
     // Create indexes
     console.log('📋 Creating indexes...');
@@ -94,7 +81,6 @@ async function createMissingTables() {
       CREATE INDEX IF NOT EXISTS idx_mortality_records_vehicle ON mortality_records(vehicle_id);
       CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
       CREATE INDEX IF NOT EXISTS idx_products_type ON products(product_type);
-      CREATE INDEX IF NOT EXISTS idx_failed_accounting_jobs_status ON failed_accounting_jobs(status);
     `);
     console.log('✅ Indexes created\n');
 
