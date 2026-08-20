@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, SelectQueryBuilder } from 'typeorm';
 import { PaymentVoucher } from './payment-voucher.entity';
 import { CreatePaymentVoucherDto } from './dto/create-payment-voucher.dto';
 import { UpdatePaymentVoucherDto } from './dto/update-payment-voucher.dto';
@@ -8,6 +8,7 @@ import { BillingService } from '../billing/billing.service';
 import { AccountingService } from '../modules/accounting/accounting.service';
 import { RetailersService } from '../retailers/retailers.service';
 import { FarmersService } from '../farmers/farmers.service';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class PaymentVouchersService {
@@ -18,7 +19,23 @@ export class PaymentVouchersService {
     private accountingService: AccountingService,
     private retailersService: RetailersService,
     private farmersService: FarmersService,
+    private readonly tenantContext: TenantContextService,
   ) { }
+
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
+  private applyTenant(query: SelectQueryBuilder<PaymentVoucher>): SelectQueryBuilder<PaymentVoucher> {
+    const tenantId = this.getTenantId();
+    if (tenantId) query.andWhere('voucher.tenantId = :tenantId', { tenantId });
+    return query;
+  }
 
   async create(createDto: CreatePaymentVoucherDto, userId: number): Promise<PaymentVoucher> {
     // Validate payeeId and payeeType
@@ -43,6 +60,7 @@ export class PaymentVouchersService {
       ...createDto,
       voucherNumber,
       createdById: userId,
+      tenantId: this.getTenantId() ?? undefined,
     });
 
     const savedVoucher = await this.paymentVoucherRepository.save(voucher);
@@ -64,6 +82,8 @@ export class PaymentVouchersService {
       .leftJoinAndSelect('voucher.approvedBy', 'approvedBy')
       .orderBy('voucher.voucherDate', 'DESC')
       .addOrderBy('voucher.id', 'DESC');
+
+    this.applyTenant(query);
 
     if (filters?.startDate && filters?.endDate) {
       query.andWhere('voucher.voucherDate BETWEEN :startDate AND :endDate', {
@@ -89,7 +109,7 @@ export class PaymentVouchersService {
 
   async findOne(id: number): Promise<PaymentVoucher> {
     const voucher = await this.paymentVoucherRepository.findOne({
-      where: { id },
+      where: this.tenantWhere({ id }),
       relations: ['createdBy', 'approvedBy'],
     });
 
@@ -156,8 +176,10 @@ export class PaymentVouchersService {
   async getStats(startDate?: string, endDate?: string): Promise<any> {
     const query = this.paymentVoucherRepository.createQueryBuilder('voucher');
 
+    this.applyTenant(query);
+
     if (startDate && endDate) {
-      query.where('voucher.voucherDate BETWEEN :startDate AND :endDate', {
+      query.andWhere('voucher.voucherDate BETWEEN :startDate AND :endDate', {
         startDate,
         endDate,
       });
@@ -196,11 +218,12 @@ export class PaymentVouchersService {
     const month = String(new Date().getMonth() + 1).padStart(2, '0');
 
     // Get the last voucher number for this month
-    const lastVoucher = await this.paymentVoucherRepository
+    const qb = this.paymentVoucherRepository
       .createQueryBuilder('voucher')
       .where('voucher.voucherNumber LIKE :pattern', { pattern: `PV-${year}-${month}-%` })
-      .orderBy('voucher.id', 'DESC')
-      .getOne();
+      .orderBy('voucher.id', 'DESC');
+    this.applyTenant(qb);
+    const lastVoucher = await qb.getOne();
 
     let sequence = 1;
     if (lastVoucher) {

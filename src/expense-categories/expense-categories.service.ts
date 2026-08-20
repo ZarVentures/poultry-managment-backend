@@ -4,18 +4,29 @@ import { Repository } from 'typeorm';
 import { ExpenseCategory } from './expense-category.entity';
 import { CreateExpenseCategoryDto } from './dto/create-expense-category.dto';
 import { UpdateExpenseCategoryDto } from './dto/update-expense-category.dto';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class ExpenseCategoriesService {
   constructor(
     @InjectRepository(ExpenseCategory)
     private readonly categoryRepo: Repository<ExpenseCategory>,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
   async create(createDto: CreateExpenseCategoryDto): Promise<ExpenseCategory> {
-    // Check if category name already exists
+    // Check if category name already exists within this tenant
     const existing = await this.categoryRepo.findOne({
-      where: { name: createDto.name },
+      where: this.tenantWhere({ name: createDto.name }),
     });
 
     if (existing) {
@@ -24,6 +35,7 @@ export class ExpenseCategoriesService {
 
     const category = this.categoryRepo.create({
       ...createDto,
+      tenantId: this.getTenantId() ?? undefined,
       isSystem: false, // User-created categories are never system categories
     });
 
@@ -34,30 +46,37 @@ export class ExpenseCategoriesService {
     if (type) {
       return this.categoryRepo.find({
         where: [
-          { isActive: true, appliesTo: type as 'main' | 'godown' | 'both' },
-          { isActive: true, appliesTo: 'both' },
+          this.tenantWhere({ isActive: true, appliesTo: type as 'main' | 'godown' | 'both' }),
+          this.tenantWhere({ isActive: true, appliesTo: 'both' }),
         ],
         order: { sortOrder: 'ASC', name: 'ASC' },
       });
     }
     return this.categoryRepo.find({
-      where: { isActive: true },
+      where: this.tenantWhere({ isActive: true }),
       order: { sortOrder: 'ASC', name: 'ASC' },
     });
   }
 
   async findAll(includeInactive = false): Promise<ExpenseCategory[]> {
     const query = this.categoryRepo.createQueryBuilder('category');
+    const tenantId = this.getTenantId();
+
+    if (tenantId) {
+      query.andWhere('category.tenant_id = :tenantId', { tenantId });
+    }
 
     if (!includeInactive) {
-      query.where('category.isActive = :isActive', { isActive: true });
+      query.andWhere('category.isActive = :isActive', { isActive: true });
     }
 
     return query.orderBy('category.name', 'ASC').getMany();
   }
 
   async findOne(id: string): Promise<ExpenseCategory> {
-    const category = await this.categoryRepo.findOne({ where: { id } });
+    const category = await this.categoryRepo.findOne({
+      where: this.tenantWhere({ id }),
+    });
 
     if (!category) {
       throw new NotFoundException(`Expense category with ID ${id} not found`);
@@ -77,7 +96,7 @@ export class ExpenseCategoriesService {
     // Check for duplicate name if name is being updated
     if (updateDto.name && updateDto.name !== category.name) {
       const existing = await this.categoryRepo.findOne({
-        where: { name: updateDto.name },
+        where: this.tenantWhere({ name: updateDto.name }),
       });
 
       if (existing) {
@@ -100,11 +119,15 @@ export class ExpenseCategoriesService {
     }
 
     // Check if category is being used by any expenses
-    const expenseCount = await this.categoryRepo
+    const query = this.categoryRepo
       .createQueryBuilder('category')
       .leftJoin('category.expenses', 'expense')
-      .where('category.id = :id', { id })
-      .getCount();
+      .where('category.id = :id', { id });
+    const tenantId = this.getTenantId();
+    if (tenantId) {
+      query.andWhere('category.tenant_id = :tenantId', { tenantId });
+    }
+    const expenseCount = await query.getCount();
 
     if (expenseCount > 0) {
       throw new BadRequestException(

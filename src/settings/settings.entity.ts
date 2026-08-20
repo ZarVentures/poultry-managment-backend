@@ -2,6 +2,9 @@ import { Column, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 
 @Entity({ name: 'settings' })
 export class Settings {
+  @PrimaryColumn({ name: 'tenant_id', type: 'bigint' })
+  tenantId!: string;
+
   @PrimaryColumn({ type: 'text' })
   key!: string;
 

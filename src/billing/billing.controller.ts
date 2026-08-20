@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { BillingService } from './billing.service';
 import { PartyType } from './entities/billing-party.entity';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('billing')
+@UseGuards(JwtAuthGuard)
 export class BillingController {
   constructor(private readonly billingService: BillingService) {}
 

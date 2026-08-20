@@ -32,6 +32,9 @@ export class InventoryItem {
   @Column({ type: 'text', nullable: true })
   notes: string;
 
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

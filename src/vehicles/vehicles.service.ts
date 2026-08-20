@@ -1,20 +1,39 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Vehicle } from './vehicle.entity';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class VehiclesService {
   constructor(
     @InjectRepository(Vehicle)
     private readonly vehiclesRepository: Repository<Vehicle>,
+    private readonly tenantContext: TenantContextService,
   ) { }
+
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
+  private applyTenant(query: SelectQueryBuilder<Vehicle>): SelectQueryBuilder<Vehicle> {
+    const tenantId = this.getTenantId();
+    if (tenantId) query.andWhere('vehicle.tenantId = :tenantId', { tenantId });
+    return query;
+  }
 
   async findAll(page?: number, limit?: number, search?: string) {
     const query = this.vehiclesRepository.createQueryBuilder('vehicle')
       .orderBy('vehicle.vehicleNumber', 'ASC');
+
+    this.applyTenant(query);
 
     if (search) {
       query.andWhere(
@@ -34,13 +53,13 @@ export class VehiclesService {
 
   async findActive(): Promise<Vehicle[]> {
     return this.vehiclesRepository.find({
-      where: { status: 'active' },
+      where: this.tenantWhere({ status: 'active' }),
       order: { vehicleNumber: 'ASC' },
     });
   }
 
   async findOne(id: string): Promise<Vehicle> {
-    const vehicle = await this.vehiclesRepository.findOne({ where: { id } });
+    const vehicle = await this.vehiclesRepository.findOne({ where: this.tenantWhere({ id }) });
     if (!vehicle) {
       throw new NotFoundException(`Vehicle with id ${id} not found`);
     }
@@ -62,6 +81,7 @@ export class VehiclesService {
       joinDate: data.joinDate,
       status: data.status ?? 'active',
       note: data.note,
+      tenantId: this.getTenantId() ?? undefined,
     });
     return this.vehiclesRepository.save(entity);
   }

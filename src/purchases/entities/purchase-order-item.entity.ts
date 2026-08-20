@@ -9,6 +9,9 @@ export class PurchaseOrderItem {
   @Column({ name: 'purchase_order_id', type: 'bigint' })
   purchaseOrderId!: string;
 
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
+
   @Column({ type: 'text' })
   description!: string;
 

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { AuditLog } from './audit-log.entity';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 export interface CreateAuditLogDto {
   userId?: string;
@@ -21,10 +22,23 @@ export class AuditService {
   constructor(
     @InjectRepository(AuditLog)
     private readonly auditLogRepository: Repository<AuditLog>,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
   async createLog(dto: CreateAuditLogDto): Promise<AuditLog> {
-    const log = this.auditLogRepository.create(dto);
+    const log = this.auditLogRepository.create({
+      ...dto,
+      tenantId: this.getTenantId() ?? undefined,
+    });
     return this.auditLogRepository.save(log);
   }
 
@@ -37,6 +51,11 @@ export class AuditService {
     limit?: number;
   }): Promise<AuditLog[]> {
     const query = this.auditLogRepository.createQueryBuilder('audit');
+    const tenantId = this.getTenantId();
+
+    if (tenantId) {
+      query.andWhere('audit.tenant_id = :tenantId', { tenantId });
+    }
 
     if (params?.startDate && params?.endDate) {
       query.andWhere('audit.created_at BETWEEN :startDate AND :endDate', {
@@ -68,14 +87,14 @@ export class AuditService {
 
   async findByEntity(entity: string, entityId: string): Promise<AuditLog[]> {
     return this.auditLogRepository.find({
-      where: { entity, entityId },
+      where: this.tenantWhere({ entity, entityId }),
       order: { createdAt: 'DESC' },
     });
   }
 
   async findByUser(userId: string, limit?: number): Promise<AuditLog[]> {
     return this.auditLogRepository.find({
-      where: { userId },
+      where: this.tenantWhere({ userId }),
       order: { createdAt: 'DESC' },
       take: limit,
     });
@@ -83,6 +102,7 @@ export class AuditService {
 
   async getRecentLogs(limit: number = 50): Promise<AuditLog[]> {
     return this.auditLogRepository.find({
+      where: this.tenantWhere({}),
       order: { createdAt: 'DESC' },
       take: limit,
     });
@@ -95,9 +115,14 @@ export class AuditService {
     byUser: Array<{ userId: string; userEmail: string; count: number }>;
   }> {
     const query = this.auditLogRepository.createQueryBuilder('audit');
+    const tenantId = this.getTenantId();
+
+    if (tenantId) {
+      query.andWhere('audit.tenant_id = :tenantId', { tenantId });
+    }
 
     if (startDate && endDate) {
-      query.where('audit.created_at BETWEEN :startDate AND :endDate', {
+      query.andWhere('audit.created_at BETWEEN :startDate AND :endDate', {
         startDate,
         endDate,
       });

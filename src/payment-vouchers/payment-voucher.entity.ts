@@ -80,6 +80,9 @@ export class PaymentVoucher {
   @Column({ name: 'approved_date', type: 'timestamp', nullable: true })
   approvedDate: Date;
 
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

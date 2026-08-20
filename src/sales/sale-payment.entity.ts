@@ -9,6 +9,9 @@ export class SalePayment {
   @Column({ name: 'sale_id', type: 'bigint' })
   saleId!: string;
 
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
+
   @Column({ name: 'payment_mode', type: 'varchar', length: 30 })
   paymentMode!: string;
 

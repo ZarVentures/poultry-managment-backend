@@ -100,6 +100,9 @@ export class PurchaseOrder {
   @OneToMany(() => Cage, (cage) => cage.purchaseOrder)
   cages!: Cage[];
 
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
+
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'NOW()' })
   createdAt!: Date;
 

@@ -23,6 +23,9 @@ export class RolePermission {
   @Column({ name: 'can_delete', type: 'boolean', default: false })
   canDelete!: boolean;
 
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 

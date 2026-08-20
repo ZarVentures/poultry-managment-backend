@@ -11,6 +11,9 @@ export class PurchaseOrderPayment {
   @Column({ name: 'purchase_order_id', type: 'bigint' })
   purchaseOrderId!: string;
 
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
+
   @Column({ name: 'payment_mode', type: 'varchar', length: 30 })
   paymentMode!: PaymentMode;
 

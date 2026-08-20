@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, SelectQueryBuilder, ObjectLiteral } from 'typeorm';
 import { BillingParty, PartyType } from './entities/billing-party.entity';
 import { BillingPayment } from './entities/billing-payment.entity';
 import { BillingLedger, LedgerReferenceType } from './entities/billing-ledger.entity';
@@ -13,6 +13,7 @@ import { Retailer } from '../retailers/retailer.entity';
 import { GodownSale } from '../godown/entities/godown-sale.entity';
 import { GodownSalePayment } from '../godown/entities/godown-sale-payment.entity';
 import { getTodayIST } from '../common/date-utils';
+import { TenantContextService } from '../tenants/tenant-context.service';
 //import { Farmer } from '../farmers/farmer.entity';
 
 @Injectable()
@@ -29,22 +30,38 @@ export class BillingService {
     @InjectRepository(Retailer) private retailerRepo: Repository<Retailer>,
     @InjectRepository(GodownSale) private godownSaleRepo: Repository<GodownSale>,
     @InjectRepository(GodownSalePayment) private godownSalePaymentRepo: Repository<GodownSalePayment>,
+    private readonly tenantContext: TenantContextService,
   ) { }
+
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
+  private applyTenant<T extends ObjectLiteral>(query: SelectQueryBuilder<T>, alias: string): SelectQueryBuilder<T> {
+    const tenantId = this.getTenantId();
+    if (tenantId) query.andWhere(`${alias}.tenantId = :tenantId`, { tenantId });
+    return query;
+  }
 
   // ─── Parties ──────────────────────────────────────────────────────────────
 
   async getParties(): Promise<BillingParty[]> {
-    return this.partyRepo.find({ order: { name: 'ASC' } });
+    return this.partyRepo.find({ where: this.tenantWhere({}), order: { name: 'ASC' } });
   }
 
   async getParty(id: string): Promise<BillingParty> {
-    const party = await this.partyRepo.findOne({ where: { id } });
+    const party = await this.partyRepo.findOne({ where: this.tenantWhere({ id }) });
     if (!party) throw new NotFoundException(`Party ${id} not found`);
     return party;
   }
 
   async createParty(data: Partial<BillingParty>): Promise<BillingParty> {
-    const party = this.partyRepo.create(data);
+    const party = this.partyRepo.create({ ...data, tenantId: this.getTenantId() ?? undefined });
     const saved = await this.partyRepo.save(party);
     const savedId: string = (saved as any).id ?? (saved as any)[0]?.id;
 
@@ -59,20 +76,21 @@ export class BillingService {
         credit: parsedOpening < 0 ? Math.abs(parsedOpening) : 0,
         balance: parsedOpening,
         date: '2000-01-01', // Set to a very old date so it always acts as the starting seed balance
+        tenantId: this.getTenantId() ?? undefined,
       }));
     }
 
     // Recalculate balance so currentBalance reflects opening balance
     await this.recalculatePartyBalance(savedId);
 
-    return this.partyRepo.findOne({ where: { id: savedId } }) as Promise<BillingParty>;
+    return this.partyRepo.findOne({ where: this.tenantWhere({ id: savedId }) }) as Promise<BillingParty>;
   }
 
   async updateParty(id: string, data: Partial<BillingParty>): Promise<BillingParty> {
     // Sync the "Opening" entry in the billing_ledger table when opening balance is updated
     if (data.openingBalance !== undefined) {
       const existingOpening = await this.ledgerRepo.findOne({
-        where: { partyId: id, referenceType: 'Opening' },
+        where: this.tenantWhere({ partyId: id, referenceType: 'Opening' }),
       });
 
       const parsedOpening = Number(data.openingBalance || 0);
@@ -95,6 +113,7 @@ export class BillingService {
           credit: parsedOpening < 0 ? Math.abs(parsedOpening) : 0,
           balance: parsedOpening,
           date: '2000-01-01',
+          tenantId: this.getTenantId() ?? undefined,
         }));
       }
     }
@@ -113,9 +132,9 @@ export class BillingService {
 
   async getSales(partyId?: string): Promise<any[]> {
     if (partyId) {
-      return this.mainSaleRepo.find({ where: { customerName: partyId } as any, order: { saleDate: 'DESC' } });
+      return this.mainSaleRepo.find({ where: this.tenantWhere({ customerName: partyId }) as any, order: { saleDate: 'DESC' } });
     }
-    return this.mainSaleRepo.find({ order: { saleDate: 'DESC' } });
+    return this.mainSaleRepo.find({ where: this.tenantWhere({}), order: { saleDate: 'DESC' } });
   }
 
   async createSale(data: any): Promise<any> {
@@ -133,13 +152,13 @@ export class BillingService {
   // ─── Payments ─────────────────────────────────────────────────────────────
 
   async getPayments(partyId?: string): Promise<BillingPayment[]> {
-    const where: any = {};
+    const where: any = this.tenantWhere({});
     if (partyId) where.partyId = partyId;
     return this.paymentRepo.find({ where, order: { date: 'DESC' } });
   }
 
   async createPayment(data: Partial<BillingPayment>): Promise<BillingPayment> {
-    const payment = this.paymentRepo.create(data);
+    const payment = this.paymentRepo.create({ ...data, tenantId: this.getTenantId() ?? undefined });
     const saved = await this.paymentRepo.save(payment);
     const savedId: string = (saved as any).id ?? (saved as any)[0]?.id;
 
@@ -148,17 +167,17 @@ export class BillingService {
       await this.recalculatePartyBalance(data.partyId!);
     }
 
-    return this.paymentRepo.findOne({ where: { id: savedId } }) as Promise<BillingPayment>;
+    return this.paymentRepo.findOne({ where: this.tenantWhere({ id: savedId }) }) as Promise<BillingPayment>;
   }
 
   async updatePayment(id: string, data: Partial<BillingPayment>): Promise<BillingPayment> {
-    const old = await this.paymentRepo.findOne({ where: { id } });
+    const old = await this.paymentRepo.findOne({ where: this.tenantWhere({ id }) });
     if (!old) throw new NotFoundException(`Payment ${id} not found`);
 
     await this.paymentRepo.update(id, { ...data, updatedAt: new Date() });
 
     // Handle ledger based on status change
-    const ledger = await this.ledgerRepo.findOne({ where: { referenceType: 'Payment', referenceId: id } });
+    const ledger = await this.ledgerRepo.findOne({ where: this.tenantWhere({ referenceType: 'Payment', referenceId: id }) });
     if (data.status === 'Completed') {
       if (ledger) {
         await this.ledgerRepo.update(ledger.id, { credit: data.amount || ledger.credit, date: data.date || ledger.date });
@@ -170,11 +189,11 @@ export class BillingService {
     }
 
     await this.recalculatePartyBalance(old.partyId);
-    return this.paymentRepo.findOne({ where: { id } }) as Promise<BillingPayment>;
+    return this.paymentRepo.findOne({ where: this.tenantWhere({ id }) }) as Promise<BillingPayment>;
   }
 
   async deletePayment(id: string): Promise<void> {
-    const payment = await this.paymentRepo.findOne({ where: { id } });
+    const payment = await this.paymentRepo.findOne({ where: this.tenantWhere({ id }) });
     if (!payment) throw new NotFoundException(`Payment ${id} not found`);
     await this.ledgerRepo.delete({ referenceType: 'Payment', referenceId: id });
     await this.paymentRepo.remove(payment);
@@ -187,7 +206,7 @@ export class BillingService {
     const credit = type === 'credit' ? Number(amount) : 0;
 
     const existing = await this.ledgerRepo.findOne({
-      where: { referenceType: 'Voucher', referenceId: refId }
+      where: this.tenantWhere({ referenceType: 'Voucher', referenceId: refId })
     });
 
     if (existing) {
@@ -231,21 +250,22 @@ export class BillingService {
   }
 
   async getLedger(partyId: string): Promise<BillingLedger[]> {
-    const party = await this.partyRepo.findOne({ where: { id: partyId } });
+    const party = await this.partyRepo.findOne({ where: this.tenantWhere({ id: partyId }) });
     if (!party) return [];
 
     // Get direct ledger entries (e.g. Opening Balance, paid PaymentVouchers)
-    const directEntries = await this.ledgerRepo.find({ where: { partyId }, order: { date: 'ASC', createdAt: 'ASC' } });
+    const directEntries = await this.ledgerRepo.find({ where: this.tenantWhere({ partyId }), order: { date: 'ASC', createdAt: 'ASC' } });
 
     const dynamicEntries: any[] = [];
 
     if (party.type === 'Farm') {
       // For a Farm (farmer), load their PurchaseOrders and PurchaseOrderPayments dynamically (case-insensitive)
-      const purchaseOrders = await this.purchaseRepo
+      const purchaseQuery = this.purchaseRepo
         .createQueryBuilder('po')
         .leftJoinAndSelect('po.payments', 'payments')
-        .where('TRIM(LOWER(po.supplierName)) = TRIM(LOWER(:name))', { name: party.name })
-        .getMany();
+        .where('TRIM(LOWER(po.supplierName)) = TRIM(LOWER(:name))', { name: party.name });
+      this.applyTenant(purchaseQuery, 'po');
+      const purchaseOrders = await purchaseQuery.getMany();
 
       for (const po of purchaseOrders) {
         // 1. Add Purchase Order as a CREDIT entry (what we owe them increases)
@@ -279,11 +299,12 @@ export class BillingService {
       }
     } else if (party.type === 'Retailer') {
       // For a Retailer, load their Sales and SalePayments dynamically (case-insensitive)
-      const sales = await this.mainSaleRepo
+      const saleQuery = this.mainSaleRepo
         .createQueryBuilder('sale')
         .leftJoinAndSelect('sale.payments', 'payments')
-        .where('TRIM(LOWER(sale.customerName)) = TRIM(LOWER(:name))', { name: party.name })
-        .getMany();
+        .where('TRIM(LOWER(sale.customerName)) = TRIM(LOWER(:name))', { name: party.name });
+      this.applyTenant(saleQuery, 'sale');
+      const sales = await saleQuery.getMany();
 
       for (const sale of sales) {
         // 1. Add Sale as a DEBIT entry (what they owe us increases)
@@ -317,11 +338,12 @@ export class BillingService {
       }
 
       // Also load Godown Sales for this Retailer
-      const godownSales = await this.godownSaleRepo
+      const godownQuery = this.godownSaleRepo
         .createQueryBuilder('gs')
         .leftJoinAndSelect('gs.payments', 'payments')
-        .where('TRIM(LOWER(gs.customerName)) = TRIM(LOWER(:name))', { name: party.name })
-        .getMany();
+        .where('TRIM(LOWER(gs.customerName)) = TRIM(LOWER(:name))', { name: party.name });
+      this.applyTenant(godownQuery, 'gs');
+      const godownSales = await godownQuery.getMany();
 
       for (const gs of godownSales) {
         dynamicEntries.push({
@@ -376,7 +398,7 @@ export class BillingService {
 
   // ── Ledger by Farmer ID ───────────────────────────────────────────────────
   async getLedgerByFarmerId(farmerId: string): Promise<BillingLedger[]> {
-    const farmer = await this.farmerRepo.findOne({ where: { id: farmerId } });
+    const farmer = await this.farmerRepo.findOne({ where: this.tenantWhere({ id: farmerId }) });
     if (!farmer) throw new NotFoundException(`Farmer ${farmerId} not found`);
     const party = await this.findOrCreatePartyByName(farmer.name, 'Farm', farmer.phone, farmer.address);
     return this.getLedger(party.id);
@@ -384,7 +406,7 @@ export class BillingService {
 
   // ── Ledger by Retailer ID ─────────────────────────────────────────────────
   async getLedgerByRetailerId(retailerId: string): Promise<BillingLedger[]> {
-    const retailer = await this.retailerRepo.findOne({ where: { id: retailerId } });
+    const retailer = await this.retailerRepo.findOne({ where: this.tenantWhere({ id: retailerId }) });
     if (!retailer) throw new NotFoundException(`Retailer ${retailerId} not found`);
     const party = await this.findOrCreatePartyByName(retailer.name, 'Retailer', retailer.phone, retailer.address);
     return this.getLedger(party.id);
@@ -393,17 +415,19 @@ export class BillingService {
   // Helper: Find or create billing party by name
   async findOrCreatePartyByName(name: string, type: PartyType = 'Retailer', phone?: string, address?: string): Promise<BillingParty> {
     // Try to find existing party by name (case-insensitive & trimmed)
-    const existing = await this.partyRepo
+    const partyQuery = this.partyRepo
       .createQueryBuilder('party')
-      .where('TRIM(LOWER(party.name)) = TRIM(LOWER(:name))', { name })
-      .getOne();
+      .where('TRIM(LOWER(party.name)) = TRIM(LOWER(:name))', { name });
+    this.applyTenant(partyQuery, 'party');
+    const existing = await partyQuery.getOne();
     
     if (existing) {
       // If the existing party has type 'Retailer' but they are actually a farmer, let's update their type to 'Farm'
-      const isFarmer = await this.farmerRepo
+      const farmerQuery = this.farmerRepo
         .createQueryBuilder('farmer')
-        .where('TRIM(LOWER(farmer.name)) = TRIM(LOWER(:name))', { name })
-        .getOne();
+        .where('TRIM(LOWER(farmer.name)) = TRIM(LOWER(:name))', { name });
+      this.applyTenant(farmerQuery, 'farmer');
+      const isFarmer = await farmerQuery.getOne();
       
       if (isFarmer && existing.type !== 'Farm') {
         existing.type = 'Farm';
@@ -412,10 +436,11 @@ export class BillingService {
       return existing;
     }
 
-    const isFarmer = await this.farmerRepo
+    const farmerQuery = this.farmerRepo
       .createQueryBuilder('farmer')
-      .where('TRIM(LOWER(farmer.name)) = TRIM(LOWER(:name))', { name })
-      .getOne();
+      .where('TRIM(LOWER(farmer.name)) = TRIM(LOWER(:name))', { name });
+    this.applyTenant(farmerQuery, 'farmer');
+    const isFarmer = await farmerQuery.getOne();
 
     const calculatedType: PartyType = isFarmer ? 'Farm' : type;
 
@@ -429,6 +454,7 @@ export class BillingService {
       currentBalance: 0,
       creditLimit: 0,
       paymentTerms: 30,
+      tenantId: this.getTenantId() ?? undefined,
     });
 
     return await this.partyRepo.save(party);
@@ -452,15 +478,15 @@ export class BillingService {
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   private async addLedgerEntry(partyId: string, type: LedgerReferenceType, refId: string, debit: number, credit: number, date: string) {
-    await this.ledgerRepo.save(this.ledgerRepo.create({ partyId, referenceType: type, referenceId: refId, debit, credit, balance: 0, date }));
+    await this.ledgerRepo.save(this.ledgerRepo.create({ partyId, referenceType: type, referenceId: refId, debit, credit, balance: 0, date, tenantId: this.getTenantId() ?? undefined }));
   }
 
   private async recalculatePartyBalance(partyId: string) {
-    const party = await this.partyRepo.findOne({ where: { id: partyId } });
+    const party = await this.partyRepo.findOne({ where: this.tenantWhere({ id: partyId }) });
     if (!party) return;
 
     if (party.type !== 'Farm') {
-      const ledgerEntries = await this.ledgerRepo.find({ where: { partyId }, order: { date: 'ASC', createdAt: 'ASC' } });
+      const ledgerEntries = await this.ledgerRepo.find({ where: this.tenantWhere({ partyId }), order: { date: 'ASC', createdAt: 'ASC' } });
 
       let balance = 0;
       for (const entry of ledgerEntries) {
@@ -481,9 +507,9 @@ export class BillingService {
   // ─── Summary ──────────────────────────────────────────────────────────────
 
   async getSummary() {
-    const parties = await this.partyRepo.find();
-    const payments = await this.paymentRepo.find({ where: { status: 'Completed' } as any });
-    const sales = await this.mainSaleRepo.find();
+    const parties = await this.partyRepo.find({ where: this.tenantWhere({}) });
+    const payments = await this.paymentRepo.find({ where: this.tenantWhere({ status: 'Completed' }) as any });
+    const sales = await this.mainSaleRepo.find({ where: this.tenantWhere({}) });
 
     return {
       totalParties: parties.length,
@@ -497,25 +523,28 @@ export class BillingService {
     try {
       const salesQuery = this.mainSaleRepo.createQueryBuilder('sale')
         .leftJoinAndSelect('sale.retailer', 'retailer');
+      this.applyTenant(salesQuery, 'sale');
 
       if (fromDate && toDate) {
-        salesQuery.where('sale.saleDate BETWEEN :fromDate AND :toDate', { fromDate, toDate });
+        salesQuery.andWhere('sale.saleDate BETWEEN :fromDate AND :toDate', { fromDate, toDate });
       }
       const sales = await salesQuery.getMany();
 
       const purchasesQuery = this.purchaseRepo.createQueryBuilder('po');
+      this.applyTenant(purchasesQuery, 'po');
       if (fromDate && toDate) {
-        purchasesQuery.where('po.orderDate BETWEEN :fromDate AND :toDate', { fromDate, toDate });
+        purchasesQuery.andWhere('po.orderDate BETWEEN :fromDate AND :toDate', { fromDate, toDate });
       }
       const purchases = await purchasesQuery.getMany();
 
       const expensesQuery = this.expenseRepo.createQueryBuilder('exp');
+      this.applyTenant(expensesQuery, 'exp');
       if (fromDate && toDate) {
-        expensesQuery.where('exp.expenseDate BETWEEN :fromDate AND :toDate', { fromDate, toDate });
+        expensesQuery.andWhere('exp.expenseDate BETWEEN :fromDate AND :toDate', { fromDate, toDate });
       }
       const expenses = await expensesQuery.getMany();
 
-      const inventory = await this.inventoryRepo.find();
+      const inventory = await this.inventoryRepo.find({ where: this.tenantWhere({}) });
 
       const totalRevenue = sales.reduce((sum, s) => sum + Number(s.netAmount || s.totalAmount || 0), 0);
 

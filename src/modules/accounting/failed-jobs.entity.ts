@@ -17,6 +17,9 @@ export class FailedAccountingJob {
   @Column({ name: 'status', type: 'varchar', length: 20, default: 'pending' })
   status!: 'pending' | 'failed' | 'completed';
 
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 

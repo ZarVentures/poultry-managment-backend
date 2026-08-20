@@ -6,8 +6,11 @@ export class ExpenseCategory {
   @PrimaryGeneratedColumn('increment', { type: 'bigint' })
   id!: string;
 
-  @Column({ type: 'varchar', length: 100, unique: true })
+  @Column({ type: 'varchar', length: 100 })
   name!: string;
+
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
 
   @Column({ type: 'text', nullable: true })
   description?: string;
