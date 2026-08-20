@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder, ObjectLiteral } from 'typeorm';
 import { GodownInwardEntry } from './godown-inward.entity';
 import { GodownSale } from './entities/godown-sale.entity';
 import { GodownSalePayment } from './entities/godown-sale-payment.entity';
@@ -8,6 +8,7 @@ import { GodownMortality } from './godown-mortality.entity';
 import { GodownExpense } from './godown-expense.entity';
 import { BirdReturn } from '../sales/entities/bird-return.entity';
 import { CagesService } from '../cages/cages.service';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class GodownService {
@@ -25,7 +26,23 @@ export class GodownService {
     @InjectRepository(BirdReturn)
     private birdReturnRepo: Repository<BirdReturn>,
     private readonly cagesService: CagesService,
+    private readonly tenantContext: TenantContextService,
   ) { }
+
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
+  private applyTenant<T extends ObjectLiteral>(query: SelectQueryBuilder<T>, alias: string): SelectQueryBuilder<T> {
+    const tenantId = this.getTenantId();
+    if (tenantId) query.andWhere(`${alias}.tenantId = :tenantId`, { tenantId });
+    return query;
+  }
 
   // ─── Inward Entries ───────────────────────────────────────────────────────
 
@@ -41,7 +58,7 @@ export class GodownService {
     // If godownInwardWeight is provided, it's the final stock weight
     if (godownInwardWeight) entryData.totalWeight = parseFloat(godownInwardWeight);
 
-    const entry = this.inwardRepo.create(entryData);
+    const entry = this.inwardRepo.create({ ...entryData, tenantId: this.getTenantId() ?? undefined });
     const savedResult = await this.inwardRepo.save(entry);
     const savedId: string = (savedResult as any).id ?? (savedResult as any)[0]?.id;
 
@@ -80,6 +97,8 @@ export class GodownService {
     const query = this.inwardRepo.createQueryBuilder('inward')
       .orderBy('inward.entryDate', 'DESC');
 
+    this.applyTenant(query, 'inward');
+
     if (search) {
       query.andWhere(
         '(inward.farmerName ILIKE :search OR inward.vehicleNumber ILIKE :search OR inward.farmHouseName ILIKE :search OR inward.inwardNo ILIKE :search)',
@@ -97,7 +116,7 @@ export class GodownService {
   }
 
   async findOneInward(id: string) {
-    const entry = await this.inwardRepo.findOne({ where: { id } });
+    const entry = await this.inwardRepo.findOne({ where: this.tenantWhere({ id }) });
     if (!entry) return null;
 
     const linkedCages = await this.cagesService.getByGodownInwardId(id);
@@ -163,12 +182,13 @@ export class GodownService {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const prefix = `GDI-${year}-${month}-`;
 
-    const lastInward = await this.inwardRepo
+    const qb = this.inwardRepo
       .createQueryBuilder('inward')
       .where('inward.inwardNo LIKE :prefix', { prefix: `${prefix}%` })
       .orderBy('inward.id', 'DESC')
-      .limit(1)
-      .getOne();
+      .limit(1);
+    this.applyTenant(qb, 'inward');
+    const lastInward = await qb.getOne();
 
     if (lastInward && lastInward.inwardNo) {
       const lastNumber = parseInt(lastInward.inwardNo.split('-').pop() || '0');
@@ -191,12 +211,13 @@ export class GodownService {
     const prefix = `GDS-${year}-${month}-`;
 
     // Find the last sale number with this prefix
-    const lastSale = await this.saleRepo
+    const qb = this.saleRepo
       .createQueryBuilder('sale')
       .where('sale.saleNo LIKE :prefix', { prefix: `${prefix}%` })
       .orderBy('sale.id', 'DESC')
-      .limit(1)
-      .getOne();
+      .limit(1);
+    this.applyTenant(qb, 'sale');
+    const lastSale = await qb.getOne();
 
     if (lastSale && lastSale.saleNo) {
       const lastNumber = parseInt(lastSale.saleNo.split('-').pop() || '0');
@@ -226,7 +247,7 @@ export class GodownService {
     const totalPaymentMade = (payments || []).reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
     saleData.amountReceived = totalPaymentMade;
 
-    const sale = this.saleRepo.create(saleData);
+    const sale = this.saleRepo.create({ ...saleData, tenantId: this.getTenantId() ?? undefined });
     const savedResult = await this.saleRepo.save(sale);
     const savedId: string = (savedResult as any).id ?? (savedResult as any)[0]?.id;
 
@@ -238,6 +259,7 @@ export class GodownService {
           godownSaleId: savedId,
           paymentMode: p.paymentMode,
           amount: parseFloat(p.amount),
+          tenantId: this.getTenantId() ?? undefined,
         }));
       if (validPayments.length > 0) {
         await this.salePaymentRepo.save(validPayments);
@@ -251,6 +273,8 @@ export class GodownService {
     const query = this.saleRepo.createQueryBuilder('sale')
       .leftJoinAndSelect('sale.payments', 'payments')
       .orderBy('sale.saleDate', 'DESC');
+
+    this.applyTenant(query, 'sale');
 
     if (search) {
       query.andWhere(
@@ -270,7 +294,7 @@ export class GodownService {
 
   async findOneSale(id: string) {
     return this.saleRepo.findOne({
-      where: { id },
+      where: this.tenantWhere({ id }),
       relations: ['payments']
     });
   }
@@ -291,6 +315,7 @@ export class GodownService {
           godownSaleId: id,
           paymentMode: p.paymentMode,
           amount: parseFloat(p.amount),
+          tenantId: this.getTenantId() ?? undefined,
         }));
 
       if (validPayments.length > 0) {
@@ -313,7 +338,7 @@ export class GodownService {
   // ─── Mortality ────────────────────────────────────────────────────────────
 
   async createMortality(data: Partial<GodownMortality>) {
-    const mortality = this.mortalityRepo.create(data);
+    const mortality = this.mortalityRepo.create({ ...data, tenantId: this.getTenantId() ?? undefined });
     return this.mortalityRepo.save(mortality);
   }
 
@@ -321,6 +346,8 @@ export class GodownService {
     const query = this.mortalityRepo.createQueryBuilder('mortality')
       .leftJoinAndSelect('mortality.godownInward', 'godownInward')
       .orderBy('mortality.mortalityDate', 'DESC');
+
+    this.applyTenant(query, 'mortality');
 
     if (search) {
       query.andWhere(
@@ -339,7 +366,7 @@ export class GodownService {
   }
 
   async findOneMortality(id: string) {
-    return this.mortalityRepo.findOne({ where: { id }, relations: ['godownInward'] });
+    return this.mortalityRepo.findOne({ where: this.tenantWhere({ id }), relations: ['godownInward'] });
   }
 
   async updateMortality(id: string, data: Partial<GodownMortality>) {
@@ -354,13 +381,15 @@ export class GodownService {
   // ─── Expenses ─────────────────────────────────────────────────────────────
 
   async createExpense(data: Partial<GodownExpense>) {
-    const expense = this.expenseRepo.create(data);
+    const expense = this.expenseRepo.create({ ...data, tenantId: this.getTenantId() ?? undefined });
     return this.expenseRepo.save(expense);
   }
 
   async findAllExpenses(page?: number, limit?: number, search?: string, startDate?: string, endDate?: string) {
     const query = this.expenseRepo.createQueryBuilder('expense')
       .orderBy('expense.expenseDate', 'DESC');
+
+    this.applyTenant(query, 'expense');
 
     if (search) {
       query.andWhere(
@@ -386,7 +415,7 @@ export class GodownService {
   }
 
   async findOneExpense(id: string) {
-    return this.expenseRepo.findOne({ where: { id } });
+    return this.expenseRepo.findOne({ where: this.tenantWhere({ id }) });
   }
 
   async updateExpense(id: string, data: Partial<GodownExpense>) {
@@ -401,31 +430,34 @@ export class GodownService {
   // ─── Summary ──────────────────────────────────────────────────────────────
 
   async getSummary() {
-    const inward = await this.inwardRepo
+    const inwardQuery = this.inwardRepo
       .createQueryBuilder('entry')
       .select([
         'SUM(entry.numberOfBirds) AS birds',
         'SUM(entry.totalWeight) AS weight',
         'SUM(entry.totalAmount) AS value',
-      ])
-      .getRawOne();
+      ]);
+    this.applyTenant(inwardQuery, 'entry');
+    const inward = await inwardQuery.getRawOne();
 
-    const sold = await this.saleRepo
+    const soldQuery = this.saleRepo
       .createQueryBuilder('sale')
       .select([
         'SUM(sale.numberOfBirds) AS birds',
         'SUM(sale.totalWeight) AS weight',
         'SUM(sale.totalAmount) AS value',
-      ])
-      .getRawOne();
+      ]);
+    this.applyTenant(soldQuery, 'sale');
+    const sold = await soldQuery.getRawOne();
 
-    const mortality = await this.mortalityRepo
+    const mortalityQuery = this.mortalityRepo
       .createQueryBuilder('mortality')
       .select([
         'SUM(mortality.numberOfBirdsDied) AS birds',
         'SUM(mortality.weightOfDeadBirds) AS weight',
-      ])
-      .getRawOne();
+      ]);
+    this.applyTenant(mortalityQuery, 'mortality');
+    const mortality = await mortalityQuery.getRawOne();
 
     const totalInwardBirds = parseFloat(inward.birds) || 0;
     const totalInwardWeight = parseFloat(inward.weight) || 0;
@@ -469,15 +501,20 @@ export class GodownService {
     const typeFilter = (filters?.type || 'all').toLowerCase();
     const search = (filters?.search || '').trim().toLowerCase();
 
+    const tenantId = this.getTenantId();
+    const where: any = {};
+    if (tenantId) where.tenantId = tenantId;
+
     const [inwards, sales, mortalities, birdReturns] = await Promise.all([
-      this.inwardRepo.find({ order: { entryDate: 'ASC', id: 'ASC' } }),
-      this.saleRepo.find({ order: { saleDate: 'ASC', id: 'ASC' } }),
+      this.inwardRepo.find({ where, order: { entryDate: 'ASC', id: 'ASC' } }),
+      this.saleRepo.find({ where, order: { saleDate: 'ASC', id: 'ASC' } }),
       this.mortalityRepo.find({
+        where,
         relations: ['godownInward'],
         order: { mortalityDate: 'ASC', id: 'ASC' },
       }),
       this.birdReturnRepo.find({
-        where: { status: 'processed' },
+        where: { ...where, status: 'processed' },
         order: { returnDate: 'ASC', id: 'ASC' },
       }),
     ]);

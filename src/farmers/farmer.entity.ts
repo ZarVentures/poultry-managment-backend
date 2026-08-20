@@ -29,6 +29,9 @@ export class Farmer {
   @Column({ name: 'opening_balance', type: 'numeric', precision: 14, scale: 2, default: 0 })
   openingBalance!: number;
 
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
+
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'NOW()' })
   createdAt!: Date;
 

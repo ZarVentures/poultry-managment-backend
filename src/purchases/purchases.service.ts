@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { PurchaseOrder } from './entities/purchase-order.entity';
 import { PurchaseOrderItem } from './entities/purchase-order-item.entity';
 import { PurchaseOrderPayment } from './entities/purchase-order-payment.entity';
@@ -8,6 +8,7 @@ import { CagesService } from '../cages/cages.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 import { AccountingService } from '../modules/accounting/accounting.service';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class PurchasesService {
@@ -20,7 +21,23 @@ export class PurchasesService {
     private readonly purchaseOrderPaymentRepository: Repository<PurchaseOrderPayment>,
     private readonly cagesService: CagesService,
     private readonly accountingService: AccountingService,
+    private readonly tenantContext: TenantContextService,
   ) { }
+
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
+  private applyTenant(query: SelectQueryBuilder<PurchaseOrder>): SelectQueryBuilder<PurchaseOrder> {
+    const tenantId = this.getTenantId();
+    if (tenantId) query.andWhere('po.tenantId = :tenantId', { tenantId });
+    return query;
+  }
 
   private calcAmounts(dto: { totalWeight?: string; ratePerKg?: string; transportCharges?: string; otherCharges?: string }) {
     const totalWeight = parseFloat(dto.totalWeight || '0');
@@ -40,12 +57,13 @@ export class PurchasesService {
     const prefix = `PO-${year}-${month}-`;
 
     // Find the last order number with this prefix
-    const lastOrder = await this.purchaseOrderRepository
+    const qb = this.purchaseOrderRepository
       .createQueryBuilder('po')
       .where('po.orderNumber LIKE :prefix', { prefix: `${prefix}%` })
       .orderBy('po.id', 'DESC')
-      .limit(1)
-      .getOne();
+      .limit(1);
+    this.applyTenant(qb);
+    const lastOrder = await qb.getOne();
 
     if (lastOrder && lastOrder.orderNumber) {
       const lastNumber = parseInt(lastOrder.orderNumber.split('-').pop() || '0');
@@ -63,7 +81,7 @@ export class PurchasesService {
     // Auto-generate order number if not provided
     const orderNumber = dto.orderNumber || await this.generateOrderNumber();
 
-    const existing = await this.purchaseOrderRepository.findOne({ where: { orderNumber } });
+    const existing = await this.purchaseOrderRepository.findOne({ where: this.tenantWhere({ orderNumber }) });
     if (existing) throw new BadRequestException(`Purchase order ${orderNumber} already exists`);
 
     let totalWeight = 0;
@@ -94,6 +112,7 @@ export class PurchasesService {
       balanceAmount,
       notes: dto.notes,
       invoiceAttachment: dto.invoiceAttachment,
+      tenantId: this.getTenantId() ?? undefined,
     });
 
     const saved = await this.purchaseOrderRepository.save(order);
@@ -108,6 +127,7 @@ export class PurchasesService {
           unitCost: parseFloat(item.unitCost),
           lineTotal: parseFloat(item.quantity) * parseFloat(item.unitCost),
           purchaseOrderId: savedId,
+          tenantId: this.getTenantId() ?? undefined,
         })
       );
       await this.purchaseOrderItemRepository.save(items);
@@ -128,6 +148,7 @@ export class PurchasesService {
           amount: parseFloat(p.amount),
           isAdvance: p.isAdvance ?? false,
           purchaseOrderId: savedId,
+          tenantId: this.getTenantId() ?? undefined,
         })
       );
       await this.purchaseOrderPaymentRepository.save(payments);
@@ -154,6 +175,8 @@ export class PurchasesService {
       .leftJoinAndSelect('po.cages', 'cages')
       .orderBy('po.orderDate', 'DESC');
 
+    this.applyTenant(query);
+
     if (startDate && endDate) query.andWhere('po.orderDate BETWEEN :startDate AND :endDate', { startDate, endDate });
     if (supplier) query.andWhere('po.supplierName ILIKE :supplier', { supplier: `%${supplier}%` });
     if (status) {
@@ -177,6 +200,7 @@ export class PurchasesService {
           'SUM(po.balanceAmount) as "totalBalance"',
           'COUNT(po.id) as count'
         ]);
+      this.applyTenant(summaryQuery);
 
       if (startDate && endDate) summaryQuery.andWhere('po.orderDate BETWEEN :startDate AND :endDate', { startDate, endDate });
       if (supplier) summaryQuery.andWhere('po.supplierName ILIKE :supplier', { supplier: `%${supplier}%` });
@@ -210,7 +234,7 @@ export class PurchasesService {
 
   async findOne(id: string): Promise<PurchaseOrder> {
     const order = await this.purchaseOrderRepository.findOne({
-      where: { id },
+      where: this.tenantWhere({ id }),
       relations: ['items', 'payments', 'cages'],
     });
     if (!order) throw new NotFoundException(`Purchase order ${id} not found`);
@@ -221,7 +245,7 @@ export class PurchasesService {
     const order = await this.findOne(id);
 
     if (dto.orderNumber && dto.orderNumber !== order.orderNumber) {
-      const existing = await this.purchaseOrderRepository.findOne({ where: { orderNumber: dto.orderNumber } });
+      const existing = await this.purchaseOrderRepository.findOne({ where: this.tenantWhere({ orderNumber: dto.orderNumber }) });
       if (existing) throw new BadRequestException(`Purchase order ${dto.orderNumber} already exists`);
     }
 
@@ -245,6 +269,7 @@ export class PurchasesService {
             unit: item.unit, unitCost: parseFloat(item.unitCost),
             lineTotal: parseFloat(item.quantity) * parseFloat(item.unitCost),
             purchaseOrderId: id,
+            tenantId: this.getTenantId() ?? undefined,
           })
         );
         await this.purchaseOrderItemRepository.save(items);
@@ -255,7 +280,7 @@ export class PurchasesService {
       await this.purchaseOrderPaymentRepository.delete({ purchaseOrderId: id });
       if (dto.payments.length > 0) {
         const payments = dto.payments.map(p =>
-          this.purchaseOrderPaymentRepository.create({ paymentMode: p.paymentMode as any, amount: parseFloat(p.amount), isAdvance: p.isAdvance ?? false, purchaseOrderId: id })
+          this.purchaseOrderPaymentRepository.create({ paymentMode: p.paymentMode as any, amount: parseFloat(p.amount), isAdvance: p.isAdvance ?? false, purchaseOrderId: id, tenantId: this.getTenantId() ?? undefined })
         );
         await this.purchaseOrderPaymentRepository.save(payments);
       }
@@ -348,11 +373,12 @@ export class PurchasesService {
   }
 
   async getInvoiceList(): Promise<Array<{ id: string; orderNumber: string; orderDate: string; supplierName: string }>> {
-    const orders = await this.purchaseOrderRepository
+    const qb = this.purchaseOrderRepository
       .createQueryBuilder('po')
       .select(['po.id', 'po.orderNumber', 'po.orderDate', 'po.supplierName'])
-      .orderBy('po.orderDate', 'DESC')
-      .getMany();
+      .orderBy('po.orderDate', 'DESC');
+    this.applyTenant(qb);
+    const orders = await qb.getMany();
     return orders.map(o => ({ id: o.id, orderNumber: o.orderNumber, orderDate: o.orderDate, supplierName: o.supplierName }));
   }
 

@@ -8,6 +8,7 @@ export interface JwtPayload {
   sub: string;
   email: string;
   role: string;
+  tenantId?: string | null;
   sessionToken: string;
 }
 
@@ -35,6 +36,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       userId: user.id,
       email: user.email,
       role: user.role,
+      tenantId: user.tenantId ?? null,
     };
   }
 }

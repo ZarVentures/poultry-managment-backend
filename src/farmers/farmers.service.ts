@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Farmer } from './farmer.entity';
 import { CreateFarmerDto } from './dto/create-farmer.dto';
 import { UpdateFarmerDto } from './dto/update-farmer.dto';
 import { BillingService } from '../billing/billing.service';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class FarmersService {
@@ -12,10 +13,29 @@ export class FarmersService {
     @InjectRepository(Farmer)
     private readonly farmerRepository: Repository<Farmer>,
     private readonly billingService: BillingService,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
+  private applyTenant(query: SelectQueryBuilder<Farmer>): SelectQueryBuilder<Farmer> {
+    const tenantId = this.getTenantId();
+    if (tenantId) query.andWhere('farmer.tenantId = :tenantId', { tenantId });
+    return query;
+  }
+
   async create(createFarmerDto: CreateFarmerDto): Promise<Farmer> {
-    const farmer = this.farmerRepository.create(createFarmerDto);
+    const farmer = this.farmerRepository.create({
+      ...createFarmerDto,
+      tenantId: this.getTenantId() ?? undefined,
+    });
     const saved = await this.farmerRepository.save(farmer);
 
     if (createFarmerDto.openingBalance && Number(createFarmerDto.openingBalance) !== 0) {
@@ -34,9 +54,11 @@ export class FarmersService {
   async findAll(page: number = 1, limit: number = 100, search?: string, status?: string) {
     const query = this.farmerRepository.createQueryBuilder('farmer');
 
+    this.applyTenant(query);
+
     // Search filter
     if (search) {
-      query.where(
+      query.andWhere(
         '(farmer.name ILIKE :search OR farmer.phone ILIKE :search OR farmer.email ILIKE :search OR farmer.address ILIKE :search)',
         { search: `%${search}%` }
       );
@@ -67,13 +89,13 @@ export class FarmersService {
 
   async findActive(): Promise<Farmer[]> {
     return this.farmerRepository.find({
-      where: { status: 'active' },
+      where: this.tenantWhere({ status: 'active' }),
       order: { name: 'ASC' },
     });
   }
 
   async findOne(id: string): Promise<Farmer> {
-    const farmer = await this.farmerRepository.findOne({ where: { id } });
+    const farmer = await this.farmerRepository.findOne({ where: this.tenantWhere({ id }) });
     if (!farmer) {
       throw new NotFoundException(`Farmer with ID ${id} not found`);
     }

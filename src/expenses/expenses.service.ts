@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Expense } from './expense.entity';
 import { ExpenseCategory } from '../expense-categories/expense-category.entity';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
 import { AccountingService } from '../modules/accounting/accounting.service';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class ExpensesService {
@@ -15,12 +16,29 @@ export class ExpensesService {
     @InjectRepository(ExpenseCategory)
     private readonly categoryRepository: Repository<ExpenseCategory>,
     private readonly accountingService: AccountingService,
+    private readonly tenantContext: TenantContextService,
   ) { }
+
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
+  private applyTenant(query: SelectQueryBuilder<Expense>): SelectQueryBuilder<Expense> {
+    const tenantId = this.getTenantId();
+    if (tenantId) query.andWhere('expense.tenantId = :tenantId', { tenantId });
+    return query;
+  }
 
   async create(createExpenseDto: CreateExpenseDto): Promise<Expense> {
     const expense = this.expenseRepository.create({
       ...createExpenseDto,
       amount: parseFloat(createExpenseDto.amount),
+      tenantId: this.getTenantId() ?? undefined,
     });
     // If a categoryId was provided, resolve and attach the category entity
     if (createExpenseDto.categoryId) {
@@ -51,6 +69,8 @@ export class ExpensesService {
       .leftJoinAndSelect('expense.expenseCategory', 'expenseCategory')
       .orderBy('expense.expenseDate', 'DESC');
 
+    this.applyTenant(query);
+
     if (startDate && endDate) {
       query.andWhere('expense.expenseDate BETWEEN :startDate AND :endDate', {
         startDate,
@@ -71,7 +91,7 @@ export class ExpensesService {
 
   async findOne(id: string): Promise<Expense> {
     const expense = await this.expenseRepository.findOne({
-      where: { id },
+      where: this.tenantWhere({ id }),
       relations: ['expenseCategory']
     });
     if (!expense) {
@@ -123,6 +143,8 @@ export class ExpensesService {
       .addSelect('SUM(expense.amount)', 'total')
       .groupBy('COALESCE(cat.name, expense.category)');
 
+    this.applyTenant(query);
+
     if (startDate && endDate) {
       query.andWhere('expense.expenseDate BETWEEN :startDate AND :endDate', {
         startDate,
@@ -136,6 +158,8 @@ export class ExpensesService {
   async getTotalExpenses(startDate?: string, endDate?: string): Promise<number> {
     const query = this.expenseRepository.createQueryBuilder('expense')
       .select('SUM(expense.amount)', 'total');
+
+    this.applyTenant(query);
 
     if (startDate && endDate) {
       query.andWhere('expense.expenseDate BETWEEN :startDate AND :endDate', {

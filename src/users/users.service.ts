@@ -5,16 +5,27 @@ import * as bcrypt from 'bcrypt';
 import { User } from './user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
   async findAll(): Promise<User[]> {
-    return this.usersRepository.find({ order: { name: 'ASC' } });
+    return this.usersRepository.find({ where: this.tenantWhere({}), order: { name: 'ASC' } });
   }
 
   async findOne(id: string): Promise<User> {
@@ -27,6 +38,33 @@ export class UsersService {
 
   async findByEmail(email: string): Promise<User | null> {
     return this.usersRepository.findOne({ where: { email } });
+  }
+
+  async findByPhone(phone: string): Promise<User | null> {
+    return this.usersRepository.findOne({ where: { phone } });
+  }
+
+  async findByIdentifier(identifier: string): Promise<User | null> {
+    return this.usersRepository.findOne({
+      where: [
+        { email: identifier.toLowerCase() },
+        { phone: identifier }
+      ]
+    });
+  }
+
+  async createPhoneUser(data: { name: string; phone: string }): Promise<User> {
+    const existing = await this.findByPhone(data.phone);
+    if (existing) {
+      throw new ConflictException(`User with phone ${data.phone} already exists`);
+    }
+    const user = this.usersRepository.create({
+      name: data.name,
+      phone: data.phone,
+      role: 'admin',
+      status: 'active',
+    });
+    return this.usersRepository.save(user);
   }
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -42,7 +80,7 @@ export class UsersService {
       name: dto.name,
       email: dto.email.toLowerCase(),
       passwordHash,
-      role: dto.role ?? 'manager',
+      role: dto.role ?? 'admin',
       status: dto.status ?? 'active',
     });
 
@@ -106,6 +144,7 @@ export class UsersService {
     managerUsers: number;
     staffUsers: number;
   }> {
+    const where = this.tenantWhere({});
     const [
       totalUsers,
       activeUsers,
@@ -114,12 +153,12 @@ export class UsersService {
       managerUsers,
       staffUsers,
     ] = await Promise.all([
-      this.usersRepository.count(),
-      this.usersRepository.count({ where: { status: 'active' } }),
-      this.usersRepository.count({ where: { status: 'inactive' } }),
-      this.usersRepository.count({ where: { role: 'admin' } }),
-      this.usersRepository.count({ where: { role: 'manager' } }),
-      this.usersRepository.count({ where: { role: 'staff' } }),
+      this.usersRepository.count({ where }),
+      this.usersRepository.count({ where: { ...where, status: 'active' } }),
+      this.usersRepository.count({ where: { ...where, status: 'inactive' } }),
+      this.usersRepository.count({ where: { ...where, role: 'admin' } }),
+      this.usersRepository.count({ where: { ...where, role: 'manager' } }),
+      this.usersRepository.count({ where: { ...where, role: 'staff' } }),
     ]);
 
     return {
@@ -130,6 +169,11 @@ export class UsersService {
       managerUsers,
       staffUsers,
     };
+  }
+
+  async updateTenantId(id: string, tenantId: string): Promise<User> {
+    await this.usersRepository.update(id, { tenantId });
+    return this.findOne(id);
   }
 
   async updateLastLogin(id: string): Promise<void> {

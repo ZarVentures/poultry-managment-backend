@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Mortality } from './mortality.entity';
 import { CreateMortalityDto } from './dto/create-mortality.dto';
 import { UpdateMortalityDto } from './dto/update-mortality.dto';
 import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { GodownMortality } from '../godown/godown-mortality.entity';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class MortalityService {
@@ -16,7 +17,29 @@ export class MortalityService {
     private purchaseOrderRepository: Repository<PurchaseOrder>,
     @InjectRepository(GodownMortality)
     private godownMortalityRepository: Repository<GodownMortality>,
+    private readonly tenantContext: TenantContextService,
   ) {}
+
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
+  private applyTenantMortality(query: SelectQueryBuilder<Mortality>): SelectQueryBuilder<Mortality> {
+    const tenantId = this.getTenantId();
+    if (tenantId) query.andWhere('mortality.tenantId = :tenantId', { tenantId });
+    return query;
+  }
+
+  private applyTenantGodown(query: SelectQueryBuilder<GodownMortality>): SelectQueryBuilder<GodownMortality> {
+    const tenantId = this.getTenantId();
+    if (tenantId) query.andWhere('gm.tenantId = :tenantId', { tenantId });
+    return query;
+  }
 
   async create(createMortalityDto: CreateMortalityDto): Promise<Mortality> {
     // Generate record number
@@ -27,7 +50,7 @@ export class MortalityService {
     // Find purchase order by invoice number (optional)
     const purchaseOrder = invoiceNo && invoiceNo !== 'N/A'
       ? await this.purchaseOrderRepository.findOne({
-          where: { orderNumber: invoiceNo },
+          where: this.tenantWhere({ orderNumber: invoiceNo }),
           relations: ['cages'],
         })
       : null;
@@ -50,13 +73,18 @@ export class MortalityService {
       recordNumber,
       purchaseOrderId: purchaseOrder?.id,
       amount,
+      tenantId: this.getTenantId() ?? undefined,
     });
 
     return this.mortalityRepository.save(mortality);
   }
 
   async findAll(): Promise<Mortality[]> {
+    const where: any = {};
+    const tenantId = this.getTenantId();
+    if (tenantId) where.tenantId = tenantId;
     return this.mortalityRepository.find({
+      where,
       relations: ['purchaseOrder'],
       order: { createdAt: 'DESC' },
     });
@@ -64,7 +92,7 @@ export class MortalityService {
 
   async findOne(id: string): Promise<Mortality> {
     const mortality = await this.mortalityRepository.findOne({
-      where: { id },
+      where: this.tenantWhere({ id }),
       relations: ['purchaseOrder'],
     });
 
@@ -82,7 +110,7 @@ export class MortalityService {
     if (updateMortalityDto.purchaseInvoiceNo && 
         updateMortalityDto.purchaseInvoiceNo !== mortality.purchaseInvoiceNo) {
       const purchaseOrder = await this.purchaseOrderRepository.findOne({
-        where: { orderNumber: updateMortalityDto.purchaseInvoiceNo },
+        where: this.tenantWhere({ orderNumber: updateMortalityDto.purchaseInvoiceNo }),
       });
       mortality.purchaseOrderId = purchaseOrder?.id;
     }
@@ -107,6 +135,8 @@ export class MortalityService {
 
   async getStats(startDate?: string, endDate?: string) {
     const query = this.mortalityRepository.createQueryBuilder('mortality');
+
+    this.applyTenantMortality(query);
 
     // Filter by purchaseDate (same field used on mortality page date filter)
     if (startDate) {
@@ -133,6 +163,7 @@ export class MortalityService {
 
     // Include godown mortality so dashboard bird count matches all mortality records
     const godownQuery = this.godownMortalityRepository.createQueryBuilder('gm');
+    this.applyTenantGodown(godownQuery);
     if (startDate) {
       godownQuery.andWhere('gm.mortalityDate >= :startDate', { startDate });
     }

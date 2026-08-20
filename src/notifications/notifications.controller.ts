@@ -1,8 +1,10 @@
-import { Controller, Post, Get, Query, Body, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Query, Body, HttpException, HttpStatus, UseGuards } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { CommunicationLog } from './communication-log.entity';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('notifications')
+@UseGuards(JwtAuthGuard)
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 

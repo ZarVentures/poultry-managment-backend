@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
 import { CommunicationLog } from './communication-log.entity';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class NotificationsService {
@@ -16,6 +17,7 @@ export class NotificationsService {
     private readonly configService: ConfigService,
     @InjectRepository(CommunicationLog)
     private readonly logRepository: Repository<CommunicationLog>,
+    private readonly tenantContext: TenantContextService,
   ) {
     const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
     const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
@@ -116,6 +118,7 @@ export class NotificationsService {
         contentPreview,
         status,
         errorMessage,
+        tenantId: this.tenantContext.getTenantId() ?? undefined,
       });
       await this.logRepository.save(log);
     } catch (err) {
@@ -124,15 +127,22 @@ export class NotificationsService {
   }
 
   async getLogs(limit: number = 50): Promise<CommunicationLog[]> {
+    const tenantId = this.tenantContext.getTenantId();
+    const where: any = {};
+    if (tenantId) where.tenantId = tenantId;
     return this.logRepository.find({
+      where,
       order: { sentAt: 'DESC' },
       take: limit,
     });
   }
 
   async getCounts(): Promise<{ emailCount: number; smsCount: number }> {
-    const emailCount = await this.logRepository.count({ where: { channel: 'email', status: 'sent' } });
-    const smsCount = await this.logRepository.count({ where: { channel: 'sms', status: 'sent' } });
+    const tenantId = this.tenantContext.getTenantId();
+    const where: any = {};
+    if (tenantId) where.tenantId = tenantId;
+    const emailCount = await this.logRepository.count({ where: { channel: 'email', status: 'sent', ...where } });
+    const smsCount = await this.logRepository.count({ where: { channel: 'sms', status: 'sent', ...where } });
     return { emailCount, smsCount };
   }
 }

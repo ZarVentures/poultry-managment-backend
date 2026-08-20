@@ -7,6 +7,7 @@ import { CreateBirdReturnDto } from './dto/create-bird-return.dto';
 import { UpdateBirdReturnDto } from './dto/update-bird-return.dto';
 import { BillingService } from '../billing/billing.service';
 import { GodownMortality } from '../godown/godown-mortality.entity';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class BirdReturnsService {
@@ -18,7 +19,25 @@ export class BirdReturnsService {
     @InjectRepository(GodownMortality)
     private readonly godownMortalityRepository: Repository<GodownMortality>,
     private readonly billingService: BillingService,
+    private readonly tenantContext: TenantContextService,
   ) {}
+
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
+  private applyTenant(query: any, alias: string): any {
+    const tenantId = this.getTenantId();
+    if (tenantId) {
+      query.andWhere(`${alias}.tenantId = :tenantId`, { tenantId });
+    }
+    return query;
+  }
 
   private async generateReturnNumber(): Promise<string> {
     const today = new Date();
@@ -26,12 +45,15 @@ export class BirdReturnsService {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const prefix = `RET-${year}-${month}-`;
 
-    const lastReturn = await this.birdReturnRepository
+    const query = this.birdReturnRepository
       .createQueryBuilder('return')
       .where('return.returnNumber LIKE :prefix', { prefix: `${prefix}%` })
       .orderBy('return.id', 'DESC')
-      .limit(1)
-      .getOne();
+      .limit(1);
+
+    this.applyTenant(query, 'return');
+
+    const lastReturn = await query.getOne();
 
     if (lastReturn && lastReturn.returnNumber) {
       const lastNumber = parseInt(lastReturn.returnNumber.split('-').pop() || '0');
@@ -42,9 +64,9 @@ export class BirdReturnsService {
   }
 
   async create(dto: CreateBirdReturnDto, createdBy?: string): Promise<BirdReturn> {
-    // Verify sale exists
+    // Verify sale exists (scoped to tenant)
     const sale = await this.godownSaleRepository.findOne({ 
-      where: { id: dto.saleId }
+      where: this.tenantWhere({ id: dto.saleId })
     });
     if (!sale) {
       throw new NotFoundException(`Sale ${dto.saleId} not found`);
@@ -78,6 +100,7 @@ export class BirdReturnsService {
       returnedToInventory: dto.returnedToInventory || false,
       inventoryLocation: dto.inventoryLocation,
       notes: dto.notes,
+      tenantId: this.getTenantId() ?? undefined,
     });
 
     const saved = await this.birdReturnRepository.save(birdReturn);
@@ -104,6 +127,8 @@ export class BirdReturnsService {
       .leftJoinAndSelect('return.sale', 'sale')
       .leftJoinAndSelect('return.retailer', 'retailer')
       .orderBy('return.returnDate', 'DESC');
+
+    this.applyTenant(query, 'return');
 
     if (startDate && endDate) {
       query.andWhere('return.returnDate BETWEEN :startDate AND :endDate', { startDate, endDate });
@@ -136,7 +161,7 @@ export class BirdReturnsService {
 
   async findOne(id: string): Promise<BirdReturn> {
     const birdReturn = await this.birdReturnRepository.findOne({
-      where: { id },
+      where: this.tenantWhere({ id }),
       relations: ['sale', 'retailer'],
     });
     if (!birdReturn) {
@@ -147,19 +172,22 @@ export class BirdReturnsService {
 
   async findBySaleId(saleId: string): Promise<BirdReturn[]> {
     return this.birdReturnRepository.find({
-      where: { saleId },
+      where: this.tenantWhere({ saleId }),
       relations: ['sale', 'retailer'],
       order: { returnDate: 'DESC' },
     });
   }
 
   async getTotalBirdsReturnedForSale(saleId: string): Promise<number> {
-    const result = await this.birdReturnRepository
+    const query = this.birdReturnRepository
       .createQueryBuilder('return')
       .select('SUM(return.numberOfBirdsReturned)', 'total')
       .where('return.saleId = :saleId', { saleId })
-      .andWhere('return.status != :rejected', { rejected: 'rejected' })
-      .getRawOne();
+      .andWhere('return.status != :rejected', { rejected: 'rejected' });
+
+    this.applyTenant(query, 'return');
+
+    const result = await query.getRawOne();
 
     return parseInt(result?.total || '0');
   }
@@ -178,7 +206,7 @@ export class BirdReturnsService {
       const currentReturnBirds = birdReturn.numberOfBirdsReturned;
       const newTotal = totalReturned - currentReturnBirds + dto.numberOfBirdsReturned;
 
-      const sale = await this.godownSaleRepository.findOne({ where: { id: birdReturn.saleId } });
+      const sale = await this.godownSaleRepository.findOne({ where: this.tenantWhere({ id: birdReturn.saleId }) });
       const saleQuantity = Number(sale?.numberOfBirds || 0);
 
       if (newTotal > saleQuantity) {
@@ -249,7 +277,7 @@ export class BirdReturnsService {
     }
 
     // Update sale record - reduce quantity and adjust amounts
-    const sale = await this.godownSaleRepository.findOne({ where: { id: birdReturn.saleId } });
+    const sale = await this.godownSaleRepository.findOne({ where: this.tenantWhere({ id: birdReturn.saleId }) });
     if (sale) {
       // Reduce bird count
       if (sale.numberOfBirds) {
@@ -305,6 +333,7 @@ export class BirdReturnsService {
           weightOfDeadBirds: birdReturn.weightReturned,
           reason: `Dead on Return (Ref: ${birdReturn.returnNumber})`,
           notes: `Automatically created from processed Bird Return ${birdReturn.returnNumber}. Details: ${birdReturn.reasonDescription || 'None'}`,
+          tenantId: this.getTenantId() ?? undefined,
         });
         await this.godownMortalityRepository.save(godownMortality);
       } catch (error) {
@@ -334,8 +363,10 @@ export class BirdReturnsService {
   async getReturnStats(startDate?: string, endDate?: string): Promise<any> {
     const query = this.birdReturnRepository.createQueryBuilder('return');
 
+    this.applyTenant(query, 'return');
+
     if (startDate && endDate) {
-      query.where('return.returnDate BETWEEN :startDate AND :endDate', { startDate, endDate });
+      query.andWhere('return.returnDate BETWEEN :startDate AND :endDate', { startDate, endDate });
     }
 
     const returns = await query.getMany();

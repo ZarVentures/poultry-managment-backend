@@ -95,6 +95,9 @@ export class VehicleBirdReturn {
   @Column({ name: 'attachment_url', type: 'text', nullable: true })
   attachmentUrl?: string;
 
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
+
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'NOW()' })
   createdAt!: Date;
 

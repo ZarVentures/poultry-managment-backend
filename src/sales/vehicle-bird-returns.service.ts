@@ -10,6 +10,7 @@ import { GodownInwardEntry } from '../godown/godown-inward.entity';
 import { GodownMortality } from '../godown/godown-mortality.entity';
 import { Mortality } from '../mortality/mortality.entity';
 import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class VehicleBirdReturnsService {
@@ -27,7 +28,25 @@ export class VehicleBirdReturnsService {
     @InjectRepository(PurchaseOrder)
     private readonly purchaseOrderRepository: Repository<PurchaseOrder>,
     private readonly billingService: BillingService,
+    private readonly tenantContext: TenantContextService,
   ) {}
+
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
+  private applyTenant(query: any, alias: string): any {
+    const tenantId = this.getTenantId();
+    if (tenantId) {
+      query.andWhere(`${alias}.tenantId = :tenantId`, { tenantId });
+    }
+    return query;
+  }
 
   private async generateReturnNumber(): Promise<string> {
     const today = new Date();
@@ -35,12 +54,15 @@ export class VehicleBirdReturnsService {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const prefix = `VRET-${year}-${month}-`;
 
-    const lastReturn = await this.vehicleBirdReturnRepository
+    const query = this.vehicleBirdReturnRepository
       .createQueryBuilder('return')
       .where('return.returnNumber LIKE :prefix', { prefix: `${prefix}%` })
       .orderBy('return.id', 'DESC')
-      .limit(1)
-      .getOne();
+      .limit(1);
+
+    this.applyTenant(query, 'return');
+
+    const lastReturn = await query.getOne();
 
     if (lastReturn && lastReturn.returnNumber) {
       const lastNumber = parseInt(lastReturn.returnNumber.split('-').pop() || '0');
@@ -51,9 +73,9 @@ export class VehicleBirdReturnsService {
   }
 
   async create(dto: CreateVehicleBirdReturnDto, createdBy?: string): Promise<VehicleBirdReturn> {
-    // Verify sale exists
+    // Verify sale exists (scoped to tenant)
     const sale = await this.saleRepository.findOne({ 
-      where: { id: dto.saleId }
+      where: this.tenantWhere({ id: dto.saleId })
     });
     if (!sale) {
       throw new NotFoundException(`Sale ${dto.saleId} not found`);
@@ -87,6 +109,7 @@ export class VehicleBirdReturnsService {
       returnedToInventory: dto.returnedToInventory || false,
       inventoryLocation: dto.inventoryLocation,
       notes: dto.notes,
+      tenantId: this.getTenantId() ?? undefined,
     });
 
     const saved = await this.vehicleBirdReturnRepository.save(birdReturn);
@@ -113,6 +136,8 @@ export class VehicleBirdReturnsService {
       .leftJoinAndSelect('return.sale', 'sale')
       .leftJoinAndSelect('return.retailer', 'retailer')
       .orderBy('return.returnDate', 'DESC');
+
+    this.applyTenant(query, 'return');
 
     if (startDate && endDate) {
       query.andWhere('return.returnDate BETWEEN :startDate AND :endDate', { startDate, endDate });
@@ -145,7 +170,7 @@ export class VehicleBirdReturnsService {
 
   async findOne(id: string): Promise<VehicleBirdReturn> {
     const birdReturn = await this.vehicleBirdReturnRepository.findOne({
-      where: { id },
+      where: this.tenantWhere({ id }),
       relations: ['sale', 'retailer'],
     });
     if (!birdReturn) {
@@ -156,19 +181,22 @@ export class VehicleBirdReturnsService {
 
   async findBySaleId(saleId: string): Promise<VehicleBirdReturn[]> {
     return this.vehicleBirdReturnRepository.find({
-      where: { saleId },
+      where: this.tenantWhere({ saleId }),
       relations: ['sale', 'retailer'],
       order: { returnDate: 'DESC' },
     });
   }
 
   async getTotalBirdsReturnedForSale(saleId: string): Promise<number> {
-    const result = await this.vehicleBirdReturnRepository
+    const query = this.vehicleBirdReturnRepository
       .createQueryBuilder('return')
       .select('SUM(return.numberOfBirdsReturned)', 'total')
       .where('return.saleId = :saleId', { saleId })
-      .andWhere('return.status != :rejected', { rejected: 'rejected' })
-      .getRawOne();
+      .andWhere('return.status != :rejected', { rejected: 'rejected' });
+
+    this.applyTenant(query, 'return');
+
+    const result = await query.getRawOne();
 
     return parseInt(result?.total || '0');
   }
@@ -187,7 +215,7 @@ export class VehicleBirdReturnsService {
       const currentReturnBirds = birdReturn.numberOfBirdsReturned;
       const newTotal = totalReturned - currentReturnBirds + dto.numberOfBirdsReturned;
 
-      const sale = await this.saleRepository.findOne({ where: { id: birdReturn.saleId } });
+      const sale = await this.saleRepository.findOne({ where: this.tenantWhere({ id: birdReturn.saleId }) });
       const saleQuantity = Number(sale?.numberOfBirds || 0);
 
       if (newTotal > saleQuantity) {
@@ -258,7 +286,7 @@ export class VehicleBirdReturnsService {
     }
 
     // Update sale record - reduce quantity and adjust amounts
-    const sale = await this.saleRepository.findOne({ where: { id: birdReturn.saleId } });
+    const sale = await this.saleRepository.findOne({ where: this.tenantWhere({ id: birdReturn.saleId }) });
     if (sale) {
       // Reduce bird count
       if (sale.numberOfBirds) {
@@ -319,12 +347,15 @@ export class VehicleBirdReturnsService {
           const month = String(today.getMonth() + 1).padStart(2, '0');
           const prefix = `GDI-${year}-${month}-`;
 
-          const lastInward = await this.godownInwardRepository
+          const inwardQuery = this.godownInwardRepository
             .createQueryBuilder('inward')
             .where('inward.inwardNo LIKE :prefix', { prefix: `${prefix}%` })
             .orderBy('inward.id', 'DESC')
-            .limit(1)
-            .getOne();
+            .limit(1);
+
+          this.applyTenant(inwardQuery, 'inward');
+
+          const lastInward = await inwardQuery.getOne();
 
           let inwardNo = `${prefix}0001`;
           if (lastInward && lastInward.inwardNo) {
@@ -345,6 +376,7 @@ export class VehicleBirdReturnsService {
             weightLoss: 0,
             totalAmount: 0,
             ratePerKg: 0,
+            tenantId: this.getTenantId() ?? undefined,
           });
 
           await this.godownInwardRepository.save(inwardEntry);
@@ -363,12 +395,15 @@ export class VehicleBirdReturnsService {
           const month = String(today.getMonth() + 1).padStart(2, '0');
           const prefix = `MOR-${year}-${month}-`;
 
-          const lastMortality = await this.mortalityRepository
+          const mortalityQuery = this.mortalityRepository
             .createQueryBuilder('mor')
             .where('mor.recordNumber LIKE :prefix', { prefix: `${prefix}%` })
             .orderBy('mor.id', 'DESC')
-            .limit(1)
-            .getOne();
+            .limit(1);
+
+          this.applyTenant(mortalityQuery, 'mor');
+
+          const lastMortality = await mortalityQuery.getOne();
 
           let recordNumber = `${prefix}0001`;
           if (lastMortality && lastMortality.recordNumber) {
@@ -380,7 +415,7 @@ export class VehicleBirdReturnsService {
           let purchaseOrder: PurchaseOrder | null = null;
           if (sale.purchaseBillNo) {
             purchaseOrder = await this.purchaseOrderRepository.findOne({
-              where: { orderNumber: sale.purchaseBillNo }
+              where: this.tenantWhere({ orderNumber: sale.purchaseBillNo })
             });
           }
 
@@ -395,6 +430,7 @@ export class VehicleBirdReturnsService {
             weightOfDeadBirds: birdReturn.weightReturned,
             cause: `Dead on Vehicle Return (Ref: ${birdReturn.returnNumber})`,
             notes: `Automatically created from processed Vehicle Bird Return ${birdReturn.returnNumber}. Details: ${birdReturn.reasonDescription || 'None'}`,
+            tenantId: this.getTenantId() ?? undefined,
           });
 
           await this.mortalityRepository.save(mortality);
@@ -427,8 +463,10 @@ export class VehicleBirdReturnsService {
   async getReturnStats(startDate?: string, endDate?: string): Promise<any> {
     const query = this.vehicleBirdReturnRepository.createQueryBuilder('return');
 
+    this.applyTenant(query, 'return');
+
     if (startDate && endDate) {
-      query.where('return.returnDate BETWEEN :startDate AND :endDate', { startDate, endDate });
+      query.andWhere('return.returnDate BETWEEN :startDate AND :endDate', { startDate, endDate });
     }
 
     const returns = await query.getMany();

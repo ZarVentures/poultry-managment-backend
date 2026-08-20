@@ -10,6 +10,7 @@ import { GodownSale } from '../godown/entities/godown-sale.entity';
 
 import { SalePayment } from '../sales/sale-payment.entity';
 import { GodownSalePayment } from '../godown/entities/godown-sale-payment.entity';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class ReportsService {
@@ -28,7 +29,27 @@ export class ReportsService {
     private readonly salePaymentRepository: Repository<SalePayment>,
     @InjectRepository(GodownSalePayment)
     private readonly godownSalePaymentRepository: Repository<GodownSalePayment>,
+    private readonly tenantContext: TenantContextService,
   ) { }
+
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
+  private tenantSqlFilter(alias: string): string {
+    const tenantId = this.getTenantId();
+    return tenantId ? `${alias}.tenant_id = '${tenantId}'` : '1=1';
+  }
+
+  private tenantSqlFilterNoAlias(): string {
+    const tenantId = this.getTenantId();
+    return tenantId ? `tenant_id = '${tenantId}'` : '1=1';
+  }
 
   async getPurchaseReport(startDate?: string, endDate?: string) {
     const whereClause: any = {};
@@ -38,7 +59,7 @@ export class ReportsService {
     }
 
     const purchases = await this.purchaseRepository.find({
-      where: whereClause,
+      where: this.tenantWhere(whereClause),
       relations: ['cages'],
       order: { orderDate: 'DESC' },
     });
@@ -75,7 +96,7 @@ export class ReportsService {
     }
 
     const sales = await this.saleRepository.find({
-      where: whereClause,
+      where: this.tenantWhere(whereClause),
       order: { saleDate: 'DESC' },
     });
 
@@ -116,7 +137,7 @@ export class ReportsService {
 
     const purchases = await this.purchaseRepository
       .createQueryBuilder('purchase')
-      .where(whereClause)
+      .where(this.tenantWhere(whereClause))
       .orderBy('purchase.orderDate', 'DESC')
       .getMany();
 
@@ -155,10 +176,10 @@ export class ReportsService {
       whereClauseExpense.expenseDate = Between(start, end);
     }
 
-    const purchases = await this.purchaseRepository.find({ where: whereClausePurchase });
-    const sales = await this.saleRepository.find({ where: whereClauseSale });
+    const purchases = await this.purchaseRepository.find({ where: this.tenantWhere(whereClausePurchase) });
+    const sales = await this.saleRepository.find({ where: this.tenantWhere(whereClauseSale) });
     const expenses = await this.expenseRepository.find({
-      where: whereClauseExpense,
+      where: this.tenantWhere(whereClauseExpense),
       relations: ['expenseCategory']
     });
 
@@ -220,7 +241,7 @@ export class ReportsService {
     }
 
     const sales = await this.godownSaleRepository.find({
-      where: whereClause,
+      where: this.tenantWhere(whereClause),
       order: { saleDate: 'DESC' },
       relations: ['payments'],
     });
@@ -253,8 +274,8 @@ export class ReportsService {
       whereClauseSale.saleDate = Between(start, end);
     }
 
-    const purchases = await this.purchaseRepository.find({ where: whereClausePurchase });
-    const sales = await this.saleRepository.find({ where: whereClauseSale });
+    const purchases = await this.purchaseRepository.find({ where: this.tenantWhere(whereClausePurchase) });
+    const sales = await this.saleRepository.find({ where: this.tenantWhere(whereClauseSale) });
 
     const totalRevenue = sales.reduce((sum, s) => sum + parseFloat(s.netAmount as any), 0);
     const totalCost = purchases.reduce((sum, p) => sum + parseFloat(p.netAmount as any), 0);
@@ -280,7 +301,7 @@ export class ReportsService {
     }
 
     const expenses = await this.expenseRepository.find({
-      where: whereClause,
+      where: this.tenantWhere(whereClause),
       relations: ['expenseCategory']
     });
     const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount as any), 0);
@@ -311,7 +332,7 @@ export class ReportsService {
     }
 
     const purchases = await this.purchaseRepository.find({
-      where: whereClause,
+      where: this.tenantWhere(whereClause),
       order: { orderDate: 'DESC' },
     });
 
@@ -349,7 +370,7 @@ export class ReportsService {
       whereClause.orderDate = Between(new Date(startDate), new Date(endDate));
     }
 
-    const purchases = await this.purchaseRepository.find({ where: whereClause });
+    const purchases = await this.purchaseRepository.find({ where: this.tenantWhere(whereClause) });
 
     // Group by farmer
     const farmData: Record<string, any> = {};
@@ -394,7 +415,7 @@ export class ReportsService {
       whereClause.saleDate = Between(new Date(startDate), new Date(endDate));
     }
 
-    const sales = await this.saleRepository.find({ where: whereClause });
+    const sales = await this.saleRepository.find({ where: this.tenantWhere(whereClause) });
 
     // Group by customer
     const customerData: Record<string, any> = {};
@@ -432,6 +453,9 @@ export class ReportsService {
   async getOutstandingReport(page?: number, limit?: number, sortBy: string = 'outstanding') {
     const offset = page && limit ? (page - 1) * limit : 0;
     const take = limit ? limit : 1000;
+    const tenantId = this.getTenantId();
+    const tenantRetailerFilter = tenantId ? `WHERE r.tenant_id = '${tenantId}'` : '';
+    const tenantSalesFilter = tenantId ? `WHERE tenant_id = '${tenantId}'` : '';
 
     const query = `
       SELECT 
@@ -441,21 +465,24 @@ export class ReportsService {
         CAST((COALESCE(s.total_sales, 0) + COALESCE(gs.total_sales, 0)) - (COALESCE(s.total_received, 0) + COALESCE(gs.total_received, 0)) AS FLOAT) as outstanding,
         CAST(COALESCE(s.sales_count, 0) + COALESCE(gs.sales_count, 0) AS INTEGER) as "salesCount"
       FROM retailers r
+      ${tenantRetailerFilter}
       LEFT JOIN (
         SELECT retailer_id, SUM(net_amount) as total_sales, SUM(amount_received) as total_received, COUNT(*) as sales_count
         FROM sales
+        ${tenantSalesFilter}
         GROUP BY retailer_id
       ) s ON s.retailer_id = r.id
       LEFT JOIN (
         SELECT retailer_id, SUM(total_amount) as total_sales, SUM(amount_received) as total_received, COUNT(*) as sales_count
         FROM godown_sales
+        ${tenantSalesFilter}
         GROUP BY retailer_id
       ) gs ON gs.retailer_id = r.id
       ORDER BY ${sortBy === 'name' ? 'r.name ASC' : 'outstanding DESC'}
       OFFSET ${offset} LIMIT ${take}
     `;
 
-    const countQuery = `SELECT COUNT(*) FROM retailers`;
+    const countQuery = `SELECT COUNT(*) FROM retailers ${tenantId ? `WHERE tenant_id = '${tenantId}'` : ''}`;
 
     // Global summary totals (for all retailers)
     const summaryQuery = `
@@ -468,14 +495,17 @@ export class ReportsService {
         SELECT 
           (COALESCE(s.total_sales, 0) + COALESCE(gs.total_sales, 0)) - (COALESCE(s.total_received, 0) + COALESCE(gs.total_received, 0)) as outstanding
         FROM retailers r
+        ${tenantRetailerFilter}
         LEFT JOIN (
           SELECT retailer_id, SUM(net_amount) as total_sales, SUM(amount_received) as total_received
           FROM sales
+          ${tenantSalesFilter}
           GROUP BY retailer_id
         ) s ON s.retailer_id = r.id
         LEFT JOIN (
           SELECT retailer_id, SUM(total_amount) as total_sales, SUM(amount_received) as total_received
           FROM godown_sales
+          ${tenantSalesFilter}
           GROUP BY retailer_id
         ) gs ON gs.retailer_id = r.id
       ) t
@@ -508,6 +538,8 @@ export class ReportsService {
     const { startDate, endDate, mode, page, limit } = filters;
     const offset = page && limit ? (page - 1) * limit : 0;
     const take = limit ? limit : 20;
+    const tenantId = this.getTenantId();
+    const tenantJoinFilter = tenantId ? ` AND s.tenant_id = '${tenantId}'` : '';
 
     let whereClause = 'WHERE 1=1';
     if (startDate && endDate) {
@@ -529,7 +561,7 @@ export class ReportsService {
       FROM (
         SELECT p.id, p.sale_id, s.invoice_number, s.customer_name, p.payment_mode, p.amount, p.created_at
         FROM sale_payments p
-        JOIN sales s ON s.id = p.sale_id
+        JOIN sales s ON s.id = p.sale_id${tenantJoinFilter}
       ) t1
       UNION ALL
       SELECT 
@@ -543,7 +575,7 @@ export class ReportsService {
       FROM (
         SELECT p.id, p.godown_sale_id, s.invoice_number, s.customer_name, p.payment_mode, p.amount, p.created_at
         FROM godown_sale_payments p
-        JOIN godown_sales s ON s.id = p.godown_sale_id
+        JOIN godown_sales s ON s.id = p.godown_sale_id${tenantJoinFilter}
       ) t2
     `;
 

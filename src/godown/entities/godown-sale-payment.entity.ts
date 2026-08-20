@@ -9,6 +9,9 @@ export class GodownSalePayment {
   @Column({ name: 'godown_sale_id', type: 'bigint' })
   godownSaleId!: string;
 
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
+
   @Column({ name: 'payment_mode', type: 'varchar', length: 30 })
   paymentMode!: string;
 

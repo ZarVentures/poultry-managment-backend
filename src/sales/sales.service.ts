@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Sale } from './sale.entity';
 import { SalePayment } from './sale-payment.entity';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { AccountingService } from '../modules/accounting/accounting.service';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class SalesService {
@@ -15,7 +16,23 @@ export class SalesService {
     @InjectRepository(SalePayment)
     private readonly salePaymentRepository: Repository<SalePayment>,
     private readonly accountingService: AccountingService,
+    private readonly tenantContext: TenantContextService,
   ) { }
+
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
+  private applyTenant(query: SelectQueryBuilder<Sale>): SelectQueryBuilder<Sale> {
+    const tenantId = this.getTenantId();
+    if (tenantId) query.andWhere('sale.tenantId = :tenantId', { tenantId });
+    return query;
+  }
 
   private calcAmounts(dto: {
     quantity?: string; unitPrice?: string;
@@ -43,12 +60,13 @@ export class SalesService {
     const prefix = `SL-${year}-${month}-`;
 
     // Find the last invoice number with this prefix
-    const lastSale = await this.saleRepository
+    const qb = this.saleRepository
       .createQueryBuilder('sale')
       .where('sale.invoiceNumber LIKE :prefix', { prefix: `${prefix}%` })
       .orderBy('sale.id', 'DESC')
-      .limit(1)
-      .getOne();
+      .limit(1);
+    this.applyTenant(qb);
+    const lastSale = await qb.getOne();
 
     if (lastSale && lastSale.invoiceNumber) {
       const lastNumber = parseInt(lastSale.invoiceNumber.split('-').pop() || '0');
@@ -66,7 +84,7 @@ export class SalesService {
     // Auto-generate invoice number if not provided
     const invoiceNumber = dto.invoiceNumber || await this.generateInvoiceNumber();
 
-    const existing = await this.saleRepository.findOne({ where: { invoiceNumber } });
+    const existing = await this.saleRepository.findOne({ where: this.tenantWhere({ invoiceNumber }) });
     if (existing) throw new BadRequestException(`Sale ${invoiceNumber} already exists`);
 
     const amounts = this.calcAmounts(dto);
@@ -90,6 +108,7 @@ export class SalesService {
       amountReceived: totalPaymentMade || parseFloat(dto.amountReceived || '0'),
       notes: dto.notes,
       retailerId: dto.retailerId,
+      tenantId: this.getTenantId() ?? undefined,
     });
 
     const savedResult = await this.saleRepository.save(sale);
@@ -98,7 +117,7 @@ export class SalesService {
     if (dto.payments && dto.payments.length > 0) {
       const payments = dto.payments
         .filter(p => parseFloat(p.amount || '0') > 0)
-        .map(p => this.salePaymentRepository.create({ paymentMode: p.paymentMode, amount: parseFloat(p.amount), saleId: savedId }));
+        .map(p => this.salePaymentRepository.create({ paymentMode: p.paymentMode, amount: parseFloat(p.amount), saleId: savedId, tenantId: this.getTenantId() ?? undefined }));
       if (payments.length > 0) await this.salePaymentRepository.save(payments);
     }
 
@@ -137,6 +156,8 @@ export class SalesService {
       .leftJoinAndSelect('sale.payments', 'payments')
       .orderBy('sale.saleDate', 'DESC');
 
+    this.applyTenant(query);
+
     if (startDate && endDate) query.andWhere('sale.saleDate BETWEEN :startDate AND :endDate', { startDate, endDate });
     if (customer) {
       const q = `%${customer.trim()}%`;
@@ -163,6 +184,8 @@ export class SalesService {
         .leftJoinAndSelect('sale.retailer', 'retailer')
         .leftJoinAndSelect('sale.payments', 'payments')
         .orderBy('sale.saleDate', 'DESC');
+
+      this.applyTenant(summaryQuery);
 
       if (startDate && endDate) summaryQuery.andWhere('sale.saleDate BETWEEN :startDate AND :endDate', { startDate, endDate });
       if (customer) {
@@ -192,17 +215,18 @@ export class SalesService {
   }
 
   async getInvoiceList(): Promise<Array<{ id: string; invoiceNumber: string; saleDate: string; customerName: string }>> {
-    const sales = await this.saleRepository
+    const qb = this.saleRepository
       .createQueryBuilder('sale')
       .select(['sale.id', 'sale.invoiceNumber', 'sale.saleDate', 'sale.customerName'])
       .orderBy('sale.saleDate', 'DESC')
-      .limit(100)
-      .getMany();
+      .limit(100);
+    this.applyTenant(qb);
+    const sales = await qb.getMany();
     return sales.map(s => ({ id: s.id, invoiceNumber: s.invoiceNumber, saleDate: s.saleDate, customerName: s.customerName }));
   }
 
   async findOne(id: string): Promise<Sale> {
-    const sale = await this.saleRepository.findOne({ where: { id }, relations: ['retailer', 'payments'] });
+    const sale = await this.saleRepository.findOne({ where: this.tenantWhere({ id }), relations: ['retailer', 'payments'] });
     if (!sale) throw new NotFoundException(`Sale ${id} not found`);
     return sale;
   }
@@ -211,7 +235,7 @@ export class SalesService {
     const sale = await this.findOne(id);
 
     if (dto.invoiceNumber && dto.invoiceNumber !== sale.invoiceNumber) {
-      const existing = await this.saleRepository.findOne({ where: { invoiceNumber: dto.invoiceNumber } });
+      const existing = await this.saleRepository.findOne({ where: this.tenantWhere({ invoiceNumber: dto.invoiceNumber }) });
       if (existing) throw new BadRequestException(`Sale ${dto.invoiceNumber} already exists`);
     }
 
@@ -232,7 +256,7 @@ export class SalesService {
       await this.salePaymentRepository.delete({ saleId: id });
       const validPayments = dto.payments.filter(p => parseFloat(p.amount || '0') > 0);
       if (validPayments.length > 0) {
-        const payments = validPayments.map(p => this.salePaymentRepository.create({ paymentMode: p.paymentMode, amount: parseFloat(p.amount), saleId: id }));
+        const payments = validPayments.map(p => this.salePaymentRepository.create({ paymentMode: p.paymentMode, amount: parseFloat(p.amount), saleId: id, tenantId: this.getTenantId() ?? undefined }));
         await this.salePaymentRepository.save(payments);
       }
     }

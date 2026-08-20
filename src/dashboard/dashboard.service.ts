@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder, ObjectLiteral } from 'typeorm';
 import { Sale } from '../sales/sale.entity';
 import { Expense } from '../expenses/expense.entity';
 import { Vehicle } from '../vehicles/vehicle.entity';
 import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { InventoryItem } from '../inventory/entities/inventory-item.entity';
 import { GodownSale } from '../godown/entities/godown-sale.entity';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class DashboardService {
@@ -23,7 +24,23 @@ export class DashboardService {
     private readonly inventoryRepository: Repository<InventoryItem>,
     @InjectRepository(GodownSale)
     private readonly godownSaleRepository: Repository<GodownSale>,
+    private readonly tenantContext: TenantContextService,
   ) {}
+
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
+  private applyTenant<T extends ObjectLiteral>(query: SelectQueryBuilder<T>, alias: string): SelectQueryBuilder<T> {
+    const tenantId = this.getTenantId();
+    if (tenantId) query.andWhere(`${alias}.tenantId = :tenantId`, { tenantId });
+    return query;
+  }
 
   // IST-aware date helpers
   // DB stores dates as plain dates (no timezone), so we need to work in IST
@@ -74,6 +91,7 @@ export class DashboardService {
       .addSelect('COUNT(*)', 'count')
       .addSelect('COALESCE(SUM(sale.numberOfBirds), 0)', 'totalBirds')
       .where('sale.saleDate >= :startDate AND sale.saleDate <= :endDate', dateFilter);
+    this.applyTenant(revenueQuery, 'sale');
     
     const revenueResult = await revenueQuery.getRawOne();
     const saleRevenue = parseFloat(revenueResult.total) || 0;
@@ -84,6 +102,7 @@ export class DashboardService {
       .select('COALESCE(SUM(gs.totalAmount), 0)', 'total')
       .addSelect('COUNT(*)', 'count')
       .where('gs.saleDate >= :startDate AND gs.saleDate <= :endDate', dateFilter);
+    this.applyTenant(godownQuery, 'gs');
 
     const godownResult = await godownQuery.getRawOne();
     const godownRevenue = parseFloat(godownResult.total) || 0;
@@ -94,6 +113,7 @@ export class DashboardService {
     const expenseQuery = this.expenseRepository.createQueryBuilder('expense')
       .select('COALESCE(SUM(expense.amount), 0)', 'total')
       .where('expense.expenseDate >= :startDate AND expense.expenseDate <= :endDate', dateFilter);
+    this.applyTenant(expenseQuery, 'expense');
     
     const expenseResult = await expenseQuery.getRawOne();
     const totalExpenses = parseFloat(expenseResult.total) || 0;
@@ -103,7 +123,7 @@ export class DashboardService {
 
     // Total Active Vehicles
     const totalVehicles = await this.vehicleRepository.count({
-      where: { status: 'active' }
+      where: this.tenantWhere({ status: 'active' })
     });
 
     // Total Sales Count MTD — poultry + godown
@@ -137,6 +157,7 @@ export class DashboardService {
       .addSelect('COUNT(*)', 'count')
       .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", dateFilter)
       .groupBy('sale.productType');
+    this.applyTenant(query, 'sale');
 
     return query.getRawMany();
   }
@@ -153,12 +174,14 @@ export class DashboardService {
       .addSelect('COUNT(*)', 'count')
       .where('expense.expenseDate >= :startDate AND expense.expenseDate <= :endDate', dateFilter)
       .groupBy('expense.category');
+    this.applyTenant(query, 'expense');
 
     return query.getRawMany();
   }
 
   async getRecentSales(limit: number = 10) {
     return this.saleRepository.find({
+      where: this.tenantWhere({}),
       relations: ['retailer'],
       order: { saleDate: 'DESC', createdAt: 'DESC' },
       take: limit,
@@ -167,6 +190,7 @@ export class DashboardService {
 
   async getRecentExpenses(limit: number = 10) {
     return this.expenseRepository.find({
+      where: this.tenantWhere({}),
       order: { expenseDate: 'DESC', createdAt: 'DESC' },
       take: limit,
     });
@@ -188,22 +212,25 @@ export class DashboardService {
       const endDate = this.monthEnd(year, month);
 
       // Revenue for the month
-      const revenueResult = await this.saleRepository.createQueryBuilder('sale')
+      const revenueQ = this.saleRepository.createQueryBuilder('sale')
         .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
-        .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", { startDate, endDate })
-        .getRawOne();
+        .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", { startDate, endDate });
+      this.applyTenant(revenueQ, 'sale');
+      const revenueResult = await revenueQ.getRawOne();
 
       // Godown revenue for the month
-      const godownRevenueResult = await this.godownSaleRepository.createQueryBuilder('gs')
+      const godownQ = this.godownSaleRepository.createQueryBuilder('gs')
         .select('COALESCE(SUM(gs.totalAmount), 0)', 'total')
-        .where("gs.saleDate >= :startDate AND gs.saleDate <= :endDate", { startDate, endDate })
-        .getRawOne();
+        .where("gs.saleDate >= :startDate AND gs.saleDate <= :endDate", { startDate, endDate });
+      this.applyTenant(godownQ, 'gs');
+      const godownRevenueResult = await godownQ.getRawOne();
 
       // Expenses for the month
-      const expenseResult = await this.expenseRepository.createQueryBuilder('expense')
+      const expenseQ = this.expenseRepository.createQueryBuilder('expense')
         .select('COALESCE(SUM(expense.amount), 0)', 'total')
-        .where('expense.expenseDate >= :startDate AND expense.expenseDate <= :endDate', { startDate, endDate })
-        .getRawOne();
+        .where('expense.expenseDate >= :startDate AND expense.expenseDate <= :endDate', { startDate, endDate });
+      this.applyTenant(expenseQ, 'expense');
+      const expenseResult = await expenseQ.getRawOne();
 
       const monthSaleRevenue = parseFloat(revenueResult.total) || 0;
       const monthGodownRevenue = parseFloat(godownRevenueResult.total) || 0;
@@ -232,20 +259,23 @@ export class DashboardService {
       const startDate = this.monthStart(year, month);
       const endDate = this.monthEnd(year, month);
 
-      const revenueResult = await this.saleRepository.createQueryBuilder('sale')
+      const revenueQ = this.saleRepository.createQueryBuilder('sale')
         .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
-        .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", { startDate, endDate })
-        .getRawOne();
+        .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", { startDate, endDate });
+      this.applyTenant(revenueQ, 'sale');
+      const revenueResult = await revenueQ.getRawOne();
 
-      const godownRevenueResult = await this.godownSaleRepository.createQueryBuilder('gs')
+      const godownQ = this.godownSaleRepository.createQueryBuilder('gs')
         .select('COALESCE(SUM(gs.totalAmount), 0)', 'total')
-        .where("gs.saleDate >= :startDate AND gs.saleDate <= :endDate", { startDate, endDate })
-        .getRawOne();
+        .where("gs.saleDate >= :startDate AND gs.saleDate <= :endDate", { startDate, endDate });
+      this.applyTenant(godownQ, 'gs');
+      const godownRevenueResult = await godownQ.getRawOne();
 
-      const expenseResult = await this.expenseRepository.createQueryBuilder('expense')
+      const expenseQ = this.expenseRepository.createQueryBuilder('expense')
         .select('COALESCE(SUM(expense.amount), 0)', 'total')
-        .where('expense.expenseDate >= :startDate AND expense.expenseDate <= :endDate', { startDate, endDate })
-        .getRawOne();
+        .where('expense.expenseDate >= :startDate AND expense.expenseDate <= :endDate', { startDate, endDate });
+      this.applyTenant(expenseQ, 'expense');
+      const expenseResult = await expenseQ.getRawOne();
 
       const monthSaleRev = parseFloat(revenueResult.total) || 0;
       const monthGodownRev = parseFloat(godownRevenueResult.total) || 0;
@@ -272,25 +302,28 @@ export class DashboardService {
     const endDate = this.today();
 
     // Total Revenue
-    const revenueResult = await this.saleRepository.createQueryBuilder('sale')
+    const revenueQ = this.saleRepository.createQueryBuilder('sale')
       .select('COALESCE(SUM(sale.netAmount), 0)', 'total')
-      .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", { startDate, endDate })
-      .getRawOne();
+      .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", { startDate, endDate });
+    this.applyTenant(revenueQ, 'sale');
+    const revenueResult = await revenueQ.getRawOne();
     const saleRev = parseFloat(revenueResult.total) || 0;
 
-    const godownRevResult = await this.godownSaleRepository.createQueryBuilder('gs')
+    const godownQ = this.godownSaleRepository.createQueryBuilder('gs')
       .select('COALESCE(SUM(gs.totalAmount), 0)', 'total')
-      .where("gs.saleDate >= :startDate AND gs.saleDate <= :endDate", { startDate, endDate })
-      .getRawOne();
+      .where("gs.saleDate >= :startDate AND gs.saleDate <= :endDate", { startDate, endDate });
+    this.applyTenant(godownQ, 'gs');
+    const godownRevResult = await godownQ.getRawOne();
     const godownRev = parseFloat(godownRevResult.total) || 0;
 
     const totalRevenue = saleRev + godownRev;
 
     // Total Expenses
-    const expenseResult = await this.expenseRepository.createQueryBuilder('expense')
+    const expenseQ = this.expenseRepository.createQueryBuilder('expense')
       .select('COALESCE(SUM(expense.amount), 0)', 'total')
-      .where('expense.expenseDate >= :startDate AND expense.expenseDate <= :endDate', { startDate, endDate })
-      .getRawOne();
+      .where('expense.expenseDate >= :startDate AND expense.expenseDate <= :endDate', { startDate, endDate });
+    this.applyTenant(expenseQ, 'expense');
+    const expenseResult = await expenseQ.getRawOne();
     const totalExpenses = parseFloat(expenseResult.total) || 0;
 
     // Total Profit
@@ -345,6 +378,7 @@ export class DashboardService {
       .where("sale.saleDate >= :startDate AND sale.saleDate <= :endDate", dateFilter)
       .groupBy('sale.productType')
       .orderBy('revenue', 'DESC');
+    this.applyTenant(query, 'sale');
 
     const results = await query.getRawMany();
     
@@ -371,6 +405,7 @@ export class DashboardService {
       .groupBy('expense.category')
       .orderBy('amount', 'DESC')
       .limit(limit);
+    this.applyTenant(query, 'expense');
 
     const results = await query.getRawMany();
     
@@ -383,28 +418,31 @@ export class DashboardService {
 
   async getInventorySummary() {
     // Total items
-    const totalItems = await this.inventoryRepository.count();
+    const totalItems = await this.inventoryRepository.count({ where: this.tenantWhere({}) });
 
     // Low stock items
-    const lowStockItems = await this.inventoryRepository
+    const lowStockQ = this.inventoryRepository
       .createQueryBuilder('item')
-      .where('item.currentStockLevel <= item.minimumStockLevel')
-      .getCount();
+      .where('item.currentStockLevel <= item.minimumStockLevel');
+    this.applyTenant(lowStockQ, 'item');
+    const lowStockItems = await lowStockQ.getCount();
 
     // Total inventory value (sum of current stock levels)
-    const valueResult = await this.inventoryRepository
+    const valueQ = this.inventoryRepository
       .createQueryBuilder('item')
-      .select('COALESCE(SUM(item.currentStockLevel), 0)', 'total')
-      .getRawOne();
+      .select('COALESCE(SUM(item.currentStockLevel), 0)', 'total');
+    this.applyTenant(valueQ, 'item');
+    const valueResult = await valueQ.getRawOne();
     const totalValue = parseFloat(valueResult.total) || 0;
 
     // Items by type
-    const byType = await this.inventoryRepository
+    const byTypeQ = this.inventoryRepository
       .createQueryBuilder('item')
       .select('item.itemType', 'itemType')
       .addSelect('COUNT(*)', 'count')
-      .groupBy('item.itemType')
-      .getRawMany();
+      .groupBy('item.itemType');
+    this.applyTenant(byTypeQ, 'item');
+    const byType = await byTypeQ.getRawMany();
 
     return {
       totalItems,
@@ -424,24 +462,27 @@ export class DashboardService {
     };
 
     // Total orders
-    const totalOrders = await this.purchaseRepository
+    const totalOrdersQ = this.purchaseRepository
       .createQueryBuilder('po')
-      .where('po.orderDate >= :startDate AND po.orderDate <= :endDate', dateFilter)
-      .getCount();
+      .where('po.orderDate >= :startDate AND po.orderDate <= :endDate', dateFilter);
+    this.applyTenant(totalOrdersQ, 'po');
+    const totalOrders = await totalOrdersQ.getCount();
 
     // Pending orders
-    const pendingOrders = await this.purchaseRepository
+    const pendingOrdersQ = this.purchaseRepository
       .createQueryBuilder('po')
       .where('po.orderDate >= :startDate AND po.orderDate <= :endDate', dateFilter)
-      .andWhere('po.status = :status', { status: 'pending' })
-      .getCount();
+      .andWhere('po.status = :status', { status: 'pending' });
+    this.applyTenant(pendingOrdersQ, 'po');
+    const pendingOrders = await pendingOrdersQ.getCount();
 
     // Total value
-    const valueResult = await this.purchaseRepository
+    const valueQ = this.purchaseRepository
       .createQueryBuilder('po')
       .select('COALESCE(SUM(po.netAmount), 0)', 'total')
-      .where('po.orderDate >= :startDate AND po.orderDate <= :endDate', dateFilter)
-      .getRawOne();
+      .where('po.orderDate >= :startDate AND po.orderDate <= :endDate', dateFilter);
+    this.applyTenant(valueQ, 'po');
+    const valueResult = await valueQ.getRawOne();
     const totalValue = parseFloat(valueResult.total) || 0;
 
     return {

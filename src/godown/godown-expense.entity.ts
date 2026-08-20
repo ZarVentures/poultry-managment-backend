@@ -23,6 +23,9 @@ export class GodownExpense {
   @Column({ type: 'text', nullable: true })
   notes?: string;
 
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
+
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'NOW()' })
   createdAt!: Date;
 

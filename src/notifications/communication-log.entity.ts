@@ -20,6 +20,9 @@ export class CommunicationLog {
   @Column({ type: 'varchar', length: 20 })
   status!: 'sent' | 'failed';
 
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
+
   @Column({ type: 'text', nullable: true })
   errorMessage?: string;
 

@@ -1,14 +1,31 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Cage, CageStatus } from './cage.entity';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class CagesService {
   constructor(
     @InjectRepository(Cage)
     private readonly cageRepo: Repository<Cage>,
+    private readonly tenantContext: TenantContextService,
   ) { }
+
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
+
+  private applyTenant(query: SelectQueryBuilder<Cage>, alias = 'cage'): SelectQueryBuilder<Cage> {
+    const tenantId = this.getTenantId();
+    if (tenantId) query.andWhere(`${alias}.tenantId = :tenantId`, { tenantId });
+    return query;
+  }
 
   // Create cages from a purchase order
   async createFromPurchase(purchaseOrderId: string, cageData: Array<{
@@ -23,6 +40,7 @@ export class CagesService {
         numberOfBirds: c.numberOfBirds,
         purchaseWeight: c.purchaseWeight,
         status: 'pending',
+        tenantId: this.getTenantId() ?? undefined,
       })
     );
     return this.cageRepo.save(cages);
@@ -33,6 +51,7 @@ export class CagesService {
     const query = this.cageRepo.createQueryBuilder('cage')
       .innerJoin('cage.purchaseOrder', 'po')
       .where('po.orderNumber = :orderNumber', { orderNumber });
+    this.applyTenant(query, 'cage');
 
     if (status) query.andWhere('cage.status = :status', { status });
 
@@ -44,6 +63,7 @@ export class CagesService {
     const query = this.cageRepo.createQueryBuilder('cage')
       .leftJoinAndSelect('cage.purchaseOrder', 'po')
       .where('cage.godownInwardId = :godownInwardId', { godownInwardId });
+    this.applyTenant(query, 'cage');
 
     if (status) {
       query.andWhere('cage.status = :status', { status });
@@ -55,7 +75,7 @@ export class CagesService {
 
   // Get cages by purchase order ID
   async getByPurchaseOrderId(purchaseOrderId: string, status?: CageStatus): Promise<Cage[]> {
-    const where: any = { purchaseOrderId };
+    const where: any = this.tenantWhere({ purchaseOrderId });
     if (status) where.status = status;
     return this.cageRepo.find({ where, order: { cageId: 'ASC' } });
   }
@@ -149,7 +169,7 @@ export class CagesService {
     soldWeight: number,
     weightLoss: number = 0
   ): Promise<void> {
-    const cage = await this.cageRepo.findOne({ where: { id: cageId } });
+    const cage = await this.cageRepo.findOne({ where: this.tenantWhere({ id: cageId }) });
     if (!cage) throw new NotFoundException(`Cage ${cageId} not found`);
 
     if (soldBirds >= cage.numberOfBirds) {
@@ -189,7 +209,7 @@ export class CagesService {
   // Get all cages currently in godown
   async getInGodown(): Promise<Cage[]> {
     return this.cageRepo.find({
-      where: { status: 'in_godown' },
+      where: this.tenantWhere({ status: 'in_godown' }),
       order: { cageId: 'ASC' },
       relations: ['purchaseOrder'],
     });
@@ -231,7 +251,7 @@ export class CagesService {
   // Get all cages currently on a vehicle
   async getCagesByVehicle(vehicleId: string): Promise<Cage[]> {
     return this.cageRepo.find({
-      where: { vehicleId, status: 'on_vehicle' },
+      where: this.tenantWhere({ vehicleId, status: 'on_vehicle' }),
       order: { cageId: 'ASC' },
     });
   }
@@ -239,7 +259,7 @@ export class CagesService {
   // Get cages by godown sale ID
   async getByGodownSaleId(godownSaleId: string): Promise<Cage[]> {
     return this.cageRepo.find({
-      where: { godownSaleId },
+      where: this.tenantWhere({ godownSaleId }),
       order: { cageId: 'ASC' },
       relations: ['purchaseOrder'],
     });
@@ -283,7 +303,7 @@ export class CagesService {
     soldWeight: number,
     weightLoss: number = 0
   ): Promise<void> {
-    const cage = await this.cageRepo.findOne({ where: { id: cageId } });
+    const cage = await this.cageRepo.findOne({ where: this.tenantWhere({ id: cageId }) });
     if (!cage) throw new NotFoundException(`Cage ${cageId} not found`);
 
     if (soldBirds >= cage.numberOfBirds) {

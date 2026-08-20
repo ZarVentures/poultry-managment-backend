@@ -34,6 +34,9 @@ export class BillingPayment {
   @JoinColumn({ name: 'party_id' })
   party!: BillingParty;
 
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
+
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'NOW()' })
   createdAt!: Date;
 

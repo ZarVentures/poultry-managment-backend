@@ -10,6 +10,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage, FileFilterCallback } from 'multer';
@@ -18,8 +19,10 @@ import { PurchasesService } from './purchases.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 import { AccountingService } from '../modules/accounting/accounting.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('purchases')
+@UseGuards(JwtAuthGuard)
 export class PurchasesController {
   constructor(
     private readonly purchasesService: PurchasesService,

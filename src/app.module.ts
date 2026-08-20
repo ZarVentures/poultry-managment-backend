@@ -8,6 +8,7 @@ import { HealthModule } from './health/health.module';
 import { UsersModule } from './users/users.module';
 import { User } from './users/user.entity';
 import { AuthModule } from './auth/auth.module';
+import { OtpSession } from './auth/otp.entity';
 import { FarmersModule } from './farmers/farmers.module';
 import { Farmer } from './farmers/farmer.entity';
 import { RetailersModule } from './retailers/retailers.module';
@@ -59,6 +60,8 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { CommunicationLog } from './notifications/communication-log.entity';
 import { AccountingModule } from './modules/accounting/accounting.module';
 import { FailedAccountingJob } from './modules/accounting/failed-jobs.entity';
+import { TenantsModule } from './tenants/tenants.module';
+import { Tenant } from './tenants/tenant.entity';
 
 @Module({
   imports: [
@@ -79,7 +82,7 @@ import { FailedAccountingJob } from './modules/accounting/failed-jobs.entity';
             ssl: {
               rejectUnauthorized: false
             },
-            entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment, Sale, SalePayment, BirdReturn, VehicleBirdReturn, Expense, ExpenseCategory, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownSalePayment, GodownMortality, GodownExpense, Cage, RolePermission, UserPermission, Mortality, Product, BillingParty, BillingSale, BillingPayment, BillingLedger, PaymentVoucher, CommunicationLog,FailedAccountingJob],
+            entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment, Sale, SalePayment, BirdReturn, VehicleBirdReturn, Expense, ExpenseCategory, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownSalePayment, GodownMortality, GodownExpense, Cage, RolePermission, UserPermission, Mortality, Product, BillingParty, BillingSale, BillingPayment, BillingLedger, PaymentVoucher, CommunicationLog, FailedAccountingJob, OtpSession, Tenant],
             // entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment, Sale, SalePayment, Expense, ExpenseCategory, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownSalePayment, GodownMortality, GodownExpense, Cage, RolePermission, UserPermission, Mortality, Product, BillingParty, BillingSale, BillingPayment, BillingLedger, PaymentVoucher, FailedAccountingJob],
             synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
             logging: config.get<boolean>('DB_LOGGING', false),
@@ -95,7 +98,7 @@ import { FailedAccountingJob } from './modules/accounting/failed-jobs.entity';
           username: config.get<string>('DB_USERNAME', 'postgres'),
           password: config.get<string>('DB_PASSWORD', 'postgres'),
           database: config.get<string>('DB_NAME', 'poultry'),
-          entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment, Sale, SalePayment, BirdReturn, VehicleBirdReturn, Expense, ExpenseCategory, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownSalePayment, GodownMortality, GodownExpense, Cage, RolePermission, UserPermission, Mortality, Product, BillingParty, BillingSale, BillingPayment, BillingLedger, PaymentVoucher, CommunicationLog,FailedAccountingJob],
+          entities: [User, Vehicle, Farmer, Retailer, PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment, Sale, SalePayment, BirdReturn, VehicleBirdReturn, Expense, ExpenseCategory, InventoryItem, Settings, AuditLog, GodownInwardEntry, GodownSale, GodownSalePayment, GodownMortality, GodownExpense, Cage, RolePermission, UserPermission, Mortality, Product, BillingParty, BillingSale, BillingPayment, BillingLedger, PaymentVoucher, CommunicationLog, FailedAccountingJob, OtpSession, Tenant],
           synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
           logging: config.get<boolean>('DB_LOGGING', false),
           timezone: 'Z', // Use UTC for consistency, handle IST in application layer
@@ -126,6 +129,7 @@ import { FailedAccountingJob } from './modules/accounting/failed-jobs.entity';
     PaymentVouchersModule,
     NotificationsModule,
     AccountingModule,
+    TenantsModule,
   ],
 })
 export class AppModule implements NestModule {

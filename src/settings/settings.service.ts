@@ -4,20 +4,37 @@ import { Repository } from 'typeorm';
 import { Settings } from './settings.entity';
 import { CreateSettingDto } from './dto/create-setting.dto';
 import { UpdateSettingDto } from './dto/update-setting.dto';
+import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
 export class SettingsService {
   constructor(
     @InjectRepository(Settings)
     private readonly settingsRepository: Repository<Settings>,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
   async findAll(): Promise<Settings[]> {
-    return this.settingsRepository.find({ order: { category: 'ASC', key: 'ASC' } });
+    const query = this.settingsRepository.createQueryBuilder('s')
+      .orderBy('s.category', 'ASC')
+      .addOrderBy('s.key', 'ASC');
+
+    const tenantId = this.getTenantId();
+    if (tenantId) query.where('s.tenantId = :tenantId', { tenantId });
+
+    return query.getMany();
   }
 
   async findOne(id: string): Promise<Settings> {
-    const setting = await this.settingsRepository.findOne({ where: { key: id } });
+    const where: any = { key: id };
+    const tenantId = this.getTenantId();
+    if (tenantId) where.tenantId = tenantId;
+
+    const setting = await this.settingsRepository.findOne({ where });
     if (!setting) {
       throw new NotFoundException(`Setting with id ${id} not found`);
     }
@@ -25,18 +42,27 @@ export class SettingsService {
   }
 
   async findByKey(key: string): Promise<Settings | null> {
-    return this.settingsRepository.findOne({ where: { key } });
+    const where: any = { key };
+    const tenantId = this.getTenantId();
+    if (tenantId) where.tenantId = tenantId;
+    return this.settingsRepository.findOne({ where });
   }
 
   async findByCategory(category: string): Promise<Settings[]> {
-    return this.settingsRepository.find({ 
-      where: { category },
+    const where: any = { category };
+    const tenantId = this.getTenantId();
+    if (tenantId) where.tenantId = tenantId;
+    return this.settingsRepository.find({
+      where,
       order: { key: 'ASC' }
     });
   }
 
   async create(dto: CreateSettingDto): Promise<Settings> {
-    const setting = this.settingsRepository.create(dto);
+    const setting = this.settingsRepository.create({
+      ...dto,
+      tenantId: this.getTenantId() ?? undefined,
+    });
     return this.settingsRepository.save(setting);
   }
 
@@ -94,10 +120,10 @@ export class SettingsService {
     return {
       currency: settingsMap.get('currency') || 'INR',
       theme: settingsMap.get('theme') || 'light',
-      companyName: settingsMap.get('company_name') || 'Aziz Poultry',
-      companyEmail: settingsMap.get('company_email') || '',
-      companyPhone: settingsMap.get('company_phone') || '',
-      companyAddress: settingsMap.get('company_address') || '',
+      companyName: settingsMap.get('company_name') || settingsMap.get('farmName') || 'Aziz Poultry',
+      companyEmail: settingsMap.get('company_email') || settingsMap.get('farmEmail') || '',
+      companyPhone: settingsMap.get('company_phone') || settingsMap.get('farmPhone') || '',
+      companyAddress: settingsMap.get('company_address') || settingsMap.get('farmLocation') || '',
     };
   }
 

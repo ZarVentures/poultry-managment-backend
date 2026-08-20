@@ -12,15 +12,18 @@ export class User {
   @Column({ type: 'varchar', length: 100 })
   name!: string;
 
-  @Column({ type: 'citext', unique: true })
-  email!: string;
+  @Column({ type: 'citext', nullable: true })
+  email?: string;
 
-  @Column({ type: 'varchar', length: 20, nullable: true })
-  phone?: string;
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
+
+  @Column({ type: 'varchar', length: 20, unique: true })
+  phone!: string;
 
   @Exclude()
-  @Column({ name: 'password_hash', type: 'text' })
-  passwordHash!: string;
+  @Column({ name: 'password_hash', type: 'text', nullable: true })
+  passwordHash?: string;
 
   @Column({
     type: 'varchar',

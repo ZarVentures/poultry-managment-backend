@@ -35,6 +35,9 @@ export class AuditLog {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
+  @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
+  tenantId?: string;
+
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'NOW()' })
   createdAt!: Date;
 }

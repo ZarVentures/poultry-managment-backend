@@ -8,6 +8,7 @@ import { AccountingClient } from './accounting.client';
 import { AccountingLogger } from './accounting.logger';
 import { AccountingTransactionDTO } from './accounting.dto';
 import { AccountingMapper } from './accounting.mapper';
+import { TenantContextService } from '../../tenants/tenant-context.service';
 
 @Injectable()
 export class AccountingService {
@@ -16,7 +17,17 @@ export class AccountingService {
     private readonly failedJobRepository: Repository<FailedAccountingJob>,
     private readonly accountingClient: AccountingClient,
     private readonly logger: AccountingLogger,
+    private readonly tenantContext: TenantContextService,
   ) {}
+
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
 
   /**
    * Validates and attempts to send a transaction to the Accounting Service.
@@ -59,7 +70,7 @@ export class AccountingService {
     try {
       // Check if a job already exists for this transactionId to prevent duplicate retries
       const existing = await this.failedJobRepository.findOne({
-        where: { payload: Like(`%"transactionId":"${payload.transactionId}"%`) }
+        where: this.tenantWhere({ payload: Like(`%"transactionId":"${payload.transactionId}"%`) })
       });
 
       if (existing) {
@@ -74,6 +85,7 @@ export class AccountingService {
         errorMessage,
         retryCount: 0,
         status,
+        tenantId: this.getTenantId() ?? undefined,
       });
       return await this.failedJobRepository.save(job);
     } catch (dbError: any) {

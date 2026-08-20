@@ -1,12 +1,15 @@
-import { Controller, Get, Post, Param, Query, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, NotFoundException, UseGuards } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FailedAccountingJob } from './failed-jobs.entity';
 import { AccountingClient } from './accounting.client';
 import { AccountingRetryService } from './accounting.retry.service';
 import { AccountingLogger } from './accounting.logger';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { TenantContextService } from '../../tenants/tenant-context.service';
 
 @Controller('accounting')
+@UseGuards(JwtAuthGuard)
 export class AccountingController {
   constructor(
     @InjectRepository(FailedAccountingJob)
@@ -14,7 +17,17 @@ export class AccountingController {
     private readonly accountingClient: AccountingClient,
     private readonly retryService: AccountingRetryService,
     private readonly logger: AccountingLogger,
+    private readonly tenantContext: TenantContextService,
   ) {}
+
+  private getTenantId(): string | null {
+    return this.tenantContext.getTenantId();
+  }
+
+  private tenantWhere(extra: any): any {
+    const tenantId = this.getTenantId();
+    return tenantId ? { ...extra, tenantId } : extra;
+  }
 
   @Get('status')
   async getStatus() {
@@ -32,9 +45,9 @@ export class AccountingController {
       apiDetails = { error: error.message };
     }
 
-    const pendingCount = await this.failedJobRepository.count({ where: { status: 'pending' } });
-    const failedCount = await this.failedJobRepository.count({ where: { status: 'failed' } });
-    const completedCount = await this.failedJobRepository.count({ where: { status: 'completed' } });
+    const pendingCount = await this.failedJobRepository.count({ where: this.tenantWhere({ status: 'pending' }) });
+    const failedCount = await this.failedJobRepository.count({ where: this.tenantWhere({ status: 'failed' }) });
+    const completedCount = await this.failedJobRepository.count({ where: this.tenantWhere({ status: 'completed' }) });
 
     return {
       integrationStatus: apiStatus,
@@ -49,7 +62,7 @@ export class AccountingController {
 
   @Get('failed-jobs')
   async getFailedJobs(@Query('status') status?: 'pending' | 'failed' | 'completed') {
-    const query: any = {};
+    const query: any = this.tenantWhere({});
     if (status) {
       query.status = status;
     }
@@ -74,7 +87,7 @@ export class AccountingController {
 
   @Post('retry/:id')
   async retrySingleJob(@Param('id') id: string) {
-    const job = await this.failedJobRepository.findOne({ where: { id } as any });
+    const job = await this.failedJobRepository.findOne({ where: this.tenantWhere({ id } as any) });
     if (!job) {
       throw new NotFoundException(`Failed Job ID ${id} not found`);
     }
