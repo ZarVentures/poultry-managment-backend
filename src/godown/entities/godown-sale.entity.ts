@@ -1,10 +1,18 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import { GodownSalePayment } from './godown-sale-payment.entity';
+import { GodownMaster } from '../godown-master.entity';
 
 @Entity('godown_sales')
 export class GodownSale {
   @PrimaryGeneratedColumn('increment', { type: 'bigint' })
   id!: string;
+
+  @Column({ name: 'godown_id', type: 'bigint', nullable: true })
+  godownId?: string;
+
+  @ManyToOne(() => GodownMaster, { nullable: true })
+  @JoinColumn({ name: 'godown_id' })
+  godown?: GodownMaster;
 
   @Column({ name: 'sale_date', type: 'date' })
   saleDate!: string;

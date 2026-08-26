@@ -22,8 +22,9 @@ export class GodownController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('search') search?: string,
+    @Query('godownId') godownId?: string,
   ) {
-    return this.godownService.findAllInward(page, limit, search);
+    return this.godownService.findAllInward(page, limit, search, godownId);
   }
 
   @Get('inward/:id')
@@ -72,8 +73,9 @@ export class GodownController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('search') search?: string,
+    @Query('godownId') godownId?: string,
   ) {
-    return this.godownService.findAllSales(page, limit, search);
+    return this.godownService.findAllSales(page, limit, search, godownId);
   }
 
   @Get('sales/:id')
@@ -107,8 +109,9 @@ export class GodownController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('search') search?: string,
+    @Query('godownId') godownId?: string,
   ) {
-    return this.godownService.findAllMortality(page, limit, search);
+    return this.godownService.findAllMortality(page, limit, search, godownId);
   }
 
   @Get('mortality/:id')
@@ -144,8 +147,9 @@ export class GodownController {
     @Query('search') search?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('godownId') godownId?: string,
   ) {
-    return this.godownService.findAllExpenses(page, limit, search, startDate, endDate);
+    return this.godownService.findAllExpenses(page, limit, search, startDate, endDate, godownId);
   }
 
   @Get('expenses/:id')
@@ -169,8 +173,8 @@ export class GodownController {
   // Summary
   @Get('summary')
   @Permissions('godown', 'read')
-  getSummary() {
-    return this.godownService.getSummary();
+  getSummary(@Query('godownId') godownId?: string) {
+    return this.godownService.getSummary(godownId);
   }
 
   // Stock Ledger — chronological bird/weight movements with running balance
@@ -179,9 +183,10 @@ export class GodownController {
   getStockLedger(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('godownId') godownId?: string,
     @Query('type') type?: string,
     @Query('search') search?: string,
   ) {
-    return this.godownService.getStockLedger({ startDate, endDate, type, search });
+    return this.godownService.getStockLedger({ startDate, endDate, godownId, type, search });
   }
 }

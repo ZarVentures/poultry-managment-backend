@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder, ObjectLiteral } from 'typeorm';
+import { GodownMaster } from './godown-master.entity';
 import { GodownInwardEntry } from './godown-inward.entity';
 import { GodownSale } from './entities/godown-sale.entity';
 import { GodownSalePayment } from './entities/godown-sale-payment.entity';
@@ -13,6 +14,8 @@ import { TenantContextService } from '../tenants/tenant-context.service';
 @Injectable()
 export class GodownService {
   constructor(
+    @InjectRepository(GodownMaster)
+    private godownRepo: Repository<GodownMaster>,
     @InjectRepository(GodownInwardEntry)
     private inwardRepo: Repository<GodownInwardEntry>,
     @InjectRepository(GodownSale)
@@ -44,10 +47,143 @@ export class GodownService {
     return query;
   }
 
+  private applyGodown<T extends ObjectLiteral>(
+    query: SelectQueryBuilder<T>,
+    alias: string,
+    godownId?: string,
+  ): SelectQueryBuilder<T> {
+    if (godownId && godownId !== 'all') {
+      query.andWhere(`${alias}.godownId = :godownId`, { godownId });
+    }
+    return query;
+  }
+
+  private withGodownName<T extends { godown?: GodownMaster; godownName?: string }>(entity: T): T {
+    if (entity?.godown) {
+      entity.godownName = entity.godown.name;
+    }
+    return entity;
+  }
+
+  private async ensureDefaultGodown(): Promise<GodownMaster> {
+    const tenantId = this.getTenantId();
+    const where = this.tenantWhere({ code: 'DEFAULT' });
+    let godown = await this.godownRepo.findOne({ where });
+    if (!godown) {
+      godown = this.godownRepo.create({
+        name: 'Default Godown',
+        code: 'DEFAULT',
+        location: 'Default',
+        status: 'active',
+        tenantId: tenantId ?? undefined,
+      });
+      godown = await this.godownRepo.save(godown);
+    }
+    return godown;
+  }
+
+  private async normalizeGodownId(godownId?: string | null): Promise<string> {
+    if (godownId) {
+      const exists = await this.godownRepo.findOne({ where: this.tenantWhere({ id: godownId }) });
+      if (!exists) throw new BadRequestException('Invalid godownId');
+      return godownId;
+    }
+    const fallback = await this.ensureDefaultGodown();
+    return fallback.id;
+  }
+
+  // ─── Godown Master ─────────────────────────────────────────────────────────
+
+  async createGodown(data: any) {
+    const entity = this.godownRepo.create({
+      name: String(data.name || '').trim(),
+      code: String(data.code || '').trim().toUpperCase(),
+      location: data.location || undefined,
+      address: data.address || undefined,
+      capacityBirds: data.capacityBirds === '' || data.capacityBirds == null ? undefined : Number(data.capacityBirds),
+      managerName: data.managerName || undefined,
+      phone: data.phone || undefined,
+      status: data.status || 'active',
+      notes: data.notes || undefined,
+      tenantId: this.getTenantId() ?? undefined,
+    });
+
+    if (!entity.name || !entity.code) {
+      throw new BadRequestException('Godown name and code are required');
+    }
+
+    return this.godownRepo.save(entity);
+  }
+
+  async findAllGodowns(page?: number, limit?: number, search?: string, status?: string) {
+    const query = this.godownRepo.createQueryBuilder('godown')
+      .orderBy('godown.name', 'ASC');
+    this.applyTenant(query, 'godown');
+
+    if (search) {
+      query.andWhere(
+        '(godown.name ILIKE :search OR godown.code ILIKE :search OR godown.location ILIKE :search OR godown.managerName ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    if (status && status !== 'all') {
+      query.andWhere('godown.status = :status', { status });
+    }
+
+    if (page && limit) {
+      const skip = (Number(page) - 1) * Number(limit);
+      const [data, total] = await query.skip(skip).take(Number(limit)).getManyAndCount();
+      return { data, total, page: Number(page), limit: Number(limit) };
+    }
+
+    return query.getMany();
+  }
+
+  async findActiveGodowns() {
+    const list = await this.godownRepo.find({
+      where: this.tenantWhere({ status: 'active' }),
+      order: { name: 'ASC' },
+    });
+    if (list.length > 0) return list;
+    return [await this.ensureDefaultGodown()];
+  }
+
+  async findOneGodown(id: string) {
+    const godown = await this.godownRepo.findOne({ where: this.tenantWhere({ id }) });
+    if (!godown) throw new NotFoundException(`Godown with id ${id} not found`);
+    return godown;
+  }
+
+  async updateGodown(id: string, data: any) {
+    const existing = await this.findOneGodown(id);
+    Object.assign(existing, {
+      ...data,
+      code: data.code !== undefined ? String(data.code).trim().toUpperCase() : existing.code,
+      capacityBirds: data.capacityBirds === '' ? null : data.capacityBirds,
+    });
+    return this.godownRepo.save(existing);
+  }
+
+  async removeGodown(id: string) {
+    const [inwardCount, saleCount, mortalityCount, expenseCount] = await Promise.all([
+      this.inwardRepo.count({ where: this.tenantWhere({ godownId: id }) }),
+      this.saleRepo.count({ where: this.tenantWhere({ godownId: id }) }),
+      this.mortalityRepo.count({ where: this.tenantWhere({ godownId: id }) }),
+      this.expenseRepo.count({ where: this.tenantWhere({ godownId: id }) }),
+    ]);
+    if (inwardCount + saleCount + mortalityCount + expenseCount > 0) {
+      await this.godownRepo.update(this.tenantWhere({ id }), { status: 'inactive' });
+      return;
+    }
+    await this.godownRepo.delete(this.tenantWhere({ id }));
+  }
+
   // ─── Inward Entries ───────────────────────────────────────────────────────
 
   async createInward(data: any) {
     const { cageIds, cages, godownInwardWeight, actualWeight, weightLoss, ...entryData } = data;
+    entryData.godownId = await this.normalizeGodownId(entryData.godownId);
 
     if (!entryData.inwardNo) {
       entryData.inwardNo = await this.generateInwardNumber();
@@ -93,11 +229,13 @@ export class GodownService {
     return this.findOneInward(savedId);
   }
 
-  async findAllInward(page?: number, limit?: number, search?: string) {
+  async findAllInward(page?: number, limit?: number, search?: string, godownId?: string) {
     const query = this.inwardRepo.createQueryBuilder('inward')
+      .leftJoinAndSelect('inward.godown', 'godown')
       .orderBy('inward.entryDate', 'DESC');
 
     this.applyTenant(query, 'inward');
+    this.applyGodown(query, 'inward', godownId);
 
     if (search) {
       query.andWhere(
@@ -109,19 +247,20 @@ export class GodownService {
     if (page && limit) {
       const skip = (page - 1) * limit;
       const [data, total] = await query.skip(skip).take(limit).getManyAndCount();
-      return { data, total, page, limit };
+      return { data: data.map((entry) => this.withGodownName(entry)), total, page, limit };
     }
 
-    return query.getMany();
+    return (await query.getMany()).map((entry) => this.withGodownName(entry));
   }
 
   async findOneInward(id: string) {
-    const entry = await this.inwardRepo.findOne({ where: this.tenantWhere({ id }) });
+    const entry = await this.inwardRepo.findOne({ where: this.tenantWhere({ id }), relations: ['godown'] });
     if (!entry) return null;
 
     const linkedCages = await this.cagesService.getByGodownInwardId(id);
     return {
       ...entry,
+      godownName: entry.godown?.name,
       cages: linkedCages.map((c) => ({
         id: c.id,
         cageId: c.cageId,
@@ -142,6 +281,7 @@ export class GodownService {
     if (actualWeight !== undefined) updateData.actualWeight = parseFloat(actualWeight);
     if (weightLoss !== undefined) updateData.weightLoss = parseFloat(weightLoss);
     if (godownInwardWeight !== undefined) updateData.totalWeight = parseFloat(godownInwardWeight);
+    if (updateData.godownId !== undefined) updateData.godownId = await this.normalizeGodownId(updateData.godownId);
 
     await this.inwardRepo.update(id, updateData);
 
@@ -233,6 +373,7 @@ export class GodownService {
 
   async createSale(data: any) {
     const { cageIds, godownSaleWeight, payments, weightLoss, ...saleData } = data;
+    saleData.godownId = await this.normalizeGodownId(saleData.godownId);
 
     // Auto-generate sale number if not provided
     if (!saleData.saleNo) {
@@ -269,12 +410,14 @@ export class GodownService {
     return this.findOneSale(savedId);
   }
 
-  async findAllSales(page?: number, limit?: number, search?: string) {
+  async findAllSales(page?: number, limit?: number, search?: string, godownId?: string) {
     const query = this.saleRepo.createQueryBuilder('sale')
+      .leftJoinAndSelect('sale.godown', 'godown')
       .leftJoinAndSelect('sale.payments', 'payments')
       .orderBy('sale.saleDate', 'DESC');
 
     this.applyTenant(query, 'sale');
+    this.applyGodown(query, 'sale', godownId);
 
     if (search) {
       query.andWhere(
@@ -286,17 +429,18 @@ export class GodownService {
     if (page && limit) {
       const skip = (page - 1) * limit;
       const [data, total] = await query.skip(skip).take(limit).getManyAndCount();
-      return { data, total, page, limit };
+      return { data: data.map((sale) => this.withGodownName(sale)), total, page, limit };
     }
 
-    return query.getMany();
+    return (await query.getMany()).map((sale) => this.withGodownName(sale));
   }
 
   async findOneSale(id: string) {
-    return this.saleRepo.findOne({
+    const sale = await this.saleRepo.findOne({
       where: this.tenantWhere({ id }),
-      relations: ['payments']
+      relations: ['payments', 'godown']
     });
+    return sale ? this.withGodownName(sale) : sale;
   }
 
   async updateSale(id: string, data: any) {
@@ -326,6 +470,7 @@ export class GodownService {
       const totalPaymentMade = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
       validData.amountReceived = totalPaymentMade;
     }
+    if (validData.godownId !== undefined) validData.godownId = await this.normalizeGodownId(validData.godownId);
 
     await this.saleRepo.update(id, validData);
     return this.findOneSale(id);
@@ -338,16 +483,19 @@ export class GodownService {
   // ─── Mortality ────────────────────────────────────────────────────────────
 
   async createMortality(data: Partial<GodownMortality>) {
-    const mortality = this.mortalityRepo.create({ ...data, tenantId: this.getTenantId() ?? undefined });
+    const godownId = await this.normalizeGodownId(data.godownId);
+    const mortality = this.mortalityRepo.create({ ...data, godownId, tenantId: this.getTenantId() ?? undefined });
     return this.mortalityRepo.save(mortality);
   }
 
-  async findAllMortality(page?: number, limit?: number, search?: string) {
+  async findAllMortality(page?: number, limit?: number, search?: string, godownId?: string) {
     const query = this.mortalityRepo.createQueryBuilder('mortality')
+      .leftJoinAndSelect('mortality.godown', 'godown')
       .leftJoinAndSelect('mortality.godownInward', 'godownInward')
       .orderBy('mortality.mortalityDate', 'DESC');
 
     this.applyTenant(query, 'mortality');
+    this.applyGodown(query, 'mortality', godownId);
 
     if (search) {
       query.andWhere(
@@ -359,17 +507,19 @@ export class GodownService {
     if (page && limit) {
       const skip = (page - 1) * limit;
       const [data, total] = await query.skip(skip).take(limit).getManyAndCount();
-      return { data, total, page, limit };
+      return { data: data.map((mortality) => this.withGodownName(mortality)), total, page, limit };
     }
 
-    return query.getMany();
+    return (await query.getMany()).map((mortality) => this.withGodownName(mortality));
   }
 
   async findOneMortality(id: string) {
-    return this.mortalityRepo.findOne({ where: this.tenantWhere({ id }), relations: ['godownInward'] });
+    const mortality = await this.mortalityRepo.findOne({ where: this.tenantWhere({ id }), relations: ['godownInward', 'godown'] });
+    return mortality ? this.withGodownName(mortality) : mortality;
   }
 
   async updateMortality(id: string, data: Partial<GodownMortality>) {
+    if (data.godownId !== undefined) data.godownId = await this.normalizeGodownId(data.godownId);
     await this.mortalityRepo.update(id, data);
     return this.findOneMortality(id);
   }
@@ -381,15 +531,18 @@ export class GodownService {
   // ─── Expenses ─────────────────────────────────────────────────────────────
 
   async createExpense(data: Partial<GodownExpense>) {
-    const expense = this.expenseRepo.create({ ...data, tenantId: this.getTenantId() ?? undefined });
+    const godownId = await this.normalizeGodownId(data.godownId);
+    const expense = this.expenseRepo.create({ ...data, godownId, tenantId: this.getTenantId() ?? undefined });
     return this.expenseRepo.save(expense);
   }
 
-  async findAllExpenses(page?: number, limit?: number, search?: string, startDate?: string, endDate?: string) {
+  async findAllExpenses(page?: number, limit?: number, search?: string, startDate?: string, endDate?: string, godownId?: string) {
     const query = this.expenseRepo.createQueryBuilder('expense')
+      .leftJoinAndSelect('expense.godown', 'godown')
       .orderBy('expense.expenseDate', 'DESC');
 
     this.applyTenant(query, 'expense');
+    this.applyGodown(query, 'expense', godownId);
 
     if (search) {
       query.andWhere(
@@ -408,17 +561,19 @@ export class GodownService {
     if (page && limit) {
       const skip = (page - 1) * limit;
       const [data, total] = await query.skip(skip).take(limit).getManyAndCount();
-      return { data, total, page, limit };
+      return { data: data.map((expense) => this.withGodownName(expense)), total, page, limit };
     }
 
-    return query.getMany();
+    return (await query.getMany()).map((expense) => this.withGodownName(expense));
   }
 
   async findOneExpense(id: string) {
-    return this.expenseRepo.findOne({ where: this.tenantWhere({ id }) });
+    const expense = await this.expenseRepo.findOne({ where: this.tenantWhere({ id }), relations: ['godown'] });
+    return expense ? this.withGodownName(expense) : expense;
   }
 
   async updateExpense(id: string, data: Partial<GodownExpense>) {
+    if (data.godownId !== undefined) data.godownId = await this.normalizeGodownId(data.godownId);
     await this.expenseRepo.update(id, data);
     return this.findOneExpense(id);
   }
@@ -429,7 +584,7 @@ export class GodownService {
 
   // ─── Summary ──────────────────────────────────────────────────────────────
 
-  async getSummary() {
+  async getSummary(godownId?: string) {
     const inwardQuery = this.inwardRepo
       .createQueryBuilder('entry')
       .select([
@@ -438,6 +593,7 @@ export class GodownService {
         'SUM(entry.totalAmount) AS value',
       ]);
     this.applyTenant(inwardQuery, 'entry');
+    this.applyGodown(inwardQuery, 'entry', godownId);
     const inward = await inwardQuery.getRawOne();
 
     const soldQuery = this.saleRepo
@@ -448,6 +604,7 @@ export class GodownService {
         'SUM(sale.totalAmount) AS value',
       ]);
     this.applyTenant(soldQuery, 'sale');
+    this.applyGodown(soldQuery, 'sale', godownId);
     const sold = await soldQuery.getRawOne();
 
     const mortalityQuery = this.mortalityRepo
@@ -457,7 +614,12 @@ export class GodownService {
         'SUM(mortality.weightOfDeadBirds) AS weight',
       ]);
     this.applyTenant(mortalityQuery, 'mortality');
+    this.applyGodown(mortalityQuery, 'mortality', godownId);
     const mortality = await mortalityQuery.getRawOne();
+
+    const selectedGodown = godownId && godownId !== 'all'
+      ? await this.godownRepo.findOne({ where: this.tenantWhere({ id: godownId }) })
+      : null;
 
     const totalInwardBirds = parseFloat(inward.birds) || 0;
     const totalInwardWeight = parseFloat(inward.weight) || 0;
@@ -469,6 +631,8 @@ export class GodownService {
     const totalMortalityWeight = parseFloat(mortality.weight) || 0;
 
     return {
+      godownId: selectedGodown?.id ?? null,
+      godownName: selectedGodown?.name ?? null,
       totalInward: totalInwardBirds,
       totalSold: totalSoldBirds,
       totalMortality: totalMortalityBirds,
@@ -493,28 +657,36 @@ export class GodownService {
   async getStockLedger(filters?: {
     startDate?: string;
     endDate?: string;
+    godownId?: string;
     type?: string;
     search?: string;
   }) {
     const startDate = filters?.startDate || undefined;
     const endDate = filters?.endDate || undefined;
+    const godownId = filters?.godownId && filters.godownId !== 'all' ? filters.godownId : undefined;
     const typeFilter = (filters?.type || 'all').toLowerCase();
     const search = (filters?.search || '').trim().toLowerCase();
 
     const tenantId = this.getTenantId();
     const where: any = {};
     if (tenantId) where.tenantId = tenantId;
+    if (godownId) where.godownId = godownId;
+
+    const selectedGodown = godownId
+      ? await this.godownRepo.findOne({ where: this.tenantWhere({ id: godownId }) })
+      : null;
 
     const [inwards, sales, mortalities, birdReturns] = await Promise.all([
-      this.inwardRepo.find({ where, order: { entryDate: 'ASC', id: 'ASC' } }),
-      this.saleRepo.find({ where, order: { saleDate: 'ASC', id: 'ASC' } }),
+      this.inwardRepo.find({ where, relations: ['godown'], order: { entryDate: 'ASC', id: 'ASC' } }),
+      this.saleRepo.find({ where, relations: ['godown'], order: { saleDate: 'ASC', id: 'ASC' } }),
       this.mortalityRepo.find({
         where,
-        relations: ['godownInward'],
+        relations: ['godownInward', 'godown'],
         order: { mortalityDate: 'ASC', id: 'ASC' },
       }),
       this.birdReturnRepo.find({
-        where: { ...where, status: 'processed' },
+        where: { ...(tenantId ? { tenantId } : {}), status: 'processed' },
+        relations: ['sale', 'sale.godown'],
         order: { returnDate: 'ASC', id: 'ASC' },
       }),
     ]);
@@ -527,6 +699,8 @@ export class GodownService {
       referenceType: string;
       referenceId: string;
       referenceNo: string;
+      godownId?: string | null;
+      godownName?: string | null;
       party: string;
       purchaseInvoiceNo?: string;
       vehicleId?: string;
@@ -542,6 +716,7 @@ export class GodownService {
     // Per-sale totals that were deducted when returns were processed
     const returnAdjustBySale = new Map<string, { birds: number; weight: number }>();
     for (const r of birdReturns) {
+      if (godownId && String(r.sale?.godownId || '') !== String(godownId)) continue;
       const saleId = String(r.saleId);
       const prev = returnAdjustBySale.get(saleId) || { birds: 0, weight: 0 };
       prev.birds += Number(r.numberOfBirdsReturned) || 0;
@@ -560,6 +735,8 @@ export class GodownService {
         referenceType: 'Godown Inward',
         referenceId: String(e.id),
         referenceNo: e.inwardNo || `INW-${e.id}`,
+        godownId: e.godownId || null,
+        godownName: e.godown?.name || null,
         party: e.supplierName || '-',
         purchaseInvoiceNo: e.purchaseInvoiceNo,
         vehicleId: e.vehicleId,
@@ -586,6 +763,8 @@ export class GodownService {
         referenceType: 'Godown Sale',
         referenceId: String(s.id),
         referenceNo: s.saleNo || s.invoiceNumber || `GDS-${s.id}`,
+        godownId: s.godownId || null,
+        godownName: s.godown?.name || null,
         party: s.customerName || '-',
         vehicleId: s.vehicleId,
         birdsIn: 0,
@@ -601,6 +780,7 @@ export class GodownService {
     }
 
     for (const r of birdReturns) {
+      if (godownId && String(r.sale?.godownId || '') !== String(godownId)) continue;
       const birds = Number(r.numberOfBirdsReturned) || 0;
       const weight = Number(r.weightReturned) || 0;
       const isDead = r.returnReason === 'dead';
@@ -627,6 +807,8 @@ export class GodownService {
         referenceType: 'Godown Return',
         referenceId: String(r.id),
         referenceNo: r.returnNumber || `RET-${r.id}`,
+        godownId: r.sale?.godownId || null,
+        godownName: r.sale?.godown?.name || null,
         party: r.customerName || '-',
         birdsIn,
         birdsOut,
@@ -648,6 +830,8 @@ export class GodownService {
         referenceNo: m.godownInward?.inwardNo
           ? `MOR-${m.id} (${m.godownInward.inwardNo})`
           : `MOR-${m.id}`,
+        godownId: m.godownId || null,
+        godownName: m.godown?.name || null,
         party: m.reason || 'Mortality',
         birdsIn: 0,
         birdsOut: Number(m.numberOfBirdsDied) || 0,
@@ -749,6 +933,8 @@ export class GodownService {
         referenceType: m.referenceType,
         referenceId: m.referenceId,
         referenceNo: m.referenceNo,
+        godownId: m.godownId || null,
+        godownName: m.godownName || null,
         party: m.party,
         purchaseInvoiceNo: m.purchaseInvoiceNo || null,
         vehicleId: m.vehicleId || null,
@@ -765,6 +951,8 @@ export class GodownService {
     });
 
     return {
+      godownId: selectedGodown?.id ?? null,
+      godownName: selectedGodown?.name ?? null,
       startDate: start || null,
       endDate: end || null,
       opening: {

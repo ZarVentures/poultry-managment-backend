@@ -71,6 +71,7 @@ async function createPermissionsTable() {
         ('admin', 'expenses', true, true, true, true),
         ('admin', 'inventory', true, true, true, true),
         ('admin', 'godown', true, true, true, true),
+        ('admin', 'godowns', true, true, true, true),
         ('admin', 'settings', true, true, true, true),
         
         -- Manager has most access except user management
@@ -83,6 +84,7 @@ async function createPermissionsTable() {
         ('manager', 'expenses', true, true, true, true),
         ('manager', 'inventory', true, true, true, true),
         ('manager', 'godown', true, true, true, true),
+        ('manager', 'godowns', true, true, true, true),
         ('manager', 'settings', false, true, false, false),
         
         -- Staff has limited access
@@ -95,6 +97,7 @@ async function createPermissionsTable() {
         ('staff', 'expenses', true, true, true, false),
         ('staff', 'inventory', false, true, true, false),
         ('staff', 'godown', true, true, true, false),
+        ('staff', 'godowns', false, true, false, false),
         ('staff', 'settings', false, true, false, false)
       ON CONFLICT (role, resource) DO NOTHING;
     `);

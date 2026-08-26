@@ -1,9 +1,17 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { GodownMaster } from './godown-master.entity';
 
 @Entity('godown_inward_entries')
 export class GodownInwardEntry {
   @PrimaryGeneratedColumn('increment', { type: 'bigint' })
   id!: string;
+
+  @Column({ name: 'godown_id', type: 'bigint', nullable: true })
+  godownId?: string;
+
+  @ManyToOne(() => GodownMaster, { nullable: true })
+  @JoinColumn({ name: 'godown_id' })
+  godown?: GodownMaster;
 
   @Column({ name: 'entry_date', type: 'date' })
   entryDate!: string;
