@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, Length, Matches } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, Length, Matches } from 'class-validator';
 
 export class SendOtpDto {
   @IsString()
@@ -32,6 +32,23 @@ export class RegisterSendOtpDto {
 }
 
 export class RegisterVerifyOtpDto extends RegisterSendOtpDto {
+  @IsString()
+  @IsNotEmpty()
+  @Length(6, 6, { message: 'OTP must be exactly 6 digits' })
+  otp!: string;
+}
+
+export class EmailSendOtpDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email!: string;
+}
+
+export class EmailVerifyOtpDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email!: string;
+
   @IsString()
   @IsNotEmpty()
   @Length(6, 6, { message: 'OTP must be exactly 6 digits' })

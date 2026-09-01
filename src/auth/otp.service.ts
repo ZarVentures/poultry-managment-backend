@@ -79,6 +79,22 @@ export class OtpService {
   }
 
   /**
+   * Abstracted method to send the OTP via email provider.
+   */
+  async sendOtpEmail(email: string, otp: string): Promise<void> {
+    const provider = this.configService.get<string>('OTP_PROVIDER', 'dev');
+
+    if (provider === 'dev') {
+      this.logger.log(
+        `\n=========================================\nDEV MODE: Mock email to ${email}\nYour OTP is: ${otp}\n=========================================`,
+      );
+      return;
+    }
+
+    this.logger.log(`Sending OTP email to ${email} using provider: ${provider}`);
+  }
+
+  /**
    * Verifies the OTP, checks expiry, and increments attempts.
    */
   async verifyOtp(phoneNumber: string, otp: string): Promise<boolean> {
