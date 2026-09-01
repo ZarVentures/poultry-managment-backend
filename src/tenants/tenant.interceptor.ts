@@ -6,6 +6,7 @@ import {
   NestInterceptor,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
+import { DataSource } from 'typeorm';
 import { TenantContextService } from './tenant-context.service';
 
 const NO_SHOP_ALLOWLIST = [
@@ -13,18 +14,41 @@ const NO_SHOP_ALLOWLIST = [
   '/api/v1/tenants',
   '/api/v1/tenants/me',
   '/api/v1/auth',
+  '/api/health',
+  '/api/tenants',
+  '/api/tenants/me',
+  '/api/auth',
 ];
 
 @Injectable()
 export class TenantInterceptor implements NestInterceptor {
-  constructor(private readonly tenantContext: TenantContextService) {}
+  constructor(
+    private readonly tenantContext: TenantContextService,
+    private readonly dataSource: DataSource,
+  ) {}
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<any>> {
     const req = context.switchToHttp().getRequest();
-    const tenantId = req.user?.tenantId ?? null;
+    let tenantId =
+      req.user?.tenantId != null && req.user.tenantId !== ''
+        ? String(req.user.tenantId)
+        : null;
 
-    // Authenticated user without a shop yet: only allow setup/profile routes.
-    // This prevents a pre-shop user from reading every shop's data.
+    if (!tenantId && req.user?.userId) {
+      try {
+        const rows = await this.dataSource.query(
+          `SELECT tenant_id FROM users WHERE id = $1 LIMIT 1`,
+          [String(req.user.userId)],
+        );
+        if (rows?.[0]?.tenant_id != null) {
+          tenantId = String(rows[0].tenant_id);
+          req.user.tenantId = tenantId;
+        }
+      } catch {
+        // service-level checks still apply
+      }
+    }
+
     if (req.user && !tenantId) {
       const path: string = req.path || req.url || '';
       const allowed = NO_SHOP_ALLOWLIST.some(
@@ -37,25 +61,15 @@ export class TenantInterceptor implements NestInterceptor {
       }
     }
 
-    // Wrap subscription inside the AsyncLocalStorage context so all downstream
-    // async work (controllers → services → repositories) sees the tenant id.
+    const tid = tenantId == null || tenantId === '' ? null : String(tenantId);
     return new Observable((observer) => {
-      let isDisposed = false;
-      const runResult = this.tenantContext.run(tenantId, () => next.handle());
-      runResult.subscribe({
-        next: (value) => {
-          if (!isDisposed) observer.next(value);
-        },
-        error: (err) => {
-          if (!isDisposed) observer.error(err);
-        },
-        complete: () => {
-          if (!isDisposed) observer.complete();
-        },
-      });
-      return () => {
-        isDisposed = true;
-      };
+      return this.tenantContext.run(tid, () =>
+        next.handle().subscribe({
+          next: (value) => observer.next(value),
+          error: (err) => observer.error(err),
+          complete: () => observer.complete(),
+        }),
+      );
     });
   }
 }

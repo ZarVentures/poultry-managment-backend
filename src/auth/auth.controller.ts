@@ -2,7 +2,14 @@ import { Body, Controller, Get, Post, Request, UseGuards, Param, UnauthorizedExc
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { SendOtpDto, VerifyOtpDto, RegisterSendOtpDto, RegisterVerifyOtpDto } from './dto/otp.dto';
+import {
+  SendOtpDto,
+  VerifyOtpDto,
+  RegisterSendOtpDto,
+  RegisterVerifyOtpDto,
+  EmailSendOtpDto,
+  EmailVerifyOtpDto,
+} from './dto/otp.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -24,6 +31,16 @@ export class AuthController {
   @Post('login/verify-otp')
   async loginVerifyOtp(@Body() body: VerifyOtpDto) {
     return this.authService.loginVerifyOtp(body.phoneNumber, body.otp);
+  }
+
+  @Post('login/email/send-otp')
+  async loginSendEmailOtp(@Body() body: EmailSendOtpDto) {
+    return this.authService.loginSendEmailOtp(body.email);
+  }
+
+  @Post('login/email/verify-otp')
+  async loginVerifyEmailOtp(@Body() body: EmailVerifyOtpDto) {
+    return this.authService.loginVerifyEmailOtp(body.email, body.otp);
   }
 
   // ── Phone + OTP: Registration ─────────────────────────────────────────────
