@@ -16,12 +16,43 @@ export class AuthService {
     private readonly otpService: OtpService,
   ) {}
 
-  // ── Legacy email/password (kept for backward compat) ─────────────────────
+  private roleOf(user: User): string {
+    return (user.role || '').trim().toLowerCase();
+  }
+
+  private assertAdminMobileLogin(user: User) {
+    const role = this.roleOf(user);
+    if (role === 'staff' || role === 'manager') {
+      throw new UnauthorizedException(
+        'Staff and managers sign in with email (password or OTP), not mobile.',
+      );
+    }
+  }
+
+  private assertStaffEmailLogin(user: User) {
+    const role = this.roleOf(user);
+    if (role === 'admin' || role === '') {
+      throw new UnauthorizedException('Admins sign in with mobile OTP, not email.');
+    }
+    if (role !== 'staff' && role !== 'manager') {
+      throw new UnauthorizedException('This account cannot sign in with email.');
+    }
+  }
+
+  private emailOtpKey(email: string): string {
+    return `email:${email.trim().toLowerCase()}`;
+  }
+
+  // ── Email + password (staff / manager) ───────────────────────────────────
   async validateUser(email: string, pass: string): Promise<User> {
     const user = await this.usersService.findByEmail(email.toLowerCase());
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
-    if (!user.passwordHash) throw new UnauthorizedException('This account uses phone-based login. Please use OTP.');
+    this.assertStaffEmailLogin(user);
+
+    if (!user.passwordHash) {
+      throw new UnauthorizedException('Set a password with your admin, or sign in with email OTP.');
+    }
 
     const matches = await bcrypt.compare(pass, user.passwordHash);
     if (!matches) throw new UnauthorizedException('Invalid credentials');
@@ -31,16 +62,16 @@ export class AuthService {
     return user;
   }
 
-  // ── Phone + OTP: Login ────────────────────────────────────────────────────
+  // ── Phone + OTP: Admin login ──────────────────────────────────────────────
   async loginSendOtp(phoneNumber: string): Promise<{ message: string; devOtp?: string }> {
     const user = await this.usersService.findByPhone(phoneNumber);
     if (!user) throw new UnauthorizedException('No account found with this phone number.');
     if (user.status !== 'active') throw new UnauthorizedException('User account is inactive.');
+    this.assertAdminMobileLogin(user);
 
     const otp = await this.otpService.generateSecureOtp(phoneNumber);
     await this.otpService.sendOtpSms(phoneNumber, otp);
 
-    // Always include devOtp in response; front-end decides whether to display it
     return { message: 'OTP sent successfully', devOtp: otp };
   }
 
@@ -49,6 +80,33 @@ export class AuthService {
 
     const user = await this.usersService.findByPhone(phoneNumber);
     if (!user) throw new UnauthorizedException('User not found.');
+    this.assertAdminMobileLogin(user);
+
+    return this.login(user);
+  }
+
+  // ── Email OTP: Staff / manager login ──────────────────────────────────────
+  async loginSendEmailOtp(email: string): Promise<{ message: string; devOtp?: string }> {
+    const normalized = email.trim().toLowerCase();
+    const user = await this.usersService.findByEmail(normalized);
+    if (!user) throw new UnauthorizedException('No account found with this email.');
+    if (user.status !== 'active') throw new UnauthorizedException('User account is inactive.');
+    this.assertStaffEmailLogin(user);
+
+    const key = this.emailOtpKey(normalized);
+    const otp = await this.otpService.generateSecureOtp(key);
+    await this.otpService.sendOtpEmail(normalized, otp);
+
+    return { message: 'OTP sent successfully', devOtp: otp };
+  }
+
+  async loginVerifyEmailOtp(email: string, otp: string) {
+    const normalized = email.trim().toLowerCase();
+    await this.otpService.verifyOtp(this.emailOtpKey(normalized), otp);
+
+    const user = await this.usersService.findByEmail(normalized);
+    if (!user) throw new UnauthorizedException('User not found.');
+    this.assertStaffEmailLogin(user);
 
     return this.login(user);
   }
@@ -77,24 +135,34 @@ export class AuthService {
 
   // ── Session & Token Helpers ───────────────────────────────────────────────
   async login(user: User) {
-    if (user.isTwoFactorEnabled) {
-      const tempPayload = { sub: user.id, email: user.email, phone: user.phone, twoFactorPending: true };
+    const linked = await this.usersService.ensureTenantForLogin(user);
+    if (linked.isTwoFactorEnabled) {
+      const tempPayload = { sub: linked.id, email: linked.email, phone: linked.phone, twoFactorPending: true };
       const tempToken = await this.jwtService.signAsync(tempPayload, { expiresIn: '5m' });
       return { status: '2FA_REQUIRED', tempToken };
     }
-    return this.issueFullToken(user);
+    return this.issueFullToken(linked);
   }
 
   async issueFullToken(user: User) {
     const sessionToken = crypto.randomBytes(32).toString('hex');
     await this.usersService.updateSessionToken(user.id, sessionToken);
 
-    const payload = { sub: user.id, email: user.email, phone: user.phone, role: user.role, tenantId: user.tenantId ?? null, sessionToken };
+    const tenantId = user.tenantId != null ? String(user.tenantId) : null;
+    const payload = { sub: user.id, email: user.email, phone: user.phone, role: user.role, tenantId, sessionToken };
     const accessToken = await this.jwtService.signAsync(payload);
 
     return {
       accessToken,
-      user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role, tenantId: user.tenantId ?? null },
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        tenantId,
+        organizationId: tenantId,
+      },
     };
   }
 
@@ -105,7 +173,7 @@ export class AuthService {
   }
 
   async validateSession(userId: string, sessionToken: string): Promise<User> {
-    const user = await this.usersService.findOne(userId);
+    const user = await this.usersService.findByIdUnscoped(userId);
 
     if (!user || user.sessionToken !== sessionToken) {
       throw new UnauthorizedException('Session expired. Another login was detected for this account.');
