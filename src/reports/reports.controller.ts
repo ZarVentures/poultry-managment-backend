@@ -1,13 +1,21 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { Permissions } from '../auth/decorators/permissions.decorator';
 import { ReportsService } from './reports.service';
+import { BalanceSheetService } from './balance-sheet.service';
+import { BalanceSheetQueryDto } from './dto/balance-sheet-query.dto';
 
 @Controller('reports')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) { }
+  constructor(
+    private readonly reportsService: ReportsService,
+    private readonly balanceSheetService: BalanceSheetService,
+  ) { }
 
   @Get('purchases')
+  @Permissions('reports', 'read')
   async getPurchaseReport(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -16,6 +24,7 @@ export class ReportsController {
   }
 
   @Get('sales')
+  @Permissions('reports', 'read')
   async getSalesReport(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -24,6 +33,7 @@ export class ReportsController {
   }
 
   @Get('mortality')
+  @Permissions('reports', 'read')
   async getMortalityReport(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -32,6 +42,7 @@ export class ReportsController {
   }
 
   @Get('profit-loss')
+  @Permissions('reports', 'read')
   async getProfitLossReport(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -40,6 +51,7 @@ export class ReportsController {
   }
 
   @Get('gross-profit')
+  @Permissions('reports', 'read')
   async getGrossProfitReport(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -48,6 +60,7 @@ export class ReportsController {
   }
 
   @Get('expense-breakdown')
+  @Permissions('reports', 'read')
   async getExpenseBreakdown(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -56,6 +69,7 @@ export class ReportsController {
   }
 
   @Get('batch-wise-profit')
+  @Permissions('reports', 'read')
   async getBatchWiseProfit(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -64,6 +78,7 @@ export class ReportsController {
   }
 
   @Get('farm-wise-profit')
+  @Permissions('reports', 'read')
   async getFarmWiseProfit(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -72,6 +87,7 @@ export class ReportsController {
   }
 
   @Get('customer-wise-sales')
+  @Permissions('reports', 'read')
   async getCustomerWiseSales(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -80,6 +96,7 @@ export class ReportsController {
   }
 
   @Get('outstanding')
+  @Permissions('reports', 'read')
   async getOutstandingReport(
     @Query('page') page?: number,
     @Query('limit') limit?: number,
@@ -89,6 +106,7 @@ export class ReportsController {
   }
 
   @Get('collection')
+  @Permissions('reports', 'read')
   async getCollectionReport(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -100,10 +118,17 @@ export class ReportsController {
   }
 
   @Get('godown-sales')
+  @Permissions('reports', 'read')
   async getGodownSalesReport(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
     return this.reportsService.getGodownSalesReport(startDate, endDate);
+  }
+
+  @Get('balance-sheet')
+  @Permissions('billing', 'read')
+  async getBalanceSheet(@Query() query: BalanceSheetQueryDto) {
+    return this.balanceSheetService.getBalanceSheet(query.asOnDate);
   }
 }
