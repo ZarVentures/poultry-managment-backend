@@ -39,11 +39,16 @@ export class GodownSale {
   @Column({ name: 'total_amount', type: 'numeric', precision: 14, scale: 2, nullable: true })
   totalAmount?: number;
 
-  @Column({ name: 'payment_status', type: 'enum', enum: ['paid', 'pending', 'partial'] })
+  @Column({
+    name: 'payment_status',
+    type: 'enum',
+    enum: ['paid', 'pending', 'partial'],
+    enumName: 'payment_status_type',
+  })
   paymentStatus!: 'paid' | 'pending' | 'partial';
 
-  @Column({ name: 'weight_loss', type: 'numeric', precision: 10, scale: 2, default: 0 })
-  weightLoss!: number;
+  @Column({ name: 'weight_loss', type: 'numeric', precision: 10, scale: 2, default: 0, nullable: true })
+  weightLoss?: number;
 
   @Column({ name: 'payment_mode', type: 'varchar', length: 50, nullable: true })
   paymentMode?: string;

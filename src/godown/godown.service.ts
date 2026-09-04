@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder, ObjectLiteral } from 'typeorm';
 import { GodownInwardEntry } from './godown-inward.entity';
@@ -231,12 +231,93 @@ export class GodownService {
     return this.generateSaleNumber();
   }
 
+  private async assertGodownBirdsAvailable(requestedBirds: number, excludeSaleId?: string) {
+    const requested = Math.floor(Number(requestedBirds) || 0);
+    if (requested <= 0) {
+      throw new BadRequestException('Number of birds must be greater than 0');
+    }
+
+    const summary = await this.getSummary();
+    let available = Number(summary.currentStock) || 0;
+    if (excludeSaleId) {
+      const existing = await this.findOneSale(excludeSaleId);
+      available += Number(existing?.numberOfBirds) || 0;
+    }
+
+    if (available <= 0) {
+      throw new BadRequestException('Cannot record sale. Godown has 0 birds in stock.');
+    }
+    if (requested > available) {
+      throw new BadRequestException(
+        `Cannot sell ${requested} birds. Only ${available} birds available in godown.`,
+      );
+    }
+  }
+
+  private pickSaleColumns(data: any) {
+    const keys = [
+      'saleDate',
+      'saleNo',
+      'invoiceNumber',
+      'customerName',
+      'retailerId',
+      'vehicleId',
+      'numberOfBirds',
+      'averageWeight',
+      'totalWeight',
+      'ratePerKg',
+      'totalAmount',
+      'paymentStatus',
+      'weightLoss',
+      'paymentMode',
+      'amountReceived',
+      'notes',
+    ] as const;
+    const out: Record<string, any> = {};
+    for (const key of keys) {
+      if (data[key] !== undefined && data[key] !== '') {
+        out[key] = data[key];
+      }
+    }
+    return out;
+  }
+
+  private rethrowSaveError(error: any): never {
+    const pg = error?.driverError ?? error;
+    const message =
+      pg?.detail ||
+      pg?.message ||
+      error?.message ||
+      'Failed to save sale';
+    if (error instanceof BadRequestException) throw error;
+    throw new BadRequestException(message);
+  }
+
   async createSale(data: any) {
-    const { cageIds, godownSaleWeight, payments, weightLoss, ...saleData } = data;
+    const { payments, weightLoss, ...rest } = data;
+    const saleData = this.pickSaleColumns(rest);
+
+    await this.assertGodownBirdsAvailable(saleData.numberOfBirds);
+
+    if (saleData.invoiceNumber) {
+      const existingInvoice = await this.saleRepo.findOne({
+        where: this.tenantWhere({ invoiceNumber: saleData.invoiceNumber }),
+      });
+      if (existingInvoice) {
+        throw new BadRequestException(`Sale ${saleData.invoiceNumber} already exists`);
+      }
+    }
 
     // Auto-generate sale number if not provided
     if (!saleData.saleNo) {
-      saleData.saleNo = await this.generateSaleNumber();
+      saleData.saleNo = saleData.invoiceNumber || (await this.generateSaleNumber());
+    }
+
+    const existingSaleNo = await this.saleRepo.findOne({
+      where: this.tenantWhere({ saleNo: saleData.saleNo }),
+    });
+    if (existingSaleNo) {
+      throw new BadRequestException(`Sale ${saleData.saleNo} already exists`);
     }
 
     if (weightLoss) {
@@ -247,26 +328,32 @@ export class GodownService {
     const totalPaymentMade = (payments || []).reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
     saleData.amountReceived = totalPaymentMade;
 
-    const sale = this.saleRepo.create({ ...saleData, tenantId: this.getTenantId() ?? undefined });
-    const savedResult = await this.saleRepo.save(sale);
-    const savedId: string = (savedResult as any).id ?? (savedResult as any)[0]?.id;
+    try {
+      const insertPayload = {
+        ...saleData,
+        tenantId: this.getTenantId() ?? undefined,
+      };
+      const insertResult = await this.saleRepo.insert(insertPayload);
+      const savedId: string = String(insertResult.identifiers?.[0]?.id);
 
-    // Save payments if provided
-    if (payments && payments.length > 0) {
-      const validPayments = payments
-        .filter((p: any) => parseFloat(p.amount || '0') > 0)
-        .map((p: any) => this.salePaymentRepo.create({
-          godownSaleId: savedId,
-          paymentMode: p.paymentMode,
-          amount: parseFloat(p.amount),
-          tenantId: this.getTenantId() ?? undefined,
-        }));
-      if (validPayments.length > 0) {
-        await this.salePaymentRepo.save(validPayments);
+      if (payments && payments.length > 0) {
+        const validPayments = payments
+          .filter((p: any) => parseFloat(p.amount || '0') > 0)
+          .map((p: any) => this.salePaymentRepo.create({
+            godownSaleId: savedId,
+            paymentMode: p.paymentMode,
+            amount: parseFloat(p.amount),
+            tenantId: this.getTenantId() ?? undefined,
+          }));
+        if (validPayments.length > 0) {
+          await this.salePaymentRepo.save(validPayments);
+        }
       }
-    }
 
-    return this.findOneSale(savedId);
+      return this.findOneSale(savedId);
+    } catch (error: any) {
+      this.rethrowSaveError(error);
+    }
   }
 
   async findAllSales(page?: number, limit?: number, search?: string) {
@@ -300,35 +387,55 @@ export class GodownService {
   }
 
   async updateSale(id: string, data: any) {
-    // Filter out fields that don't exist in the entity
-    const { cages, payments, ...validData } = data;
-
-    // Handle payments update
-    if (payments !== undefined) {
-      // Delete existing payments
-      await this.salePaymentRepo.delete({ godownSaleId: id });
-
-      // Add new payments
-      const validPayments = payments
-        .filter((p: any) => parseFloat(p.amount || '0') > 0)
-        .map((p: any) => this.salePaymentRepo.create({
-          godownSaleId: id,
-          paymentMode: p.paymentMode,
-          amount: parseFloat(p.amount),
-          tenantId: this.getTenantId() ?? undefined,
-        }));
-
-      if (validPayments.length > 0) {
-        await this.salePaymentRepo.save(validPayments);
-      }
-
-      // Update amount_received
-      const totalPaymentMade = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
-      validData.amountReceived = totalPaymentMade;
+    const { payments, weightLoss, ...rest } = data;
+    const validData = this.pickSaleColumns(rest);
+    if (weightLoss !== undefined && weightLoss !== '') {
+      validData.weightLoss = parseFloat(weightLoss);
     }
 
-    await this.saleRepo.update(id, validData);
-    return this.findOneSale(id);
+    const requestedBirds =
+      validData.numberOfBirds !== undefined
+        ? validData.numberOfBirds
+        : (await this.findOneSale(id))?.numberOfBirds;
+    await this.assertGodownBirdsAvailable(requestedBirds, id);
+
+    try {
+      // Handle payments update
+      if (payments !== undefined) {
+        // Delete existing payments
+        await this.salePaymentRepo.delete({ godownSaleId: id });
+
+        // Add new payments
+        const validPayments = payments
+          .filter((p: any) => parseFloat(p.amount || '0') > 0)
+          .map((p: any) => this.salePaymentRepo.create({
+            godownSaleId: id,
+            paymentMode: p.paymentMode,
+            amount: parseFloat(p.amount),
+            tenantId: this.getTenantId() ?? undefined,
+          }));
+
+        if (validPayments.length > 0) {
+          await this.salePaymentRepo.save(validPayments);
+        }
+
+        // Update amount_received
+        const totalPaymentMade = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
+        validData.amountReceived = totalPaymentMade;
+      }
+
+      if (Object.keys(validData).length > 0) {
+        await this.saleRepo
+          .createQueryBuilder()
+          .update(GodownSale)
+          .set(validData)
+          .where('id = :id', { id })
+          .execute();
+      }
+      return this.findOneSale(id);
+    } catch (error: any) {
+      this.rethrowSaveError(error);
+    }
   }
 
   async removeSale(id: string) {
