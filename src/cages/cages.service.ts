@@ -342,15 +342,15 @@ export class CagesService {
 
   // Revert cages associated with a vehicle sale
   async revertVehicleSaleCages(saleId: string): Promise<void> {
-    await this.cageRepo.createQueryBuilder()
-      .update()
-      .set({
-        status: 'on_vehicle' as any,
+    const cages = await this.cageRepo.find({ where: this.tenantWhere({ saleId }) });
+    if (!cages.length) return;
+    for (const cage of cages) {
+      await this.cageRepo.update(cage.id, {
+        status: cage.vehicleId ? 'on_vehicle' : 'pending',
         saleId: null as any,
         saleWeight: null as any,
         updatedAt: new Date(),
-      })
-      .where('saleId = :saleId', { saleId })
-      .execute();
+      });
+    }
   }
 }

@@ -3,10 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Sale } from './sale.entity';
 import { SalePayment } from './sale-payment.entity';
-import { CreateSaleDto } from './dto/create-sale.dto';
+import { CreateSaleDto, CreateSaleCageDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { AccountingService } from '../modules/accounting/accounting.service';
 import { TenantContextService } from '../tenants/tenant-context.service';
+import { CagesService } from '../cages/cages.service';
 
 @Injectable()
 export class SalesService {
@@ -17,6 +18,7 @@ export class SalesService {
     private readonly salePaymentRepository: Repository<SalePayment>,
     private readonly accountingService: AccountingService,
     private readonly tenantContext: TenantContextService,
+    private readonly cagesService: CagesService,
   ) { }
 
   private getTenantId(): string | null {
@@ -120,6 +122,8 @@ export class SalesService {
         .map(p => this.salePaymentRepository.create({ paymentMode: p.paymentMode, amount: parseFloat(p.amount), saleId: savedId, tenantId: this.getTenantId() ?? undefined }));
       if (payments.length > 0) await this.salePaymentRepository.save(payments);
     }
+
+    await this.applySaleCages(savedId, dto.cages);
 
     const fullSale = await this.findOne(savedId);
     this.accountingService.syncSale(fullSale).catch((err) => {
@@ -288,6 +292,11 @@ export class SalesService {
     });
 
     // Use update() instead of save() to avoid cascade FK issue with sale_payments
+    if (dto.cages !== undefined) {
+      await this.cagesService.revertVehicleSaleCages(id);
+      await this.applySaleCages(id, dto.cages);
+    }
+
     await this.saleRepository.update(id, {
       invoiceNumber: sale.invoiceNumber,
       saleNo: sale.saleNo,
@@ -326,7 +335,24 @@ export class SalesService {
 
   async remove(id: string): Promise<void> {
     const sale = await this.findOne(id);
+    await this.cagesService.revertVehicleSaleCages(id);
     await this.saleRepository.remove(sale);
+  }
+
+  private async applySaleCages(saleId: string, cages?: CreateSaleCageDto[]): Promise<void> {
+    if (!cages?.length) return;
+    for (const cage of cages) {
+      if (!cage.cageId) continue;
+      const soldBirds = Number(cage.soldBirds) || 0;
+      if (soldBirds <= 0) continue;
+      await this.cagesService.partialVehicleSale(
+        cage.cageId,
+        saleId,
+        soldBirds,
+        Number(cage.soldWeight) || 0,
+        Number(cage.weightLoss) || 0,
+      );
+    }
   }
 
   async updateAttachment(id: string, fileUrl: string): Promise<Sale> {

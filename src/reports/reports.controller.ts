@@ -126,6 +126,15 @@ export class ReportsController {
     return this.reportsService.getGodownSalesReport(startDate, endDate);
   }
 
+  @Get('godown-inward')
+  @Permissions('reports', 'read')
+  async getGodownInwardReport(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportsService.getGodownInwardReport(startDate, endDate);
+  }
+
   @Get('balance-sheet')
   @Permissions('billing', 'read')
   async getBalanceSheet(@Query() query: BalanceSheetQueryDto) {
