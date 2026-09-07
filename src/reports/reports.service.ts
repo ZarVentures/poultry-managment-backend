@@ -7,6 +7,7 @@ import { Expense } from '../expenses/expense.entity';
 
 import { Retailer } from '../retailers/retailer.entity';
 import { GodownSale } from '../godown/entities/godown-sale.entity';
+import { GodownInwardEntry } from '../godown/godown-inward.entity';
 
 import { SalePayment } from '../sales/sale-payment.entity';
 import { GodownSalePayment } from '../godown/entities/godown-sale-payment.entity';
@@ -25,6 +26,8 @@ export class ReportsService {
     private readonly retailerRepository: Repository<Retailer>,
     @InjectRepository(GodownSale)
     private readonly godownSaleRepository: Repository<GodownSale>,
+    @InjectRepository(GodownInwardEntry)
+    private readonly godownInwardRepository: Repository<GodownInwardEntry>,
     @InjectRepository(SalePayment)
     private readonly salePaymentRepository: Repository<SalePayment>,
     @InjectRepository(GodownSalePayment)
@@ -263,6 +266,59 @@ export class ReportsService {
     };
   }
 
+  async getGodownInwardReport(startDate?: string, endDate?: string) {
+    const whereClause: any = {};
+
+    if (startDate && endDate) {
+      whereClause.entryDate = Between(new Date(startDate), new Date(endDate));
+    }
+
+    const entries = await this.godownInwardRepository.find({
+      where: this.tenantWhere(whereClause),
+      order: { entryDate: 'DESC' },
+    });
+
+    const invoiceNos = [...new Set(entries.map(e => e.purchaseInvoiceNo).filter(Boolean))] as string[];
+    const purchases = invoiceNos.length
+      ? await this.purchaseRepository.find({
+          where: invoiceNos.map(orderNumber => this.tenantWhere({ orderNumber })),
+        })
+      : [];
+    const purchaseByOrder = new Map(purchases.map(p => [p.orderNumber, p]));
+
+    const mapped = entries.map(e => {
+      const purchase = e.purchaseInvoiceNo ? purchaseByOrder.get(e.purchaseInvoiceNo) : undefined;
+      const weight = parseFloat((e.actualWeight ?? e.totalWeight ?? 0) as any) || 0;
+      const rate = parseFloat((e.ratePerKg ?? purchase?.ratePerKg ?? 0) as any) || 0;
+      const amount = parseFloat((e.totalAmount ?? 0) as any) || (weight * rate);
+      const paidAmount = parseFloat((purchase?.totalPaymentMade ?? 0) as any) || 0;
+      return {
+        ...e,
+        birds: e.numberOfBirds || 0,
+        weight,
+        ratePerKg: rate,
+        amount,
+        paidAmount,
+        weightLoss: parseFloat((e.weightLoss || 0) as any) || 0,
+      };
+    });
+
+    const summary = {
+      totalEntries: mapped.length,
+      totalBirds: mapped.reduce((sum, e) => sum + (e.birds || 0), 0),
+      totalWeight: mapped.reduce((sum, e) => sum + e.weight, 0),
+      totalAmount: mapped.reduce((sum, e) => sum + e.amount, 0),
+      totalPaid: mapped.reduce((sum, e) => sum + e.paidAmount, 0),
+      totalWeightLoss: mapped.reduce((sum, e) => sum + e.weightLoss, 0),
+    };
+
+    return {
+      summary,
+      entries: mapped,
+      dateRange: { startDate, endDate },
+    };
+  }
+
   async getGrossProfitReport(startDate?: string, endDate?: string) {
     const whereClausePurchase: any = {};
     const whereClauseSale: any = {};
@@ -318,8 +374,21 @@ export class ReportsService {
       summary: {
         totalExpenses,
         categoryCount: Object.keys(byCategory).length,
+        totalCount: expenses.length,
       },
       breakdown,
+      expenses: expenses
+        .map(e => ({
+          id: e.id,
+          expenseDate: e.expenseDate,
+          expenseOwner: e.expenseOwner || '',
+          category: e.expenseCategory?.name || e.category || 'Other',
+          description: e.description || '',
+          amount: parseFloat(e.amount as any) || 0,
+          paymentMethod: e.paymentMethod || '',
+          notes: e.notes || '',
+        }))
+        .sort((a, b) => String(b.expenseDate).localeCompare(String(a.expenseDate))),
       dateRange: { startDate, endDate },
     };
   }

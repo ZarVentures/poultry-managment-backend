@@ -8,13 +8,14 @@ import { Sale } from '../sales/sale.entity';
 import { Expense } from '../expenses/expense.entity';
 import { Retailer } from '../retailers/retailer.entity';
 import { GodownSale } from '../godown/entities/godown-sale.entity';
+import { GodownInwardEntry } from '../godown/godown-inward.entity';
 import { SalePayment } from '../sales/sale-payment.entity';
 import { GodownSalePayment } from '../godown/entities/godown-sale-payment.entity';
 import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PurchaseOrder, Sale, Expense, Retailer, GodownSale, SalePayment, GodownSalePayment]),
+    TypeOrmModule.forFeature([PurchaseOrder, Sale, Expense, Retailer, GodownSale, GodownInwardEntry, SalePayment, GodownSalePayment]),
     PermissionsModule,
   ],
   controllers: [ReportsController],
