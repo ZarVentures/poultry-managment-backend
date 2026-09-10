@@ -135,6 +135,15 @@ export class ReportsController {
     return this.reportsService.getGodownInwardReport(startDate, endDate);
   }
 
+  @Get('weight-loss')
+  @Permissions('reports', 'read')
+  async getWeightLossReport(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportsService.getWeightLossReport(startDate, endDate);
+  }
+
   @Get('balance-sheet')
   @Permissions('billing', 'read')
   async getBalanceSheet(@Query() query: BalanceSheetQueryDto) {

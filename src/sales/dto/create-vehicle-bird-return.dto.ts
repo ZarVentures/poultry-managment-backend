@@ -25,9 +25,9 @@ export class CreateVehicleBirdReturnDto {
   @IsOptional()
   weightReturned?: string;
 
-  @IsEnum(['dead', 'sick', 'underweight', 'quality_issue', 'customer_request', 'other'])
+  @IsEnum(['sick', 'underweight', 'quality_issue', 'customer_request', 'other', 'dead'])
   @IsNotEmpty()
-  returnReason!: 'dead' | 'sick' | 'underweight' | 'quality_issue' | 'customer_request' | 'other';
+  returnReason!: 'sick' | 'underweight' | 'quality_issue' | 'customer_request' | 'other' | 'dead';
 
   @IsString()
   @IsOptional()

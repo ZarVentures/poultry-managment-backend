@@ -90,6 +90,7 @@ export class GodownService {
       }
     }
 
+    await this.persistComputedInwardLoss(savedId);
     return this.findOneInward(savedId);
   }
 
@@ -169,7 +170,23 @@ export class GodownService {
       );
     }
 
+    await this.persistComputedInwardLoss(id);
     return this.findOneInward(id);
+  }
+
+  private async persistComputedInwardLoss(inwardId: string) {
+    const cages = await this.cagesService.getByGodownInwardId(inwardId);
+    if (!cages.length) return;
+    const purchaseWeight = cages.reduce((sum, c) => sum + (parseFloat(String(c.purchaseWeight || 0)) || 0), 0);
+    const actualWeight = cages.reduce((sum, c) => {
+      const godownWt = c.godownInwardWeight != null ? parseFloat(String(c.godownInwardWeight)) : parseFloat(String(c.purchaseWeight || 0));
+      return sum + (Number.isFinite(godownWt) ? godownWt : 0);
+    }, 0);
+    const weightLoss = Math.max(0, Math.round((purchaseWeight - actualWeight) * 100) / 100);
+    await this.inwardRepo.update(inwardId, {
+      weightLoss,
+      actualWeight: Math.round(actualWeight * 100) / 100,
+    });
   }
 
   async removeInward(id: string) {
@@ -575,15 +592,35 @@ export class GodownService {
     const totalMortalityBirds = parseFloat(mortality.birds) || 0;
     const totalMortalityWeight = parseFloat(mortality.weight) || 0;
 
+    const returnsQuery = this.birdReturnRepo
+      .createQueryBuilder('ret')
+      .select([
+        'SUM(ret.numberOfBirdsReturned) AS birds',
+        'SUM(ret.weightReturned) AS weight',
+      ])
+      .where("ret.status IN ('processed', 'approved', 'pending')");
+    this.applyTenant(returnsQuery, 'ret');
+    const returns = await returnsQuery.getRawOne();
+
+    const totalReturnBirds = parseFloat(returns?.birds) || 0;
+    const totalReturnWeight = parseFloat(returns?.weight) || 0;
+
+    // Live availability must match stock ledger closing (inward − sales + returns − mortality).
+    const ledger = await this.getStockLedger();
+    const currentStock = Math.max(0, Number(ledger?.closing?.birds) || 0);
+    const currentWeight = Math.max(0, Number(ledger?.closing?.weight) || 0);
+
     return {
       totalInward: totalInwardBirds,
       totalSold: totalSoldBirds,
       totalMortality: totalMortalityBirds,
-      currentStock: totalInwardBirds - totalSoldBirds - totalMortalityBirds,
+      totalReturns: totalReturnBirds,
+      currentStock,
       totalInwardWeight,
       totalSoldWeight,
       totalMortalityWeight,
-      currentWeight: totalInwardWeight - totalSoldWeight - totalMortalityWeight,
+      totalReturnWeight,
+      currentWeight,
       totalInwardValue,
       totalSoldValue,
       currentValue: totalInwardValue - totalSoldValue,
@@ -621,7 +658,17 @@ export class GodownService {
         order: { mortalityDate: 'ASC', id: 'ASC' },
       }),
       this.birdReturnRepo.find({
-        where: { ...where, status: 'processed' },
+        where: tenantId
+          ? [
+              { tenantId, status: 'processed' },
+              { tenantId, status: 'approved' },
+              { tenantId, status: 'pending' },
+            ]
+          : [
+              { status: 'processed' },
+              { status: 'approved' },
+              { status: 'pending' },
+            ],
         order: { returnDate: 'ASC', id: 'ASC' },
       }),
     ]);
@@ -644,11 +691,13 @@ export class GodownService {
       ratePerKg?: number;
       amount?: number;
       notes?: string;
+      affectsStock?: boolean;
     };
 
     // Per-sale totals that were deducted when returns were processed
     const returnAdjustBySale = new Map<string, { birds: number; weight: number }>();
     for (const r of birdReturns) {
+      if (r.status !== 'processed') continue;
       const saleId = String(r.saleId);
       const prev = returnAdjustBySale.get(saleId) || { birds: 0, weight: 0 };
       prev.birds += Number(r.numberOfBirdsReturned) || 0;
@@ -712,14 +761,12 @@ export class GodownService {
       const weight = Number(r.weightReturned) || 0;
       const isDead = r.returnReason === 'dead';
       const toStock = !!r.returnedToInventory;
-      // Birds come back from customer (+). If not restocked and not dead, they leave again (−).
-      // Dead birds leave via mortality row (created on process).
-      const birdsIn = birds;
-      const birdsOut = !toStock && !isDead ? birds : 0;
-      const weightIn = weight;
-      const weightOut = !toStock && !isDead ? weight : 0;
+      const processed = r.status === 'processed';
+      const birdsOut = processed && !toStock && !isDead ? birds : 0;
+      const weightOut = processed && !toStock && !isDead ? weight : 0;
 
-      let noteParts = [
+      const noteParts = [
+        r.status !== 'processed' ? `Status: ${r.status} (not yet processed)` : null,
         `Reason: ${r.returnReason}`,
         toStock ? 'Restocked to godown' : isDead ? 'Dead — see mortality' : 'Not restocked',
         r.reasonDescription,
@@ -735,12 +782,13 @@ export class GodownService {
         referenceId: String(r.id),
         referenceNo: r.returnNumber || `RET-${r.id}`,
         party: r.customerName || '-',
-        birdsIn,
+        birdsIn: birds,
         birdsOut,
-        weightIn,
+        weightIn: weight,
         weightOut,
         amount: r.refundAmount != null ? Number(r.refundAmount) : undefined,
         notes: noteParts.join(' | '),
+        affectsStock: processed,
       });
     }
 
@@ -778,6 +826,7 @@ export class GodownService {
     let openingBirds = 0;
     let openingWeight = 0;
     for (const m of movements) {
+      if (m.affectsStock === false) continue;
       if (start && m.date < start) {
         openingBirds += m.birdsIn - m.birdsOut;
         openingWeight += m.weightIn - m.weightOut;
@@ -829,21 +878,23 @@ export class GodownService {
     let returnWeightIn = 0;
 
     const entries = periodMovements.map((m) => {
-      runningBirds += m.birdsIn - m.birdsOut;
-      runningWeight += m.weightIn - m.weightOut;
-      periodInBirds += m.birdsIn;
-      periodOutBirds += m.birdsOut;
-      periodInWeight += m.weightIn;
-      periodOutWeight += m.weightOut;
-      if (m.birdsIn > 0) periodInAmount += m.amount || 0;
-      if (m.birdsOut > 0) periodOutAmount += m.amount || 0;
-      if (m.movementType === 'SALE') {
-        soldBirds += m.birdsOut;
-        soldWeight += m.weightOut;
-      }
-      if (m.movementType === 'MORTALITY') {
-        mortalityBirds += m.birdsOut;
-        mortalityWeight += m.weightOut;
+      if (m.affectsStock !== false) {
+        runningBirds += m.birdsIn - m.birdsOut;
+        runningWeight += m.weightIn - m.weightOut;
+        periodInBirds += m.birdsIn;
+        periodOutBirds += m.birdsOut;
+        periodInWeight += m.weightIn;
+        periodOutWeight += m.weightOut;
+        if (m.birdsIn > 0) periodInAmount += m.amount || 0;
+        if (m.birdsOut > 0) periodOutAmount += m.amount || 0;
+        if (m.movementType === 'SALE') {
+          soldBirds += m.birdsOut;
+          soldWeight += m.weightOut;
+        }
+        if (m.movementType === 'MORTALITY') {
+          mortalityBirds += m.birdsOut;
+          mortalityWeight += m.weightOut;
+        }
       }
       if (m.movementType === 'RETURN') {
         returnBirdsIn += m.birdsIn;
