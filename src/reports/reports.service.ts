@@ -1,6 +1,6 @@
 ﻿import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, In } from 'typeorm';
 import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { Sale } from '../sales/sale.entity';
 import { Expense } from '../expenses/expense.entity';
@@ -8,6 +8,7 @@ import { Expense } from '../expenses/expense.entity';
 import { Retailer } from '../retailers/retailer.entity';
 import { GodownSale } from '../godown/entities/godown-sale.entity';
 import { GodownInwardEntry } from '../godown/godown-inward.entity';
+import { Cage } from '../cages/cage.entity';
 
 import { SalePayment } from '../sales/sale-payment.entity';
 import { GodownSalePayment } from '../godown/entities/godown-sale-payment.entity';
@@ -28,6 +29,8 @@ export class ReportsService {
     private readonly godownSaleRepository: Repository<GodownSale>,
     @InjectRepository(GodownInwardEntry)
     private readonly godownInwardRepository: Repository<GodownInwardEntry>,
+    @InjectRepository(Cage)
+    private readonly cageRepository: Repository<Cage>,
     @InjectRepository(SalePayment)
     private readonly salePaymentRepository: Repository<SalePayment>,
     @InjectRepository(GodownSalePayment)
@@ -52,6 +55,47 @@ export class ReportsService {
   private tenantSqlFilterNoAlias(): string {
     const tenantId = this.getTenantId();
     return tenantId ? `tenant_id = '${tenantId}'` : '1=1';
+  }
+
+  private num(v: any): number {
+    const x = parseFloat(v as any);
+    return Number.isFinite(x) ? x : 0;
+  }
+
+  private round2(v: number): number {
+    return Math.round(v * 100) / 100;
+  }
+
+  private parseSaleNotesWeightLossKg(notes?: string): number {
+    if (!notes) return 0;
+    try {
+      const parsed = JSON.parse(notes);
+      const kg = parseFloat(parsed?.weightLoss?.totalWeightLoss);
+      return Number.isFinite(kg) ? kg : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private stageLoss(fromWeight: number, toWeight: number): number {
+    return Math.max(0, this.round2(fromWeight - toWeight));
+  }
+
+  private channelSummary(key: string, label: string, rows: Array<{ birds: number; purchaseWeight: number; recordedWeight: number; weightLoss: number }>) {
+    const birds = rows.reduce((s, r) => s + (r.birds || 0), 0);
+    const purchaseWeight = this.round2(rows.reduce((s, r) => s + (r.purchaseWeight || 0), 0));
+    const recordedWeight = this.round2(rows.reduce((s, r) => s + (r.recordedWeight || 0), 0));
+    const weightLoss = this.round2(rows.reduce((s, r) => s + (r.weightLoss || 0), 0));
+    return {
+      key,
+      label,
+      documents: rows.length,
+      birds,
+      purchaseWeight,
+      recordedWeight,
+      weightLoss,
+      lossPercent: purchaseWeight > 0 ? this.round2((weightLoss / purchaseWeight) * 100) : 0,
+    };
   }
 
   async getPurchaseReport(startDate?: string, endDate?: string) {
@@ -286,12 +330,30 @@ export class ReportsService {
       : [];
     const purchaseByOrder = new Map(purchases.map(p => [p.orderNumber, p]));
 
+    const inwardIds = entries.map(e => e.id);
+    const inwardCages = inwardIds.length
+      ? await this.cageRepository.find({ where: this.tenantWhere({ godownInwardId: In(inwardIds) }) })
+      : [];
+    const cagesByInward = new Map<string, Cage[]>();
+    for (const cage of inwardCages) {
+      const key = String(cage.godownInwardId);
+      if (!cagesByInward.has(key)) cagesByInward.set(key, []);
+      cagesByInward.get(key)!.push(cage);
+    }
+
     const mapped = entries.map(e => {
       const purchase = e.purchaseInvoiceNo ? purchaseByOrder.get(e.purchaseInvoiceNo) : undefined;
       const weight = parseFloat((e.actualWeight ?? e.totalWeight ?? 0) as any) || 0;
       const rate = parseFloat((e.ratePerKg ?? purchase?.ratePerKg ?? 0) as any) || 0;
       const amount = parseFloat((e.totalAmount ?? 0) as any) || (weight * rate);
       const paidAmount = parseFloat((purchase?.totalPaymentMade ?? 0) as any) || 0;
+      const related = cagesByInward.get(String(e.id)) || [];
+      const cageLoss = related.reduce((sum, c) => {
+        const purchaseWt = this.num(c.purchaseWeight);
+        const godownWt = c.godownInwardWeight != null ? this.num(c.godownInwardWeight) : purchaseWt;
+        return sum + this.stageLoss(purchaseWt, godownWt);
+      }, 0);
+      const storedLoss = parseFloat((e.weightLoss || 0) as any) || 0;
       return {
         ...e,
         birds: e.numberOfBirds || 0,
@@ -299,7 +361,7 @@ export class ReportsService {
         ratePerKg: rate,
         amount,
         paidAmount,
-        weightLoss: parseFloat((e.weightLoss || 0) as any) || 0,
+        weightLoss: this.round2(cageLoss > 0 ? cageLoss : storedLoss),
       };
     });
 
@@ -696,6 +758,187 @@ export class ReportsService {
         totalAmount,
         modeTotals
       }
+    };
+  }
+
+  async getWeightLossReport(startDate?: string, endDate?: string) {
+    const whereSale: any = {};
+    const whereInward: any = {};
+    const whereGodownSale: any = {};
+
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      whereSale.saleDate = Between(start, end);
+      whereInward.entryDate = Between(start, end);
+      whereGodownSale.saleDate = Between(start, end);
+    }
+
+    const [sales, inwards, godownSales] = await Promise.all([
+      this.saleRepository.find({
+        where: this.tenantWhere(whereSale),
+        order: { saleDate: 'DESC' },
+      }),
+      this.godownInwardRepository.find({
+        where: this.tenantWhere(whereInward),
+        order: { entryDate: 'DESC' },
+      }),
+      this.godownSaleRepository.find({
+        where: this.tenantWhere(whereGodownSale),
+        order: { saleDate: 'DESC' },
+      }),
+    ]);
+
+    const saleIds = sales.map(s => s.id);
+    const inwardIds = inwards.map(e => e.id);
+    const godownSaleIds = godownSales.map(s => s.id);
+
+    const orWhere: any[] = [];
+    if (saleIds.length) orWhere.push(this.tenantWhere({ saleId: In(saleIds) }));
+    if (inwardIds.length) orWhere.push(this.tenantWhere({ godownInwardId: In(inwardIds) }));
+    if (godownSaleIds.length) orWhere.push(this.tenantWhere({ godownSaleId: In(godownSaleIds) }));
+
+    const cages = orWhere.length ? await this.cageRepository.find({ where: orWhere }) : [];
+
+    const cagesBySale = new Map<string, Cage[]>();
+    const cagesByInward = new Map<string, Cage[]>();
+    const cagesByGodownSale = new Map<string, Cage[]>();
+    for (const cage of cages) {
+      if (cage.saleId) {
+        const key = String(cage.saleId);
+        if (!cagesBySale.has(key)) cagesBySale.set(key, []);
+        cagesBySale.get(key)!.push(cage);
+      }
+      if (cage.godownInwardId) {
+        const key = String(cage.godownInwardId);
+        if (!cagesByInward.has(key)) cagesByInward.set(key, []);
+        cagesByInward.get(key)!.push(cage);
+      }
+      if (cage.godownSaleId) {
+        const key = String(cage.godownSaleId);
+        if (!cagesByGodownSale.has(key)) cagesByGodownSale.set(key, []);
+        cagesByGodownSale.get(key)!.push(cage);
+      }
+    }
+
+    const salesRows = sales.map(s => {
+      const related = cagesBySale.get(String(s.id)) || [];
+      const birds = related.reduce((sum, c) => sum + (parseInt(String(c.numberOfBirds), 10) || 0), 0) || (parseInt(String(s.numberOfBirds || 0), 10) || 0);
+      const purchaseWeight = this.round2(related.reduce((sum, c) => sum + this.num(c.purchaseWeight), 0));
+      const recordedWeight = this.round2(related.reduce((sum, c) => sum + this.num(c.saleWeight != null ? c.saleWeight : c.purchaseWeight), 0));
+      const cageLoss = related.reduce((sum, c) => {
+        const purchaseWt = this.num(c.purchaseWeight);
+        const soldWt = c.saleWeight != null ? this.num(c.saleWeight) : purchaseWt;
+        return sum + this.stageLoss(purchaseWt, soldWt);
+      }, 0);
+      const notesLoss = this.parseSaleNotesWeightLossKg(s.notes);
+      const shortageKg = this.num(s.weightShortageKg);
+      const weightLoss = this.round2(cageLoss > 0.001 ? cageLoss : (notesLoss > 0 ? notesLoss : shortageKg));
+      const fromWeight = purchaseWeight > 0 ? purchaseWeight : this.round2(this.num(s.quantity) + weightLoss);
+      const toWeight = recordedWeight > 0 ? recordedWeight : this.num(s.quantity);
+      return {
+        channel: 'vehicle_sales',
+        channelLabel: 'Sales',
+        documentNo: s.invoiceNumber || s.saleNo || '-',
+        date: s.saleDate,
+        party: s.customerName || '-',
+        purchaseBillNo: s.purchaseBillNo || '-',
+        birds,
+        purchaseWeight: fromWeight,
+        recordedWeight: toWeight,
+        weightLoss,
+        lossPercent: fromWeight > 0 ? this.round2((weightLoss / fromWeight) * 100) : 0,
+      };
+    });
+
+    const inwardRows = inwards.map(e => {
+      const related = cagesByInward.get(String(e.id)) || [];
+      const birds = related.reduce((sum, c) => sum + (parseInt(String(c.numberOfBirds), 10) || 0), 0) || (e.numberOfBirds || 0);
+      const purchaseWeight = this.round2(related.reduce((sum, c) => sum + this.num(c.purchaseWeight), 0));
+      const recordedWeight = this.round2(related.reduce((sum, c) => {
+        return sum + this.num(c.godownInwardWeight != null ? c.godownInwardWeight : c.purchaseWeight);
+      }, 0));
+      const cageLoss = related.reduce((sum, c) => {
+        const purchaseWt = this.num(c.purchaseWeight);
+        const godownWt = c.godownInwardWeight != null ? this.num(c.godownInwardWeight) : purchaseWt;
+        return sum + this.stageLoss(purchaseWt, godownWt);
+      }, 0);
+      const storedLoss = this.num(e.weightLoss);
+      const weightLoss = this.round2(cageLoss > 0.001 ? cageLoss : storedLoss);
+      const fromWeight = purchaseWeight > 0 ? purchaseWeight : this.round2(this.num(e.actualWeight ?? e.totalWeight) + weightLoss);
+      const toWeight = recordedWeight > 0 ? recordedWeight : this.num(e.actualWeight ?? e.totalWeight);
+      return {
+        channel: 'godown_inward',
+        channelLabel: 'Godown Inward',
+        documentNo: e.inwardNo || '-',
+        date: e.entryDate,
+        party: e.supplierName || '-',
+        purchaseBillNo: e.purchaseInvoiceNo || '-',
+        birds,
+        purchaseWeight: fromWeight,
+        recordedWeight: toWeight,
+        weightLoss,
+        lossPercent: fromWeight > 0 ? this.round2((weightLoss / fromWeight) * 100) : 0,
+      };
+    });
+
+    const godownSalesRows = godownSales.map(s => {
+      const related = cagesByGodownSale.get(String(s.id)) || [];
+      const birds = related.reduce((sum, c) => sum + (parseInt(String(c.numberOfBirds), 10) || 0), 0) || (s.numberOfBirds || 0);
+      const fromCageWeight = this.round2(related.reduce((sum, c) => {
+        return sum + this.num(c.godownInwardWeight != null ? c.godownInwardWeight : c.purchaseWeight);
+      }, 0));
+      const recordedWeight = this.round2(related.reduce((sum, c) => {
+        const fromWt = this.num(c.godownInwardWeight != null ? c.godownInwardWeight : c.purchaseWeight);
+        return sum + this.num(c.godownSaleWeight != null ? c.godownSaleWeight : fromWt);
+      }, 0));
+      const cageLoss = related.reduce((sum, c) => {
+        const fromWt = this.num(c.godownInwardWeight != null ? c.godownInwardWeight : c.purchaseWeight);
+        const soldWt = c.godownSaleWeight != null ? this.num(c.godownSaleWeight) : fromWt;
+        return sum + this.stageLoss(fromWt, soldWt);
+      }, 0);
+      const storedLoss = this.num(s.weightLoss);
+      const weightLoss = this.round2(cageLoss > 0.001 ? cageLoss : storedLoss);
+      const fromWeight = fromCageWeight > 0 ? fromCageWeight : this.round2(this.num(s.totalWeight) + weightLoss);
+      const toWeight = recordedWeight > 0 ? recordedWeight : this.num(s.totalWeight);
+      return {
+        channel: 'godown_sales',
+        channelLabel: 'Godown Sales',
+        documentNo: s.invoiceNumber || s.saleNo || '-',
+        date: s.saleDate,
+        party: s.customerName || '-',
+        purchaseBillNo: '-',
+        birds,
+        purchaseWeight: fromWeight,
+        recordedWeight: toWeight,
+        weightLoss,
+        lossPercent: fromWeight > 0 ? this.round2((weightLoss / fromWeight) * 100) : 0,
+      };
+    });
+
+    const salesChannel = this.channelSummary('vehicle_sales', 'Sales', salesRows);
+    const inwardChannel = this.channelSummary('godown_inward', 'Godown Inward', inwardRows);
+    const godownSalesChannel = this.channelSummary('godown_sales', 'Godown Sales', godownSalesRows);
+    const byChannel = [salesChannel, inwardChannel, godownSalesChannel];
+    const totalLoss = this.round2(byChannel.reduce((s, c) => s + c.weightLoss, 0));
+    const totalPurchaseWeight = this.round2(byChannel.reduce((s, c) => s + c.purchaseWeight, 0));
+    const totalRecordedWeight = this.round2(byChannel.reduce((s, c) => s + c.recordedWeight, 0));
+    const totalBirds = byChannel.reduce((s, c) => s + c.birds, 0);
+
+    return {
+      summary: {
+        totalLoss,
+        totalBirds,
+        totalPurchaseWeight,
+        totalRecordedWeight,
+        lossPercent: totalPurchaseWeight > 0 ? this.round2((totalLoss / totalPurchaseWeight) * 100) : 0,
+        vehicleSalesLoss: salesChannel.weightLoss,
+        godownInwardLoss: inwardChannel.weightLoss,
+        godownSalesLoss: godownSalesChannel.weightLoss,
+      },
+      byChannel,
+      details: [...salesRows, ...inwardRows, ...godownSalesRows],
+      dateRange: { startDate, endDate },
     };
   }
 }
