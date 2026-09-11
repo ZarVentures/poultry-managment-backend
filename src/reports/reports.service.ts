@@ -898,8 +898,8 @@ export class ReportsService {
         return sum + this.stageLoss(fromWt, soldWt);
       }, 0);
       const storedLoss = this.num(s.weightLoss);
-      const weightLoss = this.round2(cageLoss > 0.001 ? cageLoss : storedLoss);
-      const fromWeight = fromCageWeight > 0 ? fromCageWeight : this.round2(this.num(s.totalWeight) + weightLoss);
+      const cageWeightLoss = this.round2(cageLoss > 0.001 ? cageLoss : storedLoss);
+      const fromWeight = fromCageWeight > 0 ? fromCageWeight : this.round2(this.num(s.totalWeight) + cageWeightLoss);
       const toWeight = recordedWeight > 0 ? recordedWeight : this.num(s.totalWeight);
       return {
         channel: 'godown_sales',
@@ -911,14 +911,52 @@ export class ReportsService {
         birds,
         purchaseWeight: fromWeight,
         recordedWeight: toWeight,
-        weightLoss,
-        lossPercent: fromWeight > 0 ? this.round2((weightLoss / fromWeight) * 100) : 0,
+        weightLoss: 0,
+        lossPercent: 0,
       };
     });
 
     const salesChannel = this.channelSummary('vehicle_sales', 'Sales', salesRows);
     const inwardChannel = this.channelSummary('godown_inward', 'Godown Inward', inwardRows);
-    const godownSalesChannel = this.channelSummary('godown_sales', 'Godown Sales', godownSalesRows);
+
+    const totalGodownInwardWeight = this.round2(
+      inwards.reduce((sum, e) => sum + this.num(e.actualWeight ?? e.totalWeight), 0),
+    );
+    const totalGodownSaleWeight = this.round2(
+      godownSales.reduce((sum, s) => sum + this.num(s.totalWeight), 0),
+    );
+    const godownSalesLoss = this.stageLoss(totalGodownInwardWeight, totalGodownSaleWeight);
+    const godownSalesBirds = godownSales.reduce(
+      (sum, s) => sum + (parseInt(String(s.numberOfBirds || 0), 10) || 0),
+      0,
+    );
+    const godownSalesChannel = {
+      key: 'godown_sales',
+      label: 'Godown Sales',
+      documents: godownSalesRows.length,
+      birds: godownSalesBirds,
+      purchaseWeight: totalGodownInwardWeight,
+      recordedWeight: totalGodownSaleWeight,
+      weightLoss: godownSalesLoss,
+      lossPercent: totalGodownInwardWeight > 0
+        ? this.round2((godownSalesLoss / totalGodownInwardWeight) * 100)
+        : 0,
+    };
+
+    const godownSalesFormulaRow = {
+      channel: 'godown_sales',
+      channelLabel: 'Godown Sales',
+      documentNo: 'Inward − Sale',
+      date: startDate || '',
+      party: 'Total Godown Inward − Total Godown Sale',
+      purchaseBillNo: '-',
+      birds: godownSalesBirds,
+      purchaseWeight: totalGodownInwardWeight,
+      recordedWeight: totalGodownSaleWeight,
+      weightLoss: godownSalesLoss,
+      lossPercent: godownSalesChannel.lossPercent,
+    };
+
     const byChannel = [salesChannel, inwardChannel, godownSalesChannel];
     const totalLoss = this.round2(byChannel.reduce((s, c) => s + c.weightLoss, 0));
     const totalPurchaseWeight = this.round2(byChannel.reduce((s, c) => s + c.purchaseWeight, 0));
@@ -937,7 +975,7 @@ export class ReportsService {
         godownSalesLoss: godownSalesChannel.weightLoss,
       },
       byChannel,
-      details: [...salesRows, ...inwardRows, ...godownSalesRows],
+      details: [...salesRows, ...inwardRows, godownSalesFormulaRow, ...godownSalesRows],
       dateRange: { startDate, endDate },
     };
   }
