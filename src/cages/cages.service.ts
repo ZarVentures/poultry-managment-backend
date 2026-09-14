@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Cage, CageStatus } from './cage.entity';
@@ -352,5 +352,53 @@ export class CagesService {
         updatedAt: new Date(),
       });
     }
+  }
+
+  private static readonly TRAVEL_MORTALITY_STATUSES: CageStatus[] = ['pending', 'on_vehicle'];
+
+  async findTravelMortalityCage(purchaseOrderId: string, cageLabel: string): Promise<Cage | null> {
+    const query = this.cageRepo
+      .createQueryBuilder('cage')
+      .where('cage.purchaseOrderId = :purchaseOrderId', { purchaseOrderId })
+      .andWhere('LOWER(TRIM(cage.cageId)) = LOWER(:cageLabel)', { cageLabel: cageLabel.trim() });
+    this.applyTenant(query);
+    return query.getOne();
+  }
+
+  async deductTravelMortalityBirds(purchaseOrderId: string, cageLabel: string, birds: number): Promise<void> {
+    const qty = Math.floor(Number(birds) || 0);
+    if (qty <= 0) return;
+    const cage = await this.requireTravelMortalityCage(purchaseOrderId, cageLabel);
+    if (cage.numberOfBirds < qty) {
+      throw new BadRequestException(
+        `Cannot deduct ${qty} birds from cage ${cageLabel}. Only ${cage.numberOfBirds} birds remaining.`,
+      );
+    }
+    cage.numberOfBirds -= qty;
+    cage.updatedAt = new Date();
+    await this.cageRepo.save(cage);
+  }
+
+  async restoreTravelMortalityBirds(purchaseOrderId: string, cageLabel: string, birds: number): Promise<void> {
+    const qty = Math.floor(Number(birds) || 0);
+    if (qty <= 0) return;
+    const cage = await this.findTravelMortalityCage(purchaseOrderId, cageLabel);
+    if (!cage) return;
+    cage.numberOfBirds += qty;
+    cage.updatedAt = new Date();
+    await this.cageRepo.save(cage);
+  }
+
+  private async requireTravelMortalityCage(purchaseOrderId: string, cageLabel: string): Promise<Cage> {
+    const cage = await this.findTravelMortalityCage(purchaseOrderId, cageLabel);
+    if (!cage) {
+      throw new BadRequestException(`Cage ${cageLabel} not found on this purchase bill`);
+    }
+    if (!CagesService.TRAVEL_MORTALITY_STATUSES.includes(cage.status)) {
+      throw new BadRequestException(
+        `Cage ${cageLabel} is ${cage.status.replace('_', ' ')} and cannot be used for travel sales mortality`,
+      );
+    }
+    return cage;
   }
 }
