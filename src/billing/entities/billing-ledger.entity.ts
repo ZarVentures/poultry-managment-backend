@@ -1,7 +1,7 @@
 import { Column, Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { BillingParty } from './billing-party.entity';
 
-export type LedgerReferenceType = 'Opening' | 'Sale' | 'Payment' | 'Voucher';
+export type LedgerReferenceType = 'Opening' | 'Sale' | 'Payment' | 'Voucher' | 'Return';
 
 @Entity({ name: 'billing_ledger' })
 export class BillingLedger {

@@ -13,6 +13,8 @@ import { Farmer } from '../farmers/farmer.entity';
 import { Retailer } from '../retailers/retailer.entity';
 import { GodownSale } from '../godown/entities/godown-sale.entity';
 import { GodownSalePayment } from '../godown/entities/godown-sale-payment.entity';
+import { BirdReturn } from '../sales/entities/bird-return.entity';
+import { VehicleBirdReturn } from '../sales/entities/vehicle-bird-return.entity';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { GodownSalePayment } from '../godown/entities/godown-sale-payment.entity
       Retailer,
       GodownSale,
       GodownSalePayment,
+      BirdReturn,
+      VehicleBirdReturn,
     ]),
   ],
   controllers: [BillingController],

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, SelectQueryBuilder, ObjectLiteral } from 'typeorm';
+import { Repository, Between, SelectQueryBuilder, ObjectLiteral, Brackets } from 'typeorm';
 import { BillingParty, PartyType } from './entities/billing-party.entity';
 import { BillingPayment } from './entities/billing-payment.entity';
 import { BillingLedger, LedgerReferenceType } from './entities/billing-ledger.entity';
@@ -12,7 +12,9 @@ import { Farmer } from '../farmers/farmer.entity';
 import { Retailer } from '../retailers/retailer.entity';
 import { GodownSale } from '../godown/entities/godown-sale.entity';
 import { GodownSalePayment } from '../godown/entities/godown-sale-payment.entity';
-import { getTodayIST } from '../common/date-utils';
+import { BirdReturn } from '../sales/entities/bird-return.entity';
+import { VehicleBirdReturn } from '../sales/entities/vehicle-bird-return.entity';
+import { getTodayIST, normalizeToIST } from '../common/date-utils';
 import { TenantContextService } from '../tenants/tenant-context.service';
 //import { Farmer } from '../farmers/farmer.entity';
 
@@ -30,6 +32,8 @@ export class BillingService {
     @InjectRepository(Retailer) private retailerRepo: Repository<Retailer>,
     @InjectRepository(GodownSale) private godownSaleRepo: Repository<GodownSale>,
     @InjectRepository(GodownSalePayment) private godownSalePaymentRepo: Repository<GodownSalePayment>,
+    @InjectRepository(BirdReturn) private birdReturnRepo: Repository<BirdReturn>,
+    @InjectRepository(VehicleBirdReturn) private vehicleBirdReturnRepo: Repository<VehicleBirdReturn>,
     private readonly tenantContext: TenantContextService,
   ) { }
 
@@ -46,6 +50,32 @@ export class BillingService {
     const tenantId = this.getTenantId();
     if (tenantId) query.andWhere(`${alias}.tenantId = :tenantId`, { tenantId });
     return query;
+  }
+
+  /** Calendar date YYYY-MM-DD. Never use toISOString() — that shifts IST dates back a day. */
+  private toLedgerDate(value: string | Date | null | undefined, fallback?: string | Date | null): string {
+    const pick = (raw: string | Date | null | undefined): string | null => {
+      if (raw == null || raw === '') return null;
+      if (raw instanceof Date) {
+        if (Number.isNaN(raw.getTime())) return null;
+        const utcMidnight =
+          raw.getUTCHours() === 0 && raw.getUTCMinutes() === 0 && raw.getUTCSeconds() === 0;
+        if (utcMidnight) {
+          const y = raw.getUTCFullYear();
+          const m = String(raw.getUTCMonth() + 1).padStart(2, '0');
+          const d = String(raw.getUTCDate()).padStart(2, '0');
+          return `${y}-${m}-${d}`;
+        }
+        return normalizeToIST(raw.toISOString());
+      }
+      const text = String(raw).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+      const prefix = text.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (prefix && (text.includes('T00:00:00') || !text.includes('T'))) return prefix[1];
+      if (text.includes('T') || text.includes(' ')) return normalizeToIST(text);
+      return prefix ? prefix[1] : null;
+    };
+    return pick(value) || pick(fallback) || getTodayIST();
   }
 
   /**
@@ -74,6 +104,37 @@ export class BillingService {
     const d = Number(debit || 0);
     const c = Number(credit || 0);
     return partyType === 'Farm' ? c - d : d - c;
+  }
+
+  private returnImpactAmount(r: { refundAmount?: number; adjustmentAmount?: number }) {
+    return Number(r.refundAmount || 0) || Number(r.adjustmentAmount || 0);
+  }
+
+  private toReturnLedgerEntry(partyId: string, r: BirdReturn | VehicleBirdReturn, prefix: string) {
+    const amount = this.returnImpactAmount(r);
+    return {
+      id: `${prefix}-${r.id}`,
+      partyId,
+      referenceType: 'Return',
+      referenceId: r.returnNumber,
+      debit: 0,
+      credit: amount,
+      balance: 0,
+      date: this.toLedgerDate(r.returnDate),
+      createdAt: r.createdAt,
+      totalBirds: Number(r.numberOfBirdsReturned || 0),
+      totalWeight: Number(r.weightReturned || 0),
+    };
+  }
+
+  private processedReturnImpactBySale(returns: Array<BirdReturn | VehicleBirdReturn>) {
+    const map: Record<string, number> = {};
+    for (const r of returns) {
+      if (r.status !== 'processed') continue;
+      const saleId = String(r.saleId);
+      map[saleId] = (map[saleId] || 0) + this.returnImpactAmount(r);
+    }
+    return map;
   }
 
   // ─── Parties ──────────────────────────────────────────────────────────────
@@ -324,13 +385,13 @@ export class BillingService {
           debit: 0,
           credit: Number(po.netAmount || po.totalAmount || 0),
           balance: 0,
-          date: po.orderDate,
+          date: this.toLedgerDate(po.orderDate),
           createdAt: po.createdAt,
         });
 
         // 2. Add each Purchase Order Payment as a DEBIT entry (what we owe them decreases)
         for (const pay of po.payments || []) {
-          const payDate = pay.createdAt ? new Date(pay.createdAt).toISOString().split('T')[0] : po.orderDate;
+          const payDate = this.toLedgerDate((pay as any).paymentDate || pay.createdAt, po.orderDate);
           dynamicEntries.push({
             id: `pay-${pay.id}`,
             partyId,
@@ -345,31 +406,68 @@ export class BillingService {
         }
       }
     } else if (party.type === 'Retailer') {
+      const retailer = await this.retailerRepo
+        .createQueryBuilder('retailer')
+        .where('TRIM(LOWER(retailer.name)) = TRIM(LOWER(:name))', { name: party.name });
+      this.applyTenant(retailer, 'retailer');
+      const matchedRetailer = await retailer.getOne();
+
+      const vehicleReturnQuery = this.vehicleBirdReturnRepo
+        .createQueryBuilder('vr')
+        .where('vr.status <> :rejected', { rejected: 'rejected' })
+        .andWhere(new Brackets((qb) => {
+          qb.where('TRIM(LOWER(vr.customerName)) = TRIM(LOWER(:name))', { name: party.name });
+          if (matchedRetailer?.id) {
+            qb.orWhere('vr.retailerId = :retailerId', { retailerId: matchedRetailer.id });
+          }
+        }));
+      this.applyTenant(vehicleReturnQuery, 'vr');
+      const vehicleReturns = await vehicleReturnQuery.getMany();
+
+      const godownReturnQuery = this.birdReturnRepo
+        .createQueryBuilder('gr')
+        .where('gr.status <> :rejected', { rejected: 'rejected' })
+        .andWhere(new Brackets((qb) => {
+          qb.where('TRIM(LOWER(gr.customerName)) = TRIM(LOWER(:name))', { name: party.name });
+          if (matchedRetailer?.id) {
+            qb.orWhere('gr.retailerId = :retailerId', { retailerId: matchedRetailer.id });
+          }
+        }));
+      this.applyTenant(godownReturnQuery, 'gr');
+      const godownReturns = await godownReturnQuery.getMany();
+
+      const vehicleReturnImpact = this.processedReturnImpactBySale(vehicleReturns);
+      const godownReturnImpact = this.processedReturnImpactBySale(godownReturns);
+
       // For a Retailer, load their Sales and SalePayments dynamically (case-insensitive)
       const saleQuery = this.mainSaleRepo
         .createQueryBuilder('sale')
         .leftJoinAndSelect('sale.payments', 'payments')
-        .where('TRIM(LOWER(sale.customerName)) = TRIM(LOWER(:name))', { name: party.name });
+        .where(new Brackets((qb) => {
+          qb.where('TRIM(LOWER(sale.customerName)) = TRIM(LOWER(:name))', { name: party.name });
+          if (matchedRetailer?.id) {
+            qb.orWhere('sale.retailerId = :saleRetailerId', { saleRetailerId: matchedRetailer.id });
+          }
+        }));
       this.applyTenant(saleQuery, 'sale');
       const sales = await saleQuery.getMany();
 
       for (const sale of sales) {
-        // 1. Add Sale as a DEBIT entry (what they owe us increases)
+        const restored = Number(sale.netAmount || sale.totalAmount || 0) + (vehicleReturnImpact[String(sale.id)] || 0);
         dynamicEntries.push({
           id: `sale-${sale.id}`,
           partyId,
           referenceType: 'Sale',
           referenceId: sale.invoiceNumber || sale.saleNo || `INV-${sale.id}`,
-          debit: Number(sale.netAmount || sale.totalAmount || 0),
+          debit: restored,
           credit: 0,
           balance: 0,
-          date: sale.saleDate,
+          date: this.toLedgerDate(sale.saleDate),
           createdAt: sale.createdAt,
         });
 
-        // 2. Add each Sale Payment as a CREDIT entry (what they owe us decreases)
         for (const pay of sale.payments || []) {
-          const payDate = pay.createdAt ? new Date(pay.createdAt).toISOString().split('T')[0] : sale.saleDate;
+          const payDate = this.toLedgerDate((pay as any).paymentDate || pay.createdAt, sale.saleDate);
           dynamicEntries.push({
             id: `pay-${pay.id}`,
             partyId,
@@ -384,34 +482,40 @@ export class BillingService {
         }
       }
 
-      // Also load Godown Sales for this Retailer
       const godownQuery = this.godownSaleRepo
         .createQueryBuilder('gs')
-        .leftJoinAndSelect('gs.payments', 'payments')
-        .where('TRIM(LOWER(gs.customerName)) = TRIM(LOWER(:name))', { name: party.name });
+        .leftJoinAndSelect('gs.payments', 'gsPayments')
+        .where(new Brackets((qb) => {
+          qb.where('TRIM(LOWER(gs.customerName)) = TRIM(LOWER(:name))', { name: party.name });
+          if (matchedRetailer?.id) {
+            qb.orWhere('gs.retailerId = :gsRetailerId', { gsRetailerId: matchedRetailer.id });
+          }
+        }));
       this.applyTenant(godownQuery, 'gs');
       const godownSales = await godownQuery.getMany();
 
       for (const gs of godownSales) {
+        const saleDate = this.toLedgerDate(gs.saleDate);
+        const restored = Number(gs.totalAmount || 0) + (godownReturnImpact[String(gs.id)] || 0);
         dynamicEntries.push({
           id: `gs-${gs.id}`,
           partyId,
           referenceType: 'Sale',
-          referenceId: gs.saleNo || `GS-${gs.id}`,
-          debit: Number(gs.totalAmount || 0),
+          referenceId: gs.invoiceNumber || gs.saleNo || `GS-${gs.id}`,
+          debit: restored,
           credit: 0,
           balance: 0,
-          date: gs.saleDate,
+          date: saleDate,
           createdAt: gs.createdAt,
         });
 
         for (const pay of gs.payments || []) {
-          const payDate = pay.createdAt ? new Date(pay.createdAt).toISOString().split('T')[0] : gs.saleDate;
+          const payDate = this.toLedgerDate((pay as any).paymentDate, saleDate);
           dynamicEntries.push({
             id: `gspay-${pay.id}`,
             partyId,
             referenceType: 'Payment',
-            referenceId: `${gs.saleNo || `GS-${gs.id}`}-P`,
+            referenceId: `${gs.invoiceNumber || gs.saleNo || `GS-${gs.id}`}-P`,
             debit: 0,
             credit: Number(pay.amount),
             balance: 0,
@@ -420,15 +524,37 @@ export class BillingService {
           });
         }
       }
+
+      for (const r of vehicleReturns) {
+        dynamicEntries.push(this.toReturnLedgerEntry(partyId, r, 'vret'));
+      }
+      for (const r of godownReturns) {
+        dynamicEntries.push(this.toReturnLedgerEntry(partyId, r, 'gret'));
+      }
+
+      const returnKeys = new Set(
+        [...vehicleReturns, ...godownReturns].map((r) => `${r.returnDate}|${this.returnImpactAmount(r)}`),
+      );
+      for (let i = directEntries.length - 1; i >= 0; i--) {
+        const entry = directEntries[i];
+        const isReturnVoucher =
+          (entry.referenceType === 'Voucher' || entry.referenceType === 'Return') &&
+          Number(entry.credit || 0) > 0 &&
+          returnKeys.has(`${entry.date}|${Number(entry.credit)}`);
+        if (isReturnVoucher) directEntries.splice(i, 1);
+      }
     }
 
     // Combine all entries
-    const allEntries = [...directEntries, ...dynamicEntries];
+    const allEntries = [...directEntries, ...dynamicEntries].map((entry) => ({
+      ...entry,
+      date: this.toLedgerDate(entry.date),
+    }));
 
     // Sort by date ASC, then by createdAt ASC
     allEntries.sort((a, b) => {
       if (a.date !== b.date) {
-        return a.date.localeCompare(b.date);
+        return String(a.date).localeCompare(String(b.date));
       }
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
@@ -442,7 +568,20 @@ export class BillingService {
       entry.balance = balance;
     }
 
-    return allEntries as BillingLedger[];
+    return allEntries.map((entry) => ({
+      id: entry.id,
+      partyId: entry.partyId,
+      referenceType: entry.referenceType,
+      referenceId: entry.referenceId,
+      debit: Number(entry.debit || 0),
+      credit: Number(entry.credit || 0),
+      balance: Number(entry.balance || 0),
+      date: entry.date,
+      createdAt: entry.createdAt,
+      totalBirds: Number((entry as any).totalBirds || (entry as any).numberOfBirdsReturned || 0),
+      totalWeight: Number((entry as any).totalWeight || (entry as any).weightReturned || 0),
+      ratePerKg: Number((entry as any).ratePerKg || 0),
+    })) as unknown as BillingLedger[];
   }
 
   // ── Ledger by Farmer ID ───────────────────────────────────────────────────
