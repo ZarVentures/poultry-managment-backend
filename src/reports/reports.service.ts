@@ -922,21 +922,52 @@ export class ReportsService {
     const totalGodownInwardWeight = this.round2(
       inwards.reduce((sum, e) => sum + this.num(e.actualWeight ?? e.totalWeight), 0),
     );
+    const totalGodownInwardBirds = inwards.reduce(
+      (sum, e) => sum + (parseInt(String(e.numberOfBirds || 0), 10) || 0),
+      0,
+    );
     const totalGodownSaleWeight = this.round2(
       godownSales.reduce((sum, s) => sum + this.num(s.totalWeight), 0),
     );
-    const godownSalesLoss = this.stageLoss(totalGodownInwardWeight, totalGodownSaleWeight);
     const godownSalesBirds = godownSales.reduce(
       (sum, s) => sum + (parseInt(String(s.numberOfBirds || 0), 10) || 0),
       0,
     );
+
+    const availableCages = inwardIds.length
+      ? await this.cageRepository.find({
+          where: this.tenantWhere({ status: 'in_godown', godownInwardId: In(inwardIds) }),
+        })
+      : [];
+
+    let availableBirds = availableCages.reduce(
+      (sum, c) => sum + (parseInt(String(c.numberOfBirds), 10) || 0),
+      0,
+    );
+    let availableBirdsWeight = this.round2(availableCages.reduce((sum, c) => {
+      return sum + this.num(c.godownInwardWeight != null ? c.godownInwardWeight : c.purchaseWeight);
+    }, 0));
+
+    if (availableBirdsWeight <= 0) {
+      availableBirds = Math.max(0, totalGodownInwardBirds - godownSalesBirds);
+      const avgInwardWeight = totalGodownInwardBirds > 0
+        ? totalGodownInwardWeight / totalGodownInwardBirds
+        : 0;
+      availableBirdsWeight = this.round2(availableBirds * avgInwardWeight);
+    }
+
+    const recordedGodownSalesWeight = this.round2(totalGodownSaleWeight + availableBirdsWeight);
+    const godownSalesLoss = this.stageLoss(totalGodownInwardWeight, recordedGodownSalesWeight);
     const godownSalesChannel = {
       key: 'godown_sales',
       label: 'Godown Sales',
       documents: godownSalesRows.length,
       birds: godownSalesBirds,
       purchaseWeight: totalGodownInwardWeight,
-      recordedWeight: totalGodownSaleWeight,
+      recordedWeight: recordedGodownSalesWeight,
+      availableWeight: availableBirdsWeight,
+      availableBirds,
+      saleWeight: totalGodownSaleWeight,
       weightLoss: godownSalesLoss,
       lossPercent: totalGodownInwardWeight > 0
         ? this.round2((godownSalesLoss / totalGodownInwardWeight) * 100)
@@ -946,13 +977,13 @@ export class ReportsService {
     const godownSalesFormulaRow = {
       channel: 'godown_sales',
       channelLabel: 'Godown Sales',
-      documentNo: 'Inward − Sale',
+      documentNo: 'Inward − Sale − Available',
       date: startDate || '',
-      party: 'Total Godown Inward − Total Godown Sale',
+      party: 'Total Inward − Total Sale − Available Birds Weight',
       purchaseBillNo: '-',
       birds: godownSalesBirds,
       purchaseWeight: totalGodownInwardWeight,
-      recordedWeight: totalGodownSaleWeight,
+      recordedWeight: recordedGodownSalesWeight,
       weightLoss: godownSalesLoss,
       lossPercent: godownSalesChannel.lossPercent,
     };

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { BirdReturn } from './entities/bird-return.entity';
 import { GodownSale } from '../godown/entities/godown-sale.entity';
 import { CreateBirdReturnDto } from './dto/create-bird-return.dto';
@@ -37,6 +37,38 @@ export class BirdReturnsService {
       query.andWhere(`${alias}.tenantId = :tenantId`, { tenantId });
     }
     return query;
+  }
+
+  private parseOptionalId(value?: string | number | null): string | undefined {
+    if (value == null) return undefined;
+    const s = String(value).trim();
+    return /^\d+$/.test(s) ? s : undefined;
+  }
+
+  private async saveReturnRecord(birdReturn: BirdReturn): Promise<BirdReturn> {
+    try {
+      return await this.birdReturnRepository.save(birdReturn);
+    } catch (error: any) {
+      const driver = error?.driverError ?? error;
+      const code = driver?.code || error?.code;
+      const detail = String(driver?.detail || error?.message || '');
+      if (code === '23503' && birdReturn.retailerId && /retailer/i.test(detail)) {
+        birdReturn.retailerId = undefined;
+        return this.birdReturnRepository.save(birdReturn);
+      }
+      if (error instanceof QueryFailedError || code === '23503' || code === '23505') {
+        if (code === '23503') {
+          throw new BadRequestException(
+            'This godown sale could not be linked for return. Pick the sale again and retry.',
+          );
+        }
+        if (code === '23505') {
+          throw new BadRequestException('A return with this number already exists. Please retry.');
+        }
+        throw new BadRequestException(driver?.detail || error?.message || 'Failed to save bird return');
+      }
+      throw error;
+    }
   }
 
   private async generateReturnNumber(): Promise<string> {
@@ -89,7 +121,7 @@ export class BirdReturnsService {
       returnDate: dto.returnDate,
       saleId: dto.saleId,
       customerName: dto.customerName,
-      retailerId: dto.retailerId || sale.retailerId,
+      retailerId: this.parseOptionalId(dto.retailerId) || this.parseOptionalId(sale.retailerId),
       numberOfBirdsReturned: dto.numberOfBirdsReturned,
       weightReturned: dto.weightReturned ? parseFloat(dto.weightReturned) : undefined,
       returnReason: dto.returnReason,
@@ -103,7 +135,7 @@ export class BirdReturnsService {
       tenantId: this.getTenantId() ?? undefined,
     });
 
-    const saved = await this.birdReturnRepository.save(birdReturn);
+    const saved = await this.saveReturnRecord(birdReturn);
 
     // If auto-approved, process immediately
     if (saved.status === 'approved') {
@@ -219,7 +251,9 @@ export class BirdReturnsService {
     Object.assign(birdReturn, {
       returnDate: dto.returnDate ?? birdReturn.returnDate,
       customerName: dto.customerName ?? birdReturn.customerName,
-      retailerId: dto.retailerId ?? birdReturn.retailerId,
+      retailerId: dto.retailerId !== undefined
+        ? this.parseOptionalId(dto.retailerId)
+        : birdReturn.retailerId,
       numberOfBirdsReturned: dto.numberOfBirdsReturned ?? birdReturn.numberOfBirdsReturned,
       weightReturned: dto.weightReturned ? parseFloat(dto.weightReturned) : birdReturn.weightReturned,
       returnReason: dto.returnReason ?? birdReturn.returnReason,
@@ -233,7 +267,7 @@ export class BirdReturnsService {
       updatedAt: new Date(),
     });
 
-    return this.birdReturnRepository.save(birdReturn);
+    return this.saveReturnRecord(birdReturn);
   }
 
   async approveReturn(id: string, approvedBy: string): Promise<BirdReturn> {

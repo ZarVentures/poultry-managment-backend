@@ -48,6 +48,34 @@ export class BillingService {
     return query;
   }
 
+  /**
+   * Farm = supplier payable ledger.
+   * Positive master opening means we owe the farmer, posted as credit (same as a purchase).
+   * Running payable is credit - debit so the displayed balance stays positive.
+   * Retailer/other parties keep the receivable convention (positive = debit).
+   */
+  private openingDebitCredit(partyType: string | undefined, parsedOpening: number) {
+    const amount = Number(parsedOpening) || 0;
+    if (partyType === 'Farm') {
+      return {
+        debit: amount < 0 ? Math.abs(amount) : 0,
+        credit: amount > 0 ? amount : 0,
+        balance: amount,
+      };
+    }
+    return {
+      debit: amount > 0 ? amount : 0,
+      credit: amount < 0 ? Math.abs(amount) : 0,
+      balance: amount,
+    };
+  }
+
+  private ledgerSignedDelta(partyType: string | undefined, debit: number, credit: number) {
+    const d = Number(debit || 0);
+    const c = Number(credit || 0);
+    return partyType === 'Farm' ? c - d : d - c;
+  }
+
   // ─── Parties ──────────────────────────────────────────────────────────────
 
   async getParties(): Promise<BillingParty[]> {
@@ -68,13 +96,14 @@ export class BillingService {
     // Create opening balance ledger entry if openingBalance is non-zero
     if (data.openingBalance && Number(data.openingBalance) !== 0) {
       const parsedOpening = Number(data.openingBalance);
+      const { debit, credit, balance } = this.openingDebitCredit(data.type, parsedOpening);
       await this.ledgerRepo.save(this.ledgerRepo.create({
         partyId: savedId,
         referenceType: 'Opening',
         referenceId: savedId,
-        debit: parsedOpening > 0 ? parsedOpening : 0,
-        credit: parsedOpening < 0 ? Math.abs(parsedOpening) : 0,
-        balance: parsedOpening,
+        debit,
+        credit,
+        balance,
         date: '2000-01-01', // Set to a very old date so it always acts as the starting seed balance
         tenantId: this.getTenantId() ?? undefined,
       }));
@@ -89,19 +118,22 @@ export class BillingService {
   async updateParty(id: string, data: Partial<BillingParty>): Promise<BillingParty> {
     // Sync the "Opening" entry in the billing_ledger table when opening balance is updated
     if (data.openingBalance !== undefined) {
+      const existingParty = await this.partyRepo.findOne({ where: this.tenantWhere({ id }) });
+      const partyType = data.type || existingParty?.type;
       const existingOpening = await this.ledgerRepo.findOne({
         where: this.tenantWhere({ partyId: id, referenceType: 'Opening' }),
       });
 
       const parsedOpening = Number(data.openingBalance || 0);
+      const { debit, credit, balance } = this.openingDebitCredit(partyType, parsedOpening);
 
       if (existingOpening) {
         if (parsedOpening === 0) {
           await this.ledgerRepo.remove(existingOpening);
         } else {
-          existingOpening.debit = parsedOpening > 0 ? parsedOpening : 0;
-          existingOpening.credit = parsedOpening < 0 ? Math.abs(parsedOpening) : 0;
-          existingOpening.balance = parsedOpening;
+          existingOpening.debit = debit;
+          existingOpening.credit = credit;
+          existingOpening.balance = balance;
           await this.ledgerRepo.save(existingOpening);
         }
       } else if (parsedOpening !== 0) {
@@ -109,9 +141,9 @@ export class BillingService {
           partyId: id,
           referenceType: 'Opening',
           referenceId: id,
-          debit: parsedOpening > 0 ? parsedOpening : 0,
-          credit: parsedOpening < 0 ? Math.abs(parsedOpening) : 0,
-          balance: parsedOpening,
+          debit,
+          credit,
+          balance,
           date: '2000-01-01',
           tenantId: this.getTenantId() ?? undefined,
         }));
@@ -256,6 +288,21 @@ export class BillingService {
     // Get direct ledger entries (e.g. Opening Balance, paid PaymentVouchers)
     const directEntries = await this.ledgerRepo.find({ where: this.tenantWhere({ partyId }), order: { date: 'ASC', createdAt: 'ASC' } });
 
+    // Align Opening debit/credit with master opening (positive = payable/credit).
+    if (party.type === 'Farm') {
+      for (const entry of directEntries) {
+        if (entry.referenceType !== 'Opening') continue;
+        const stored = Number(party.openingBalance);
+        const amount = Number.isFinite(stored) && stored !== 0
+          ? stored
+          : Number(entry.credit || 0) - Number(entry.debit || 0);
+        const { debit, credit, balance } = this.openingDebitCredit('Farm', amount);
+        entry.debit = debit;
+        entry.credit = credit;
+        entry.balance = balance;
+      }
+    }
+
     const dynamicEntries: any[] = [];
 
     if (party.type === 'Farm') {
@@ -386,10 +433,12 @@ export class BillingService {
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
 
-    // Recalculate balances sequentially
+    // Recalculate balances sequentially.
+    // Farm payable: Opening + Purchases (credit) - Payments/OUT vouchers (debit).
+    // Retailer receivable: Sales (debit) - Payments (credit).
     let balance = 0;
     for (const entry of allEntries) {
-      balance += Number(entry.debit || 0) - Number(entry.credit || 0);
+      balance += this.ledgerSignedDelta(party.type, Number(entry.debit || 0), Number(entry.credit || 0));
       entry.balance = balance;
     }
 
@@ -401,6 +450,10 @@ export class BillingService {
     const farmer = await this.farmerRepo.findOne({ where: this.tenantWhere({ id: farmerId }) });
     if (!farmer) throw new NotFoundException(`Farmer ${farmerId} not found`);
     const party = await this.findOrCreatePartyByName(farmer.name, 'Farm', farmer.phone, farmer.address);
+    const farmerOpening = Number(farmer.openingBalance || 0);
+    if (farmerOpening !== Number(party.openingBalance || 0)) {
+      await this.updateParty(party.id, { openingBalance: farmerOpening });
+    }
     return this.getLedger(party.id);
   }
 

@@ -17,6 +17,31 @@ const migrations = [
     name: 'farmers.farmhouse_name',
     sql: `ALTER TABLE farmers ADD COLUMN IF NOT EXISTS farmhouse_name VARCHAR(150)`,
   },
+  {
+    name: 'farmers.join_date',
+    sql: `ALTER TABLE farmers ADD COLUMN IF NOT EXISTS join_date DATE DEFAULT CURRENT_DATE`,
+  },
+  {
+    name: 'farmers.join_date backfill',
+    sql: `UPDATE farmers SET join_date = created_at::date WHERE join_date IS NULL`,
+  },
+  {
+    name: 'farmers.opening_balance',
+    sql: `ALTER TABLE farmers ADD COLUMN IF NOT EXISTS opening_balance NUMERIC(14, 2) NOT NULL DEFAULT 0`,
+  },
+  {
+    name: 'flip farm opening ledger debit to credit',
+    sql: `UPDATE billing_ledger l
+      SET debit = l.credit,
+          credit = l.debit,
+          balance = -l.balance
+      FROM billing_parties p
+      WHERE l.party_id = p.id
+        AND p.type = 'Farm'
+        AND l.reference_type = 'Opening'
+        AND COALESCE(l.debit, 0) > 0
+        AND COALESCE(l.credit, 0) = 0`,
+  },
 
   // ── purchase_order_items ──────────────────────────────────────
   {
@@ -300,6 +325,51 @@ const migrations = [
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )`,
+  },
+
+  // Godown bird returns were originally FK'd to vehicle `sales`.
+  // That made returns succeed only when a godown_sales.id also existed in sales.
+  {
+    name: 'bird_returns.sale_id -> godown_sales',
+    sql: `
+      DO $$
+      DECLARE
+        r RECORD;
+        orphan_count INTEGER;
+      BEGIN
+        FOR r IN
+          SELECT c.conname
+          FROM pg_constraint c
+          JOIN pg_class t ON c.conrelid = t.oid
+          JOIN pg_namespace n ON n.oid = t.relnamespace
+          JOIN pg_class ft ON c.confrelid = ft.oid
+          WHERE n.nspname = 'public'
+            AND t.relname = 'bird_returns'
+            AND c.contype = 'f'
+            AND ft.relname = 'sales'
+        LOOP
+          EXECUTE format('ALTER TABLE bird_returns DROP CONSTRAINT %I', r.conname);
+        END LOOP;
+
+        SELECT COUNT(*) INTO orphan_count
+        FROM bird_returns br
+        WHERE NOT EXISTS (SELECT 1 FROM godown_sales gs WHERE gs.id = br.sale_id);
+
+        IF orphan_count = 0 AND NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint c
+          JOIN pg_class t ON c.conrelid = t.oid
+          JOIN pg_namespace n ON n.oid = t.relnamespace
+          WHERE n.nspname = 'public'
+            AND t.relname = 'bird_returns'
+            AND c.conname = 'bird_returns_godown_sale_id_fkey'
+        ) THEN
+          ALTER TABLE bird_returns
+            ADD CONSTRAINT bird_returns_godown_sale_id_fkey
+            FOREIGN KEY (sale_id) REFERENCES godown_sales(id) ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `,
   },
 ]
 

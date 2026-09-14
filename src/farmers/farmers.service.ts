@@ -34,6 +34,7 @@ export class FarmersService {
   async create(createFarmerDto: CreateFarmerDto): Promise<Farmer> {
     const farmer = this.farmerRepository.create({
       ...createFarmerDto,
+      joinDate: createFarmerDto.joinDate || new Date().toISOString().slice(0, 10),
       tenantId: this.getTenantId() ?? undefined,
     });
     const saved = await this.farmerRepository.save(farmer);
