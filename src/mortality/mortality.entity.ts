@@ -52,6 +52,12 @@ export class Mortality {
   @Column({ type: 'text', nullable: true })
   notes?: string;
 
+  @Column({ name: 'source', type: 'varchar', length: 30, default: 'travel_sales' })
+  source!: 'godown' | 'travel_sales';
+
+  @Column({ name: 'godown_mortality_id', type: 'bigint', nullable: true })
+  godownMortalityId?: string;
+
   @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
   tenantId?: string;
 

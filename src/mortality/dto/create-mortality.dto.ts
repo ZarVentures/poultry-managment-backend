@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsDateString, IsInt, IsNumber, Min } from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsInt, IsNumber, Min, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateMortalityDto {
@@ -53,4 +53,8 @@ export class CreateMortalityDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsIn(['godown', 'travel_sales'])
+  source?: 'godown' | 'travel_sales';
 }

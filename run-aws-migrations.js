@@ -145,6 +145,8 @@ const migrations = [
   { name: 'mortalities.weight_of_dead_birds col', sql: `ALTER TABLE mortalities ADD COLUMN IF NOT EXISTS weight_of_dead_birds NUMERIC(10,2)` },
   { name: 'mortalities.rate_per_kg col', sql: `ALTER TABLE mortalities ADD COLUMN IF NOT EXISTS rate_per_kg NUMERIC(10,2)` },
   { name: 'mortalities.amount col', sql: `ALTER TABLE mortalities ADD COLUMN IF NOT EXISTS amount NUMERIC(14,2)` },
+  { name: 'mortalities.source col', sql: `ALTER TABLE mortalities ADD COLUMN IF NOT EXISTS source VARCHAR(30) DEFAULT 'travel_sales'` },
+  { name: 'mortalities.godown_mortality_id col', sql: `ALTER TABLE mortalities ADD COLUMN IF NOT EXISTS godown_mortality_id BIGINT` },
 
   // ── user_permissions ──────────────────────────────────────────
   {
