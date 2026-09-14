@@ -29,6 +29,9 @@ export class Farmer {
   @Column({ name: 'opening_balance', type: 'numeric', precision: 14, scale: 2, default: 0 })
   openingBalance!: number;
 
+  @Column({ name: 'join_date', type: 'date', default: () => 'CURRENT_DATE' })
+  joinDate!: string;
+
   @Column({ name: 'tenant_id', type: 'bigint', nullable: true })
   tenantId?: string;
 

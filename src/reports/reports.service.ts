@@ -596,7 +596,6 @@ export class ReportsService {
         CAST((COALESCE(s.total_sales, 0) + COALESCE(gs.total_sales, 0)) - (COALESCE(s.total_received, 0) + COALESCE(gs.total_received, 0)) AS FLOAT) as outstanding,
         CAST(COALESCE(s.sales_count, 0) + COALESCE(gs.sales_count, 0) AS INTEGER) as "salesCount"
       FROM retailers r
-      ${tenantRetailerFilter}
       LEFT JOIN (
         SELECT retailer_id, SUM(net_amount) as total_sales, SUM(amount_received) as total_received, COUNT(*) as sales_count
         FROM sales
@@ -609,6 +608,7 @@ export class ReportsService {
         ${tenantSalesFilter}
         GROUP BY retailer_id
       ) gs ON gs.retailer_id = r.id
+      ${tenantRetailerFilter}
       ORDER BY ${sortBy === 'name' ? 'r.name ASC' : 'outstanding DESC'}
       OFFSET ${offset} LIMIT ${take}
     `;
@@ -626,7 +626,6 @@ export class ReportsService {
         SELECT 
           (COALESCE(s.total_sales, 0) + COALESCE(gs.total_sales, 0)) - (COALESCE(s.total_received, 0) + COALESCE(gs.total_received, 0)) as outstanding
         FROM retailers r
-        ${tenantRetailerFilter}
         LEFT JOIN (
           SELECT retailer_id, SUM(net_amount) as total_sales, SUM(amount_received) as total_received
           FROM sales
@@ -639,6 +638,7 @@ export class ReportsService {
           ${tenantSalesFilter}
           GROUP BY retailer_id
         ) gs ON gs.retailer_id = r.id
+        ${tenantRetailerFilter}
       ) t
     `;
 
@@ -671,13 +671,19 @@ export class ReportsService {
     const take = limit ? limit : 20;
     const tenantId = this.getTenantId();
     const tenantJoinFilter = tenantId ? ` AND s.tenant_id = '${tenantId}'` : '';
+    const tenantVoucherFilter = tenantId ? ` AND v.tenant_id = '${tenantId}'` : '';
 
     let whereClause = 'WHERE 1=1';
     if (startDate && endDate) {
       whereClause += ` AND created_at BETWEEN '${startDate} 00:00:00' AND '${endDate} 23:59:59'`;
     }
     if (mode && mode !== 'all') {
-      whereClause += ` AND LOWER(payment_mode) = '${mode.toLowerCase()}'`;
+      const modeKey = String(mode).toLowerCase().replace(/[^a-z_]/g, '');
+      if (modeKey === 'bank') {
+        whereClause += ` AND LOWER(payment_mode) IN ('bank', 'bank_transfer')`;
+      } else if (modeKey) {
+        whereClause += ` AND LOWER(payment_mode) = '${modeKey}'`;
+      }
     }
 
     const unionQuery = `
@@ -708,6 +714,33 @@ export class ReportsService {
         FROM godown_sale_payments p
         JOIN godown_sales s ON s.id = p.godown_sale_id${tenantJoinFilter}
       ) t2
+      UNION ALL
+      SELECT
+        id, sale_id,
+        invoice_number as "invoiceNumber",
+        customer_name as "customerName",
+        payment_mode as "payment_mode",
+        amount, created_at,
+        status,
+        'Voucher' as type
+      FROM (
+        SELECT
+          v.id::bigint as id,
+          NULL::bigint as sale_id,
+          v.voucher_number as invoice_number,
+          v.payee_name as customer_name,
+          v.payment_method as payment_mode,
+          v.amount,
+          COALESCE(v.paid_date, v.voucher_date)::timestamptz as created_at,
+          CASE
+            WHEN LOWER(COALESCE(v.status, 'paid')) IN ('paid', 'approved', 'completed') THEN 'Completed'
+            ELSE INITCAP(v.status)
+          END as status
+        FROM payment_vouchers v
+        WHERE LOWER(v.voucher_type) = 'in'
+          AND LOWER(COALESCE(v.status, 'paid')) <> 'cancelled'
+          ${tenantVoucherFilter}
+      ) t3
     `;
 
     const dataQuery = `
@@ -749,6 +782,7 @@ export class ReportsService {
     return {
       data: data.map((d: any) => ({
         ...d,
+        id: `${d.type || 'row'}-${d.id}`,
         amount: parseFloat(d.amount),
       })),
       total,
@@ -922,21 +956,52 @@ export class ReportsService {
     const totalGodownInwardWeight = this.round2(
       inwards.reduce((sum, e) => sum + this.num(e.actualWeight ?? e.totalWeight), 0),
     );
+    const totalGodownInwardBirds = inwards.reduce(
+      (sum, e) => sum + (parseInt(String(e.numberOfBirds || 0), 10) || 0),
+      0,
+    );
     const totalGodownSaleWeight = this.round2(
       godownSales.reduce((sum, s) => sum + this.num(s.totalWeight), 0),
     );
-    const godownSalesLoss = this.stageLoss(totalGodownInwardWeight, totalGodownSaleWeight);
     const godownSalesBirds = godownSales.reduce(
       (sum, s) => sum + (parseInt(String(s.numberOfBirds || 0), 10) || 0),
       0,
     );
+
+    const availableCages = inwardIds.length
+      ? await this.cageRepository.find({
+          where: this.tenantWhere({ status: 'in_godown', godownInwardId: In(inwardIds) }),
+        })
+      : [];
+
+    let availableBirds = availableCages.reduce(
+      (sum, c) => sum + (parseInt(String(c.numberOfBirds), 10) || 0),
+      0,
+    );
+    let availableBirdsWeight = this.round2(availableCages.reduce((sum, c) => {
+      return sum + this.num(c.godownInwardWeight != null ? c.godownInwardWeight : c.purchaseWeight);
+    }, 0));
+
+    if (availableBirdsWeight <= 0) {
+      availableBirds = Math.max(0, totalGodownInwardBirds - godownSalesBirds);
+      const avgInwardWeight = totalGodownInwardBirds > 0
+        ? totalGodownInwardWeight / totalGodownInwardBirds
+        : 0;
+      availableBirdsWeight = this.round2(availableBirds * avgInwardWeight);
+    }
+
+    const recordedGodownSalesWeight = this.round2(totalGodownSaleWeight + availableBirdsWeight);
+    const godownSalesLoss = this.stageLoss(totalGodownInwardWeight, recordedGodownSalesWeight);
     const godownSalesChannel = {
       key: 'godown_sales',
       label: 'Godown Sales',
       documents: godownSalesRows.length,
       birds: godownSalesBirds,
       purchaseWeight: totalGodownInwardWeight,
-      recordedWeight: totalGodownSaleWeight,
+      recordedWeight: recordedGodownSalesWeight,
+      availableWeight: availableBirdsWeight,
+      availableBirds,
+      saleWeight: totalGodownSaleWeight,
       weightLoss: godownSalesLoss,
       lossPercent: totalGodownInwardWeight > 0
         ? this.round2((godownSalesLoss / totalGodownInwardWeight) * 100)
@@ -946,13 +1011,13 @@ export class ReportsService {
     const godownSalesFormulaRow = {
       channel: 'godown_sales',
       channelLabel: 'Godown Sales',
-      documentNo: 'Inward − Sale',
+      documentNo: 'Inward − Sale − Available',
       date: startDate || '',
-      party: 'Total Godown Inward − Total Godown Sale',
+      party: 'Total Inward − Total Sale − Available Birds Weight',
       purchaseBillNo: '-',
       birds: godownSalesBirds,
       purchaseWeight: totalGodownInwardWeight,
-      recordedWeight: totalGodownSaleWeight,
+      recordedWeight: recordedGodownSalesWeight,
       weightLoss: godownSalesLoss,
       lossPercent: godownSalesChannel.lossPercent,
     };

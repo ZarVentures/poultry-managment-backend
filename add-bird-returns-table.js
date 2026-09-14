@@ -40,7 +40,7 @@ async function addBirdReturnsTable() {
         id BIGSERIAL PRIMARY KEY,
         return_number VARCHAR(50) UNIQUE NOT NULL,
         return_date DATE NOT NULL,
-        sale_id BIGINT NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+        sale_id BIGINT NOT NULL REFERENCES godown_sales(id) ON DELETE CASCADE,
         customer_name VARCHAR(150) NOT NULL,
         retailer_id BIGINT REFERENCES retailers(id) ON DELETE SET NULL,
         number_of_birds_returned INTEGER NOT NULL,

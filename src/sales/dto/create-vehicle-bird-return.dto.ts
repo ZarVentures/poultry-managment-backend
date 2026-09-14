@@ -1,4 +1,5 @@
 import { IsString, IsNotEmpty, IsNumber, IsOptional, IsEnum, IsBoolean } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateVehicleBirdReturnDto {
   @IsString()
@@ -18,6 +19,7 @@ export class CreateVehicleBirdReturnDto {
   retailerId?: string;
 
   @IsNumber()
+  @Type(() => Number)
   @IsNotEmpty()
   numberOfBirdsReturned!: number;
 

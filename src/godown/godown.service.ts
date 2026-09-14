@@ -9,6 +9,7 @@ import { GodownExpense } from './godown-expense.entity';
 import { BirdReturn } from '../sales/entities/bird-return.entity';
 import { CagesService } from '../cages/cages.service';
 import { TenantContextService } from '../tenants/tenant-context.service';
+import { normalizeToIST } from '../common/date-utils';
 
 @Injectable()
 export class GodownService {
@@ -313,6 +314,9 @@ export class GodownService {
   async createSale(data: any) {
     const { payments, weightLoss, ...rest } = data;
     const saleData = this.pickSaleColumns(rest);
+    if (saleData.saleDate) {
+      saleData.saleDate = normalizeToIST(String(saleData.saleDate));
+    }
 
     await this.assertGodownBirdsAvailable(saleData.numberOfBirds);
 
@@ -406,6 +410,9 @@ export class GodownService {
   async updateSale(id: string, data: any) {
     const { payments, weightLoss, ...rest } = data;
     const validData = this.pickSaleColumns(rest);
+    if (validData.saleDate) {
+      validData.saleDate = normalizeToIST(String(validData.saleDate));
+    }
     if (weightLoss !== undefined && weightLoss !== '') {
       validData.weightLoss = parseFloat(weightLoss);
     }
