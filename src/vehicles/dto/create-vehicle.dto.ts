@@ -1,4 +1,10 @@
-import { IsDateString, IsEnum, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, Length } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString, Length } from 'class-validator';
+
+const optionalString = ({ value }: { value: unknown }) => {
+  if (value === null || value === undefined || value === '') return undefined;
+  return String(value);
+};
 
 export class CreateVehicleDto {
   @IsString()
@@ -30,10 +36,12 @@ export class CreateVehicleDto {
   address?: string;
 
   @IsOptional()
+  @Transform(optionalString)
   @IsString()
   totalCapacity?: string;
 
   @IsOptional()
+  @Transform(optionalString)
   @IsString()
   petrolTankCapacity?: string;
 
@@ -42,6 +50,7 @@ export class CreateVehicleDto {
   fuelType?: string;
 
   @IsOptional()
+  @Transform(optionalString)
   @IsString()
   mileage?: string;
 

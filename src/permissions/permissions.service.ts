@@ -22,23 +22,39 @@ export class PermissionsService {
     private readonly tenantContext: TenantContextService,
   ) { }
 
-  private getTenantId(): string | null {
+  private getTenantId(override?: string | null): string | null {
+    if (override !== undefined && override !== null && String(override) !== '') {
+      return String(override);
+    }
     return this.tenantContext.getTenantId();
   }
 
-  private tenantWhere(extra: any): any {
-    const tenantId = this.getTenantId();
+  private tenantWhere(extra: any, tenantIdOverride?: string | null): any {
+    const tenantId = this.getTenantId(tenantIdOverride);
     return tenantId ? { ...extra, tenantId } : extra;
+  }
+
+  private denyWrite(): PermissionCheck {
+    return {
+      canCreate: false,
+      canRead: true,
+      canUpdate: false,
+      canDelete: false,
+    };
   }
 
   /**
    * Get permissions for a user on a specific resource
    * First checks user-specific permissions, then falls back to role-based permissions
    */
-  async getUserPermissions(userId: string, resource: string): Promise<PermissionCheck> {
-    // Check for user-specific permissions first
+  async getUserPermissions(
+    userId: string,
+    resource: string,
+    userRole?: string,
+    tenantId?: string | null,
+  ): Promise<PermissionCheck> {
     const userPerm = await this.userPermissionRepository.findOne({
-      where: this.tenantWhere({ userId, resource }),
+      where: this.tenantWhere({ userId, resource }, tenantId),
     });
 
     if (userPerm) {
@@ -50,22 +66,24 @@ export class PermissionsService {
       };
     }
 
-    // Fall back to role-based permissions
-    // We need to get the user's role - this should be passed or fetched
-    return {
-      canCreate: false,
-      canRead: true,
-      canUpdate: false,
-      canDelete: false,
-    };
+    if (userRole) {
+      return this.getRolePermissions(userRole, resource, tenantId);
+    }
+
+    return this.denyWrite();
   }
 
   /**
    * Get permissions for a role on a specific resource
    */
-  async getRolePermissions(role: string, resource: string): Promise<PermissionCheck> {
+  async getRolePermissions(
+    role: string,
+    resource: string,
+    tenantId?: string | null,
+  ): Promise<PermissionCheck> {
+    const normalizedRole = String(role || '').trim().toLowerCase();
     const rolePerm = await this.rolePermissionRepository.findOne({
-      where: this.tenantWhere({ role, resource }),
+      where: this.tenantWhere({ role: normalizedRole, resource }, tenantId),
     });
 
     if (rolePerm) {
@@ -77,27 +95,20 @@ export class PermissionsService {
       };
     }
 
-    // Default permissions if not found
-    return {
-      canCreate: false,
-      canRead: true,
-      canUpdate: false,
-      canDelete: false,
-    };
+    return this.denyWrite();
   }
 
   /**
    * Get all permissions for a user across all resources
    */
   async getAllUserPermissions(userId: string, userRole: string): Promise<Record<string, PermissionCheck>> {
-    // Get user-specific permissions
+    const normalizedRole = String(userRole || '').trim().toLowerCase();
     const userPerms = await this.userPermissionRepository.find({
       where: this.tenantWhere({ userId }),
     });
 
-    // Get role-based permissions
     const rolePerms = await this.rolePermissionRepository.find({
-      where: this.tenantWhere({ role: userRole }),
+      where: this.tenantWhere({ role: normalizedRole }),
     });
 
     // Merge permissions (user-specific overrides role-based)

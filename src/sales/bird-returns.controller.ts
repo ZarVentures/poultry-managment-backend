@@ -23,14 +23,14 @@ export class BirdReturnsController {
   constructor(private readonly birdReturnsService: BirdReturnsService) {}
 
   @Post()
-  @Permissions('sales', 'create')
+  @Permissions('godown', 'create')
   create(@Body() createDto: CreateBirdReturnDto, @Request() req: any) {
     const createdBy = req.user?.name || req.user?.email;
     return this.birdReturnsService.create(createDto, createdBy);
   }
 
   @Get()
-  @Permissions('sales', 'read')
+  @Permissions('godown', 'read')
   findAll(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -52,7 +52,7 @@ export class BirdReturnsController {
   }
 
   @Get('stats')
-  @Permissions('sales', 'read')
+  @Permissions('godown', 'read')
   getStats(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -61,32 +61,32 @@ export class BirdReturnsController {
   }
 
   @Get('by-sale/:saleId')
-  @Permissions('sales', 'read')
+  @Permissions('godown', 'read')
   findBySaleId(@Param('saleId') saleId: string) {
     return this.birdReturnsService.findBySaleId(saleId);
   }
 
   @Get(':id')
-  @Permissions('sales', 'read')
+  @Permissions('godown', 'read')
   findOne(@Param('id') id: string) {
     return this.birdReturnsService.findOne(id);
   }
 
   @Patch(':id')
-  @Permissions('sales', 'update')
+  @Permissions('godown', 'update')
   update(@Param('id') id: string, @Body() updateDto: UpdateBirdReturnDto) {
     return this.birdReturnsService.update(id, updateDto);
   }
 
   @Patch(':id/approve')
-  @Permissions('sales', 'update')
+  @Permissions('godown', 'update')
   approve(@Param('id') id: string, @Request() req: any) {
     const approvedBy = req.user?.name || req.user?.email;
     return this.birdReturnsService.approveReturn(id, approvedBy);
   }
 
   @Patch(':id/reject')
-  @Permissions('sales', 'update')
+  @Permissions('godown', 'update')
   reject(
     @Param('id') id: string,
     @Body('reason') reason: string,
@@ -97,14 +97,14 @@ export class BirdReturnsController {
   }
 
   @Patch(':id/process')
-  @Permissions('sales', 'update')
+  @Permissions('godown', 'update')
   process(@Param('id') id: string, @Request() req: any) {
     const processedBy = req.user?.name || req.user?.email;
     return this.birdReturnsService.processReturn(id, processedBy);
   }
 
   @Delete(':id')
-  @Permissions('sales', 'delete')
+  @Permissions('godown', 'delete')
   remove(@Param('id') id: string) {
     return this.birdReturnsService.remove(id);
   }

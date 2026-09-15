@@ -27,8 +27,10 @@ export class PermissionsGuard implements CanActivate {
             return false;
         }
 
+        const role = String(user.role || '').trim().toLowerCase();
+
         // Admins have full access to everything
-        if (user.role === 'admin') {
+        if (role === 'admin') {
             return true;
         }
 
@@ -36,6 +38,8 @@ export class PermissionsGuard implements CanActivate {
         const permissions = await this.permissionsService.getUserPermissions(
             user.userId,
             resource,
+            role,
+            user.tenantId ?? null,
         );
 
         switch (action) {

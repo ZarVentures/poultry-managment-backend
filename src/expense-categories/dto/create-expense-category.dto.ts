@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean, MaxLength } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, MaxLength, IsIn } from 'class-validator';
 
 export class CreateExpenseCategoryDto {
   @IsString()
@@ -17,4 +17,9 @@ export class CreateExpenseCategoryDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['main', 'godown', 'both'])
+  appliesTo?: 'main' | 'godown' | 'both';
 }
