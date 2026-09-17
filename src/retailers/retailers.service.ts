@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Retailer } from './retailer.entity';
@@ -8,13 +8,28 @@ import { BillingService } from '../billing/billing.service';
 import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
-export class RetailersService {
+export class RetailersService implements OnModuleInit {
+  private readonly logger = new Logger(RetailersService.name);
+
   constructor(
     @InjectRepository(Retailer)
     private readonly retailerRepository: Repository<Retailer>,
     private readonly billingService: BillingService,
     private readonly tenantContext: TenantContextService,
   ) { }
+
+  async onModuleInit() {
+    try {
+      await this.retailerRepository.query(
+        `ALTER TABLE retailers ADD COLUMN IF NOT EXISTS join_date date`,
+      );
+      await this.retailerRepository.query(
+        `UPDATE retailers SET join_date = created_at::date WHERE join_date IS NULL`,
+      );
+    } catch (err: any) {
+      this.logger.warn(`Retailer join_date migration skipped: ${err?.message || err}`);
+    }
+  }
 
   private getTenantId(): string | null {
     return this.tenantContext.getTenantId();
@@ -34,6 +49,7 @@ export class RetailersService {
   async create(createRetailerDto: CreateRetailerDto): Promise<Retailer> {
     const retailer = this.retailerRepository.create({
       ...createRetailerDto,
+      joinDate: createRetailerDto.joinDate || new Date().toISOString().slice(0, 10),
       tenantId: this.getTenantId() ?? undefined,
     });
     const saved = await this.retailerRepository.save(retailer);

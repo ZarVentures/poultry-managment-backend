@@ -147,6 +147,6 @@ export class ReportsController {
   @Get('balance-sheet')
   @Permissions('billing', 'read')
   async getBalanceSheet(@Query() query: BalanceSheetQueryDto) {
-    return this.balanceSheetService.getBalanceSheet(query.asOnDate);
+    return this.balanceSheetService.getBalanceSheet(query.asOnDate || query.toDate, query.fromDate);
   }
 }

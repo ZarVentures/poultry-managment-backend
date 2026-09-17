@@ -40,9 +40,11 @@ export class BalanceSheetService {
     return rows[0] || {};
   }
 
-  async getBalanceSheet(asOnDate?: string) {
+  async getBalanceSheet(asOnDate?: string, fromDate?: string) {
     const asOn =
       asOnDate && /^\d{4}-\d{2}-\d{2}$/.test(asOnDate) ? asOnDate : this.today();
+    const from =
+      fromDate && /^\d{4}-\d{2}-\d{2}$/.test(fromDate) ? fromDate : undefined;
 
     const [
       vehicleSales,
@@ -181,8 +183,52 @@ export class BalanceSheetService {
     const netProfit = this.round2(grossProfit - operatingExpenses);
     const difference = this.round2(totalAssets - liabilitiesAndEquity);
 
+    let periodRevenue = this.round2(revenue);
+    let periodCogs = cogs;
+    let periodGross = grossProfit;
+    let periodExpenses = this.round2(operatingExpenses);
+    let periodNet = netProfit;
+    let periodCash = {
+      vehicleCollections: this.round2(vehicleSales.received),
+      godownCollections: this.round2(godownSales.received),
+      voucherIn: this.round2(voucherIn),
+      purchasePayments: this.round2(purchases.paid),
+      expenses: this.round2(operatingExpenses),
+      voucherOut: this.round2(voucherOut),
+      netCash: cash,
+    };
+
+    if (from && from <= asOn) {
+      const [pVehicle, pGodown, pPurchases, pExpenses, pVouchers] = await Promise.all([
+        this.salesPeriod('sales', 'sale_payments', 'sale_id', 'net_amount', from, asOn),
+        this.salesPeriod('godown_sales', 'godown_sale_payments', 'godown_sale_id', 'total_amount', from, asOn),
+        this.purchasePeriod(from, asOn),
+        this.expensePeriod(from, asOn),
+        this.voucherPeriod(from, asOn),
+      ]);
+      periodRevenue = this.round2(pVehicle.billed + pGodown.billed);
+      periodExpenses = this.round2(pExpenses);
+      periodCogs = this.round2(pPurchases.net);
+      periodGross = this.round2(periodRevenue - periodCogs);
+      periodNet = this.round2(periodGross - periodExpenses);
+      const pCash = this.round2(
+        pVehicle.received + pGodown.received + pVouchers.in - pPurchases.paid - pExpenses - pVouchers.out,
+      );
+      periodCash = {
+        vehicleCollections: this.round2(pVehicle.received),
+        godownCollections: this.round2(pGodown.received),
+        voucherIn: this.round2(pVouchers.in),
+        purchasePayments: this.round2(pPurchases.paid),
+        expenses: this.round2(pExpenses),
+        voucherOut: this.round2(pVouchers.out),
+        netCash: pCash,
+      };
+    }
+
     return {
       asOnDate: asOn,
+      fromDate: from || undefined,
+      toDate: asOn,
       generatedAt: new Date().toISOString(),
       assets: { lines: assetsLines, total: totalAssets },
       liabilities: { lines: liabilityLines, total: totalLiabilities },
@@ -194,8 +240,9 @@ export class BalanceSheetService {
         isBalanced: difference === 0,
       },
       notes: {
-        basis:
-          'SQL totals from purchases, sales, godown stock, expenses, and payments. Not a double-entry ledger.',
+        basis: from
+          ? `Position as on ${asOn}. P&L and cash movement are for ${from} to ${asOn}. Not a double-entry ledger.`
+          : 'SQL totals from purchases, sales, godown stock, expenses, and payments. Not a double-entry ledger.',
         inventory: {
           birds: remainingBirds + vehicleBirds,
           weightKg: this.round2(remainingWeight + vehicleWeight),
@@ -216,21 +263,13 @@ export class BalanceSheetService {
           },
         },
         profitAndLoss: {
-          revenue: this.round2(revenue),
-          costOfGoodsSold: cogs,
-          grossProfit,
-          operatingExpenses: this.round2(operatingExpenses),
-          netProfit,
+          revenue: periodRevenue,
+          costOfGoodsSold: periodCogs,
+          grossProfit: periodGross,
+          operatingExpenses: periodExpenses,
+          netProfit: periodNet,
         },
-        cashMovements: {
-          vehicleCollections: this.round2(vehicleSales.received),
-          godownCollections: this.round2(godownSales.received),
-          voucherIn: this.round2(voucherIn),
-          purchasePayments: this.round2(purchases.paid),
-          expenses: this.round2(operatingExpenses),
-          voucherOut: this.round2(voucherOut),
-          netCash: cash,
-        },
+        cashMovements: periodCash,
       },
     };
   }
@@ -459,6 +498,106 @@ export class BalanceSheetService {
       SELECT v.voucher_type AS type, COALESCE(SUM(v.amount), 0) AS total
       FROM payment_vouchers v
       WHERE v.voucher_date <= $1
+        AND v.status <> 'cancelled'
+        AND (v.reference_type IS NULL OR LOWER(v.reference_type) = 'other')
+      ${tenant}
+      GROUP BY v.voucher_type
+      `,
+      params,
+    );
+    const map: Record<string, number> = {};
+    for (const row of rows) map[row.type] = this.n(row.total);
+    return { in: map.in || 0, out: map.out || 0 };
+  }
+
+  private async salesPeriod(
+    saleTable: 'sales' | 'godown_sales',
+    payTable: 'sale_payments' | 'godown_sale_payments',
+    fk: 'sale_id' | 'godown_sale_id',
+    billedCol: 'net_amount' | 'total_amount',
+    from: string,
+    to: string,
+  ) {
+    const params: any[] = [from, to];
+    const tenant = this.tenantFilter('s', params);
+    const row = await this.one(
+      `
+      SELECT
+        COALESCE(SUM(x.billed), 0) AS billed,
+        COALESCE(SUM(x.received), 0) AS received
+      FROM (
+        SELECT
+          s.${billedCol}::numeric AS billed,
+          CASE
+            WHEN COALESCE(p.pay_cnt, 0) > 0 THEN COALESCE(p.paid, 0)
+            ELSE COALESCE(s.amount_received, 0)
+          END::numeric AS received
+        FROM ${saleTable} s
+        LEFT JOIN (
+          SELECT ${fk} AS sid, SUM(amount) AS paid, COUNT(*) AS pay_cnt
+          FROM ${payTable}
+          WHERE created_at::date BETWEEN $1 AND $2
+          GROUP BY ${fk}
+        ) p ON p.sid = s.id
+        WHERE s.sale_date BETWEEN $1 AND $2
+        ${tenant}
+      ) x
+      `,
+      params,
+    );
+    return { billed: this.n(row.billed), received: this.n(row.received) };
+  }
+
+  private async purchasePeriod(from: string, to: string) {
+    const params: any[] = [from, to];
+    const tenant = this.tenantFilter('po', params);
+    const row = await this.one(
+      `
+      SELECT
+        COALESCE(SUM(x.net), 0) AS net,
+        COALESCE(SUM(x.paid), 0) AS paid
+      FROM (
+        SELECT
+          po.net_amount::numeric AS net,
+          CASE
+            WHEN COALESCE(p.pay_cnt, 0) > 0 THEN COALESCE(p.paid, 0)
+            ELSE COALESCE(po.total_payment_made, 0)
+          END::numeric AS paid
+        FROM purchase_orders po
+        LEFT JOIN (
+          SELECT purchase_order_id AS oid, SUM(amount) AS paid, COUNT(*) AS pay_cnt
+          FROM purchase_order_payments
+          WHERE created_at::date BETWEEN $1 AND $2
+          GROUP BY purchase_order_id
+        ) p ON p.oid = po.id
+        WHERE po.order_date BETWEEN $1 AND $2
+          AND po.status <> 'cancelled'
+        ${tenant}
+      ) x
+      `,
+      params,
+    );
+    return { net: this.n(row.net), paid: this.n(row.paid) };
+  }
+
+  private async expensePeriod(from: string, to: string) {
+    const params: any[] = [from, to];
+    const tenant = this.tenantFilter('e', params);
+    const row = await this.one(
+      `SELECT COALESCE(SUM(e.amount), 0) AS total FROM expenses e WHERE e.expense_date BETWEEN $1 AND $2 ${tenant}`,
+      params,
+    );
+    return this.n(row.total);
+  }
+
+  private async voucherPeriod(from: string, to: string) {
+    const params: any[] = [from, to];
+    const tenant = this.tenantFilter('v', params);
+    const rows = await this.dataSource.query(
+      `
+      SELECT v.voucher_type AS type, COALESCE(SUM(v.amount), 0) AS total
+      FROM payment_vouchers v
+      WHERE v.voucher_date BETWEEN $1 AND $2
         AND v.status <> 'cancelled'
         AND (v.reference_type IS NULL OR LOWER(v.reference_type) = 'other')
       ${tenant}
