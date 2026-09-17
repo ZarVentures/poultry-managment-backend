@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
-import { Expense } from './expense.entity';
+import { Expense, ExpenseCategoryType, PaymentMethodType } from './expense.entity';
 import { ExpenseCategory } from '../expense-categories/expense-category.entity';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
@@ -9,7 +9,9 @@ import { AccountingService } from '../modules/accounting/accounting.service';
 import { TenantContextService } from '../tenants/tenant-context.service';
 
 @Injectable()
-export class ExpensesService {
+export class ExpensesService implements OnModuleInit {
+  private readonly logger = new Logger(ExpensesService.name);
+
   constructor(
     @InjectRepository(Expense)
     private readonly expenseRepository: Repository<Expense>,
@@ -18,6 +20,21 @@ export class ExpensesService {
     private readonly accountingService: AccountingService,
     private readonly tenantContext: TenantContextService,
   ) { }
+
+  async onModuleInit() {
+    const statements = [
+      `ALTER TYPE payment_method_type ADD VALUE IF NOT EXISTS 'upi'`,
+      `ALTER TABLE expenses ALTER COLUMN payment_method TYPE varchar(30) USING payment_method::text`,
+      `ALTER TABLE godown_expenses ALTER COLUMN payment_method TYPE varchar(30) USING payment_method::text`,
+    ];
+    for (const sql of statements) {
+      try {
+        await this.expenseRepository.query(sql);
+      } catch (err: any) {
+        this.logger.warn(`Expense payment method migration skipped: ${err?.message || err}`);
+      }
+    }
+  }
 
   private getTenantId(): string | null {
     return this.tenantContext.getTenantId();
@@ -36,8 +53,14 @@ export class ExpensesService {
 
   async create(createExpenseDto: CreateExpenseDto): Promise<Expense> {
     const expense = this.expenseRepository.create({
-      ...createExpenseDto,
+      expenseDate: createExpenseDto.expenseDate,
+      expenseOwner: createExpenseDto.expenseOwner,
+      categoryId: createExpenseDto.categoryId,
+      category: createExpenseDto.category as ExpenseCategoryType | undefined,
+      description: createExpenseDto.description,
       amount: parseFloat(createExpenseDto.amount),
+      paymentMethod: (createExpenseDto.paymentMethod || 'cash') as PaymentMethodType,
+      notes: createExpenseDto.notes,
       tenantId: this.getTenantId() ?? undefined,
     });
     // If a categoryId was provided, resolve and attach the category entity

@@ -2,7 +2,7 @@ import { Column, Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 't
 import { ExpenseCategory } from '../expense-categories/expense-category.entity';
 
 export type ExpenseCategoryType = 'feed' | 'labor' | 'medicine' | 'utilities' | 'equipment' | 'maintenance' | 'transportation' | 'other';
-export type PaymentMethodType = 'cash' | 'bank_transfer' | 'check' | 'credit_card';
+export type PaymentMethodType = 'cash' | 'bank_transfer' | 'check' | 'credit_card' | 'upi';
 
 @Entity({ name: 'expenses' })
 export class Expense {
@@ -38,12 +38,7 @@ export class Expense {
   @Column({ type: 'numeric', precision: 14, scale: 2 })
   amount!: number;
 
-  @Column({
-    name: 'payment_method',
-    type: 'enum',
-    enum: ['cash', 'bank_transfer', 'check', 'credit_card'],
-    enumName: 'payment_method_type',
-  })
+  @Column({ name: 'payment_method', type: 'varchar', length: 30 })
   paymentMethod!: PaymentMethodType;
 
   @Column({ type: 'text', nullable: true })

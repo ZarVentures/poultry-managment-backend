@@ -15,6 +15,9 @@ export class TenantsController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   async getMyTenant(@Request() req: any) {
+    if (req.user?.tenantId) {
+      return this.tenantsService.findById(String(req.user.tenantId));
+    }
     return this.tenantsService.findByUserId(req.user.userId);
   }
 }

@@ -17,7 +17,7 @@ export class GodownExpense {
   @Column({ type: 'numeric', precision: 14, scale: 2 })
   amount!: number;
 
-  @Column({ name: 'payment_method', type: 'enum', enum: ['cash', 'bank_transfer', 'check', 'credit_card'] })
+  @Column({ name: 'payment_method', type: 'varchar', length: 30 })
   paymentMethod!: string;
 
   @Column({ type: 'text', nullable: true })

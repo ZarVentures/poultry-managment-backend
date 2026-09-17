@@ -5,12 +5,15 @@ import { Settings } from './settings.entity';
 import { CreateSettingDto } from './dto/create-setting.dto';
 import { UpdateSettingDto } from './dto/update-setting.dto';
 import { TenantContextService } from '../tenants/tenant-context.service';
+import { Tenant } from '../tenants/tenant.entity';
 
 @Injectable()
 export class SettingsService {
   constructor(
     @InjectRepository(Settings)
     private readonly settingsRepository: Repository<Settings>,
+    @InjectRepository(Tenant)
+    private readonly tenantRepository: Repository<Tenant>,
     private readonly tenantContext: TenantContextService,
   ) {}
 
@@ -59,11 +62,7 @@ export class SettingsService {
   }
 
   async create(dto: CreateSettingDto): Promise<Settings> {
-    const setting = this.settingsRepository.create({
-      ...dto,
-      tenantId: this.getTenantId() ?? undefined,
-    });
-    return this.settingsRepository.save(setting);
+    return this.upsertByKey(dto.key, dto.value, dto.category, dto.description);
   }
 
   async update(id: string, dto: UpdateSettingDto): Promise<Settings> {
@@ -90,15 +89,58 @@ export class SettingsService {
 
   async upsertByKey(key: string, value: string, category?: string, description?: string): Promise<Settings> {
     const existing = await this.findByKey(key);
+    let saved: Settings;
     if (existing) {
       existing.value = value;
       if (category) existing.category = category;
       if (description) existing.description = description;
       existing.updatedAt = new Date();
-      return this.settingsRepository.save(existing);
+      saved = await this.settingsRepository.save(existing);
     } else {
-      return this.create({ key, value, category, description });
+      saved = await this.settingsRepository.save(
+        this.settingsRepository.create({
+          key,
+          value,
+          category,
+          description,
+          tenantId: this.getTenantId() ?? undefined,
+        }),
+      );
     }
+
+    if (key === 'farmName' || key === 'company_name') {
+      await this.syncBusinessName(value, key);
+    }
+
+    return saved;
+  }
+
+  private async syncBusinessName(name: string, sourceKey: string): Promise<void> {
+    const tenantId = this.getTenantId();
+    if (tenantId) {
+      await this.tenantRepository.update({ id: tenantId }, { name });
+    }
+
+    const otherKey = sourceKey === 'farmName' ? 'company_name' : 'farmName';
+    const other = await this.findByKey(otherKey);
+    if (other) {
+      if (other.value !== name) {
+        other.value = name;
+        other.updatedAt = new Date();
+        await this.settingsRepository.save(other);
+      }
+      return;
+    }
+
+    await this.settingsRepository.save(
+      this.settingsRepository.create({
+        key: otherKey,
+        value: name,
+        category: otherKey === 'farmName' ? 'general' : 'company',
+        description: 'Business name',
+        tenantId: tenantId ?? undefined,
+      }),
+    );
   }
 
   async delete(id: string): Promise<void> {
@@ -120,7 +162,7 @@ export class SettingsService {
     return {
       currency: settingsMap.get('currency') || 'INR',
       theme: settingsMap.get('theme') || 'light',
-      companyName: settingsMap.get('company_name') || settingsMap.get('farmName') || 'Aziz Poultry',
+      companyName: settingsMap.get('company_name') || settingsMap.get('farmName') || '',
       companyEmail: settingsMap.get('company_email') || settingsMap.get('farmEmail') || '',
       companyPhone: settingsMap.get('company_phone') || settingsMap.get('farmPhone') || '',
       companyAddress: settingsMap.get('company_address') || settingsMap.get('farmLocation') || '',
