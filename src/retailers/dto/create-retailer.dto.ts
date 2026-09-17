@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEmail, MaxLength, IsEnum, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsEmail, MaxLength, IsEnum, IsNumber, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateRetailerDto {
@@ -36,4 +36,8 @@ export class CreateRetailerDto {
   @IsNumber()
   @Type(() => Number)
   openingBalance?: number;
+
+  @IsOptional()
+  @IsDateString()
+  joinDate?: string;
 }

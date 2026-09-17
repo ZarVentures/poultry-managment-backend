@@ -713,32 +713,37 @@ export class BillingService {
 
   async getCompanyReport(fromDate?: string, toDate?: string) {
     try {
+      const applyRange = (query: any, column: string) => {
+        if (fromDate) query.andWhere(`${column} >= :fromDate`, { fromDate });
+        if (toDate) query.andWhere(`${column} <= :toDate`, { toDate });
+      };
+
       const salesQuery = this.mainSaleRepo.createQueryBuilder('sale')
         .leftJoinAndSelect('sale.retailer', 'retailer');
       this.applyTenant(salesQuery, 'sale');
-
-      if (fromDate && toDate) {
-        salesQuery.andWhere('sale.saleDate BETWEEN :fromDate AND :toDate', { fromDate, toDate });
-      }
+      applyRange(salesQuery, 'sale.saleDate');
       const sales = await salesQuery.getMany();
+
+      const godownQuery = this.godownSaleRepo.createQueryBuilder('gs');
+      this.applyTenant(godownQuery, 'gs');
+      applyRange(godownQuery, 'gs.saleDate');
+      const godownSales = await godownQuery.getMany();
 
       const purchasesQuery = this.purchaseRepo.createQueryBuilder('po');
       this.applyTenant(purchasesQuery, 'po');
-      if (fromDate && toDate) {
-        purchasesQuery.andWhere('po.orderDate BETWEEN :fromDate AND :toDate', { fromDate, toDate });
-      }
+      applyRange(purchasesQuery, 'po.orderDate');
       const purchases = await purchasesQuery.getMany();
 
       const expensesQuery = this.expenseRepo.createQueryBuilder('exp');
       this.applyTenant(expensesQuery, 'exp');
-      if (fromDate && toDate) {
-        expensesQuery.andWhere('exp.expenseDate BETWEEN :fromDate AND :toDate', { fromDate, toDate });
-      }
+      applyRange(expensesQuery, 'exp.expenseDate');
       const expenses = await expensesQuery.getMany();
 
       const inventory = await this.inventoryRepo.find({ where: this.tenantWhere({}) });
 
-      const totalRevenue = sales.reduce((sum, s) => sum + Number(s.netAmount || s.totalAmount || 0), 0);
+      const totalRevenue =
+        sales.reduce((sum, s) => sum + Number(s.netAmount || s.totalAmount || 0), 0) +
+        godownSales.reduce((sum, s) => sum + Number(s.totalAmount || 0), 0);
 
       const totalPurchases = purchases.reduce((sum, p) => sum + Number(p.netAmount || p.grossAmount || 0), 0);
       const totalTransportCharges = purchases.reduce((sum, p) => sum + Number(p.transportCharges || 0), 0);
@@ -765,6 +770,10 @@ export class BillingService {
       for (const sale of sales) {
         const customerName = sale.customerName || 'Unknown';
         partyWiseSales[customerName] = (partyWiseSales[customerName] || 0) + Number(sale.netAmount || sale.totalAmount || 0);
+      }
+      for (const sale of godownSales) {
+        const customerName = sale.customerName || 'Unknown';
+        partyWiseSales[customerName] = (partyWiseSales[customerName] || 0) + Number(sale.totalAmount || 0);
       }
 
       const expenseBreakdown: Record<string, number> = {};
@@ -818,9 +827,9 @@ export class BillingService {
 
       const auditLog = {
         generatedAt: new Date().toISOString(),
-        dateRange: fromDate && toDate ? { from: fromDate, to: toDate } : null,
+        dateRange: fromDate || toDate ? { from: fromDate || null, to: toDate || null } : null,
         dataSources: {
-          salesCount: sales.length,
+          salesCount: sales.length + godownSales.length,
           purchasesCount: purchases.length,
           expensesCount: expenses.length,
           inventoryItemsCount: inventory.length,
