@@ -1,0 +1,76 @@
+{
+  "name": "leftover-godown-stock-weight",
+  "marker": "VERIFY_GODOWN_STOCK_DATASET",
+  "purpose": "Prove leftover kg = remaining birds × inward avg kg/bird, NOT inward kg − billed sale kg.",
+  "inwards": [
+    {
+      "entryDate": "2026-09-01",
+      "inwardNo": "VERIFY-INW-001",
+      "supplierName": "Verify Farm A",
+      "numberOfBirds": 100,
+      "averageWeight": 1.5,
+      "totalWeight": 150,
+      "actualWeight": 150,
+      "ratePerKg": 100,
+      "totalAmount": 15000
+    },
+    {
+      "entryDate": "2026-09-02",
+      "inwardNo": "VERIFY-INW-002",
+      "supplierName": "Verify Farm B",
+      "numberOfBirds": 50,
+      "averageWeight": 1.2,
+      "totalWeight": 60,
+      "actualWeight": 60,
+      "ratePerKg": 100,
+      "totalAmount": 6000
+    }
+  ],
+  "sales": [
+    {
+      "saleDate": "2026-09-05",
+      "saleNo": "VERIFY-GDS-001",
+      "invoiceNumber": "VERIFY-GDS-001",
+      "customerName": "Verify Retailer 1",
+      "numberOfBirds": 40,
+      "totalWeight": 70,
+      "ratePerKg": 120,
+      "totalAmount": 8400,
+      "note": "Billed 70 kg on purpose; stock out should be 40 × 1.4 = 56 kg"
+    },
+    {
+      "saleDate": "2026-09-06",
+      "saleNo": "VERIFY-GDS-002",
+      "invoiceNumber": "VERIFY-GDS-002",
+      "customerName": "Verify Retailer 2",
+      "numberOfBirds": 20,
+      "totalWeight": 20,
+      "ratePerKg": 120,
+      "totalAmount": 2400,
+      "note": "Billed 20 kg; stock out should be 20 × 1.4 = 28 kg"
+    }
+  ],
+  "mortalities": [
+    {
+      "mortalityDate": "2026-09-07",
+      "numberOfBirdsDied": 10,
+      "weightOfDeadBirds": 5,
+      "reason": "verify",
+      "note": "Recorded 5 kg dead; stock out should be 10 × 1.4 = 14 kg"
+    }
+  ],
+  "expected": {
+    "inwardBirds": 150,
+    "inwardKg": 210,
+    "avgKgPerBird": 1.4,
+    "soldBirds": 60,
+    "deadBirds": 10,
+    "remainingBirds": 80,
+    "remainingKg": 112,
+    "inwardValue": 21000,
+    "inwardRatePerKg": 100,
+    "remainingValue": 11200,
+    "wrongIfSubtractBilledKg": 115,
+    "formula": "remainingKg = (inwardBirds - soldBirds - deadBirds) × (inwardKg / inwardBirds)"
+  }
+}

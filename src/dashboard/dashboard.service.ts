@@ -8,6 +8,7 @@ import { PurchaseOrder } from '../purchases/entities/purchase-order.entity';
 import { InventoryItem } from '../inventory/entities/inventory-item.entity';
 import { GodownSale } from '../godown/entities/godown-sale.entity';
 import { TenantContextService } from '../tenants/tenant-context.service';
+import { ReportsService } from '../reports/reports.service';
 
 @Injectable()
 export class DashboardService {
@@ -25,6 +26,7 @@ export class DashboardService {
     @InjectRepository(GodownSale)
     private readonly godownSaleRepository: Repository<GodownSale>,
     private readonly tenantContext: TenantContextService,
+    private readonly reportsService: ReportsService,
   ) {}
 
   private getTenantId(): string | null {
@@ -118,9 +120,6 @@ export class DashboardService {
     const expenseResult = await expenseQuery.getRawOne();
     const totalExpenses = parseFloat(expenseResult.total) || 0;
 
-    // Profit MTD
-    const profit = totalRevenue - totalExpenses;
-
     // Total Active Vehicles
     const totalVehicles = await this.vehicleRepository.count({
       where: this.tenantWhere({ status: 'active' })
@@ -131,10 +130,29 @@ export class DashboardService {
     const godownSalesCount = parseInt(godownResult.count) || 0;
     const totalSales = poultrySalesCount + godownSalesCount;
 
+    const pl = await this.reportsService.getProfitLossReport(start, end);
+    const plSummary = pl?.summary || {};
+    const n = (v: any, fallback = 0) => {
+      const x = Number(v);
+      return Number.isFinite(x) ? x : fallback;
+    };
+
+    const poultryRev = n(plSummary.poultryRevenue, saleRevenue);
+    const godownRev = n(plSummary.godownRevenue, godownRevenue) || godownRevenue;
+    const totalRev = poultryRev + godownRev;
+    const cogs = n(plSummary.cogs);
+    const exp = n(plSummary.totalExpenses, totalExpenses);
+
     return {
-      totalRevenue,
-      totalExpenses,
-      profit,
+      totalRevenue: totalRev,
+      poultryRevenue: poultryRev,
+      godownRevenue: godownRev,
+      availableStock: n(plSummary.availableStock),
+      openingStock: n(plSummary.openingStock),
+      cogs,
+      totalPurchase: n(plSummary.totalPurchase),
+      totalExpenses: exp,
+      profit: totalRev - cogs - exp,
       totalVehicles,
       totalSales,
       totalBirdsSold,
