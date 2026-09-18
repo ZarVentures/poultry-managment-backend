@@ -7,6 +7,7 @@ import { GodownSalePayment } from './entities/godown-sale-payment.entity';
 import { GodownMortality } from './godown-mortality.entity';
 import { GodownExpense } from './godown-expense.entity';
 import { BirdReturn } from '../sales/entities/bird-return.entity';
+import { Mortality } from '../mortality/mortality.entity';
 import { CagesService } from '../cages/cages.service';
 import { TenantContextService } from '../tenants/tenant-context.service';
 import { normalizeToIST } from '../common/date-utils';
@@ -26,6 +27,8 @@ export class GodownService {
     private expenseRepo: Repository<GodownExpense>,
     @InjectRepository(BirdReturn)
     private birdReturnRepo: Repository<BirdReturn>,
+    @InjectRepository(Mortality)
+    private farmMortalityRepo: Repository<Mortality>,
     private readonly cagesService: CagesService,
     private readonly tenantContext: TenantContextService,
   ) { }
@@ -43,6 +46,31 @@ export class GodownService {
     const tenantId = this.getTenantId();
     if (tenantId) query.andWhere(`${alias}.tenantId = :tenantId`, { tenantId });
     return query;
+  }
+
+  private n(v: any): number {
+    const x = parseFloat(String(v ?? ''));
+    return Number.isFinite(x) ? x : 0;
+  }
+
+  private round2(v: number): number {
+    return Math.round((v + Number.EPSILON) * 100) / 100;
+  }
+
+  /** Inward stock kg on an entry (not sale billed kg). */
+  private inwardKg(e: GodownInwardEntry): number {
+    const recorded = this.n(e.totalWeight) || this.n(e.actualWeight);
+    if (recorded > 0) return recorded;
+    const birds = this.n(e.numberOfBirds);
+    const avg = this.n(e.averageWeight);
+    return birds > 0 && avg > 0 ? this.round2(birds * avg) : 0;
+  }
+
+  /** Leftover / movement stock kg = birds × inward avg kg/bird. */
+  private stockKgForBirds(birds: number, avgKgPerBird: number, recordedKg = 0): number {
+    const b = this.n(birds);
+    if (b > 0 && avgKgPerBird > 0) return this.round2(b * avgKgPerBird);
+    return Math.max(0, this.n(recordedKg));
   }
 
   // ─── Inward Entries ───────────────────────────────────────────────────────
@@ -565,8 +593,9 @@ export class GodownService {
       .createQueryBuilder('entry')
       .select([
         'SUM(entry.numberOfBirds) AS birds',
-        'SUM(entry.totalWeight) AS weight',
-        'SUM(entry.totalAmount) AS value',
+        'SUM(COALESCE(entry.totalWeight, entry.actualWeight, COALESCE(entry.numberOfBirds, 0) * COALESCE(entry.averageWeight, 0))) AS weight',
+        'SUM(COALESCE(NULLIF(entry.totalAmount, 0), COALESCE(entry.totalWeight, entry.actualWeight, 0) * COALESCE(entry.ratePerKg, 0))) AS value',
+        'AVG(NULLIF(entry.ratePerKg, 0)) AS avgrate',
       ]);
     this.applyTenant(inwardQuery, 'entry');
     const inward = await inwardQuery.getRawOne();
@@ -593,6 +622,7 @@ export class GodownService {
     const totalInwardBirds = parseFloat(inward.birds) || 0;
     const totalInwardWeight = parseFloat(inward.weight) || 0;
     const totalInwardValue = parseFloat(inward.value) || 0;
+    const avgInwardRate = parseFloat(inward.avgrate) || 0;
     const totalSoldBirds = parseFloat(sold.birds) || 0;
     const totalSoldWeight = parseFloat(sold.weight) || 0;
     const totalSoldValue = parseFloat(sold.value) || 0;
@@ -615,7 +645,19 @@ export class GodownService {
     // Live availability must match stock ledger closing (inward − sales + returns − mortality).
     const ledger = await this.getStockLedger();
     const currentStock = Math.max(0, Number(ledger?.closing?.birds) || 0);
-    const currentWeight = Math.max(0, Number(ledger?.closing?.weight) || 0);
+    const avgKgPerBird = totalInwardBirds > 0 && totalInwardWeight > 0
+      ? totalInwardWeight / totalInwardBirds
+      : 0;
+    // Leftover kg follows leftover birds at inward avg weight — not billed sale kg.
+    const currentWeight = currentStock <= 0
+      ? 0
+      : avgKgPerBird > 0
+        ? Math.round(currentStock * avgKgPerBird * 100) / 100
+        : Math.max(0, Number(ledger?.closing?.weight) || 0);
+    const inwardRate = totalInwardWeight > 0 && totalInwardValue > 0
+      ? totalInwardValue / totalInwardWeight
+      : avgInwardRate;
+    const currentValue = Math.max(0, Math.round(currentWeight * inwardRate * 100) / 100);
 
     return {
       totalInward: totalInwardBirds,
@@ -630,7 +672,7 @@ export class GodownService {
       currentWeight,
       totalInwardValue,
       totalSoldValue,
-      currentValue: totalInwardValue - totalSoldValue,
+      currentValue,
     };
   }
 
@@ -656,13 +698,17 @@ export class GodownService {
     const where: any = {};
     if (tenantId) where.tenantId = tenantId;
 
-    const [inwards, sales, mortalities, birdReturns] = await Promise.all([
+    const [inwards, sales, mortalities, farmMortalities, birdReturns] = await Promise.all([
       this.inwardRepo.find({ where, order: { entryDate: 'ASC', id: 'ASC' } }),
       this.saleRepo.find({ where, order: { saleDate: 'ASC', id: 'ASC' } }),
       this.mortalityRepo.find({
         where,
         relations: ['godownInward'],
         order: { mortalityDate: 'ASC', id: 'ASC' },
+      }),
+      this.farmMortalityRepo.find({
+        where: tenantId ? { tenantId, source: 'godown' } : { source: 'godown' },
+        order: { purchaseDate: 'ASC', id: 'ASC' },
       }),
       this.birdReturnRepo.find({
         where: tenantId
@@ -712,6 +758,10 @@ export class GodownService {
       returnAdjustBySale.set(saleId, prev);
     }
 
+    const inwardBirdsTotal = inwards.reduce((sum, e) => sum + this.n(e.numberOfBirds), 0);
+    const inwardKgTotal = inwards.reduce((sum, e) => sum + this.inwardKg(e), 0);
+    const avgKgPerBird = inwardBirdsTotal > 0 ? inwardKgTotal / inwardBirdsTotal : 0;
+
     const movements: Movement[] = [];
 
     for (const e of inwards) {
@@ -726,9 +776,9 @@ export class GodownService {
         party: e.supplierName || '-',
         purchaseInvoiceNo: e.purchaseInvoiceNo,
         vehicleId: e.vehicleId,
-        birdsIn: Number(e.numberOfBirds) || 0,
+        birdsIn: this.n(e.numberOfBirds),
         birdsOut: 0,
-        weightIn: Number(e.totalWeight) || 0,
+        weightIn: this.inwardKg(e),
         weightOut: 0,
         ratePerKg: e.ratePerKg != null ? Number(e.ratePerKg) : undefined,
         amount: e.totalAmount != null ? Number(e.totalAmount) : undefined,
@@ -738,9 +788,9 @@ export class GodownService {
 
     for (const s of sales) {
       const adj = returnAdjustBySale.get(String(s.id)) || { birds: 0, weight: 0 };
-      // Restore original sold qty (returns had reduced sale.numberOfBirds)
-      const birdsOut = (Number(s.numberOfBirds) || 0) + adj.birds;
-      const weightOut = (Number(s.totalWeight) || 0) + adj.weight;
+      const birdsOut = this.n(s.numberOfBirds) + adj.birds;
+      const recordedKg = this.n(s.totalWeight) + adj.weight;
+      const weightOut = this.stockKgForBirds(birdsOut, avgKgPerBird, recordedKg);
       movements.push({
         date: String(s.saleDate).slice(0, 10),
         createdAt: s.createdAt,
@@ -764,8 +814,9 @@ export class GodownService {
     }
 
     for (const r of birdReturns) {
-      const birds = Number(r.numberOfBirdsReturned) || 0;
-      const weight = Number(r.weightReturned) || 0;
+      const birds = this.n(r.numberOfBirdsReturned);
+      const recordedKg = this.n(r.weightReturned);
+      const weight = this.stockKgForBirds(birds, avgKgPerBird, recordedKg);
       const isDead = r.returnReason === 'dead';
       const toStock = !!r.returnedToInventory;
       const processed = r.status === 'processed';
@@ -799,7 +850,11 @@ export class GodownService {
       });
     }
 
+    const processedGodownMortalityIds = new Set(mortalities.map((m) => String(m.id)));
+
     for (const m of mortalities) {
+      const birdsOut = this.n(m.numberOfBirdsDied);
+      const recordedKg = this.n(m.weightOfDeadBirds);
       movements.push({
         date: String(m.mortalityDate).slice(0, 10),
         createdAt: m.createdAt,
@@ -812,10 +867,31 @@ export class GodownService {
           : `MOR-${m.id}`,
         party: m.reason || 'Mortality',
         birdsIn: 0,
-        birdsOut: Number(m.numberOfBirdsDied) || 0,
+        birdsOut,
         weightIn: 0,
-        weightOut: Number(m.weightOfDeadBirds) || 0,
+        weightOut: recordedKg > 0 ? recordedKg : this.stockKgForBirds(birdsOut, avgKgPerBird, 0),
         notes: m.notes || m.reason,
+      });
+    }
+
+    for (const m of farmMortalities) {
+      if (m.godownMortalityId && processedGodownMortalityIds.has(String(m.godownMortalityId))) continue;
+      const birdsOut = this.n(m.numberOfBirdsDied);
+      const recordedKg = this.n(m.weightOfDeadBirds);
+      movements.push({
+        date: String(m.purchaseDate || m.createdAt).slice(0, 10),
+        createdAt: m.createdAt,
+        sortId: `FM-${m.id}`,
+        movementType: 'MORTALITY',
+        referenceType: 'Godown Mortality',
+        referenceId: String(m.id),
+        referenceNo: m.recordNumber || `MRT-${m.id}`,
+        party: m.cause || 'Mortality',
+        birdsIn: 0,
+        birdsOut,
+        weightIn: 0,
+        weightOut: recordedKg > 0 ? recordedKg : this.stockKgForBirds(birdsOut, avgKgPerBird, 0),
+        notes: m.notes || m.cause,
       });
     }
 
@@ -934,7 +1010,9 @@ export class GodownService {
       endDate: end || null,
       opening: {
         birds: openingBirds,
-        weight: Number(openingWeight.toFixed(2)),
+        weight: openingBirds > 0 && avgKgPerBird > 0
+          ? this.round2(openingBirds * avgKgPerBird)
+          : Number(openingWeight.toFixed(2)),
       },
       period: {
         birdsIn: periodInBirds,
@@ -951,8 +1029,10 @@ export class GodownService {
         returnWeight: Number(returnWeightIn.toFixed(2)),
       },
       closing: {
-        birds: runningBirds,
-        weight: Number(runningWeight.toFixed(2)),
+        birds: Math.max(0, runningBirds),
+        weight: Math.max(0, runningBirds) > 0 && avgKgPerBird > 0
+          ? this.round2(Math.max(0, runningBirds) * avgKgPerBird)
+          : Math.max(0, Number(runningWeight.toFixed(2))),
       },
       entries,
       totalEntries: entries.length,

@@ -12,7 +12,11 @@ import { Cage } from '../cages/cage.entity';
 
 import { SalePayment } from '../sales/sale-payment.entity';
 import { GodownSalePayment } from '../godown/entities/godown-sale-payment.entity';
+import { Mortality } from '../mortality/mortality.entity';
+import { GodownExpense } from '../godown/godown-expense.entity';
 import { TenantContextService } from '../tenants/tenant-context.service';
+import { BalanceSheetService } from './balance-sheet.service';
+import { GodownService } from '../godown/godown.service';
 
 @Injectable()
 export class ReportsService {
@@ -35,7 +39,13 @@ export class ReportsService {
     private readonly salePaymentRepository: Repository<SalePayment>,
     @InjectRepository(GodownSalePayment)
     private readonly godownSalePaymentRepository: Repository<GodownSalePayment>,
+    @InjectRepository(Mortality)
+    private readonly mortalityRepository: Repository<Mortality>,
+    @InjectRepository(GodownExpense)
+    private readonly godownExpenseRepository: Repository<GodownExpense>,
     private readonly tenantContext: TenantContextService,
+    private readonly balanceSheetService: BalanceSheetService,
+    private readonly godownService: GodownService,
   ) { }
 
   private getTenantId(): string | null {
@@ -62,8 +72,60 @@ export class ReportsService {
     return Number.isFinite(x) ? x : 0;
   }
 
+  /** Billed kg on a godown invoice (fallback only). */
+  private godownSoldKg(s: { totalWeight?: number; numberOfBirds?: number; averageWeight?: number }): number {
+    const weight = this.num(s.totalWeight);
+    if (weight > 0) return weight;
+    const birds = this.num(s.numberOfBirds);
+    const avg = this.num(s.averageWeight);
+    return birds > 0 && avg > 0 ? birds * avg : 0;
+  }
+
+  private inwardEntryKg(e: { totalWeight?: number; actualWeight?: number; numberOfBirds?: number; averageWeight?: number }): number {
+    const recorded = this.num(e.totalWeight) || this.num(e.actualWeight);
+    if (recorded > 0) return recorded;
+    const birds = this.num(e.numberOfBirds);
+    const avg = this.num(e.averageWeight);
+    return birds > 0 && avg > 0 ? this.round2(birds * avg) : 0;
+  }
+
+  /** Inward rate = rate entered when birds came into godown (kg-weighted). */
+  private weightedInwardRate(entries: GodownInwardEntry[]): { kg: number; birds: number; rate: number } {
+    let kg = 0;
+    let birds = 0;
+    let cost = 0;
+    for (const e of entries) {
+      const w = this.inwardEntryKg(e);
+      const rate = this.num(e.ratePerKg);
+      kg += w;
+      birds += this.num(e.numberOfBirds);
+      cost += rate > 0 ? w * rate : this.num(e.totalAmount);
+    }
+    return { kg, birds, rate: kg > 0 ? cost / kg : 0 };
+  }
+
+  /** Purchase rate = rate_per_kg entered on the purchase bill (kg-weighted). */
+  private weightedPurchaseRate(orders: PurchaseOrder[]): number {
+    let kg = 0;
+    let cost = 0;
+    for (const p of orders) {
+      if (String(p.status) === 'cancelled') continue;
+      const w = this.num(p.totalWeight);
+      const rate = this.num(p.ratePerKg);
+      kg += w;
+      cost += rate > 0 ? w * rate : this.num(p.netAmount);
+    }
+    return kg > 0 ? cost / kg : 0;
+  }
+
   private round2(v: number): number {
     return Math.round(v * 100) / 100;
+  }
+
+  /** Date-only range, matching dashboard string compare (avoids UTC Between dropping today's rows). */
+  private dateBetween(startDate?: string, endDate?: string) {
+    if (!startDate || !endDate) return undefined;
+    return Between(startDate, endDate);
   }
 
   private parseSaleNotesWeightLossKg(notes?: string): number {
@@ -79,6 +141,22 @@ export class ReportsService {
 
   private stageLoss(fromWeight: number, toWeight: number): number {
     return Math.max(0, this.round2(fromWeight - toWeight));
+  }
+
+  private todayYmd(): string {
+    const now = new Date();
+    const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const y = ist.getFullYear();
+    const m = String(ist.getMonth() + 1).padStart(2, '0');
+    const d = String(ist.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  private dayBefore(ymd: string): string {
+    const [y, m, d] = ymd.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() - 1);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
   }
 
   private channelSummary(key: string, label: string, rows: Array<{ birds: number; purchaseWeight: number; recordedWeight: number; weightLoss: number }>) {
@@ -101,9 +179,8 @@ export class ReportsService {
   async getPurchaseReport(startDate?: string, endDate?: string) {
     const whereClause: any = {};
 
-    if (startDate && endDate) {
-      whereClause.orderDate = Between(new Date(startDate), new Date(endDate));
-    }
+    const orderRange = this.dateBetween(startDate, endDate);
+    if (orderRange) whereClause.orderDate = orderRange;
 
     const purchases = await this.purchaseRepository.find({
       where: this.tenantWhere(whereClause),
@@ -138,14 +215,13 @@ export class ReportsService {
   async getSalesReport(startDate?: string, endDate?: string) {
     const whereClause: any = {};
 
-    if (startDate && endDate) {
-      whereClause.saleDate = Between(new Date(startDate), new Date(endDate));
-    }
+    const saleRange = this.dateBetween(startDate, endDate);
+    if (saleRange) whereClause.saleDate = saleRange;
 
-    const sales = await this.saleRepository.find({
+    const sales = (await this.saleRepository.find({
       where: this.tenantWhere(whereClause),
       order: { saleDate: 'DESC' },
-    });
+    })).filter((s) => s.saleMode !== 'from_godown');
 
     const summary = {
       totalSales: sales.length,
@@ -178,9 +254,8 @@ export class ReportsService {
   async getMortalityReport(startDate?: string, endDate?: string) {
     const whereClause: any = {};
 
-    if (startDate && endDate) {
-      whereClause.orderDate = Between(new Date(startDate), new Date(endDate));
-    }
+    const orderRange = this.dateBetween(startDate, endDate);
+    if (orderRange) whereClause.orderDate = orderRange;
 
     const purchases = await this.purchaseRepository
       .createQueryBuilder('purchase')
@@ -215,33 +290,126 @@ export class ReportsService {
     const whereClauseSale: any = {};
     const whereClauseExpense: any = {};
 
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      whereClausePurchase.orderDate = Between(start, end);
-      whereClauseSale.saleDate = Between(start, end);
-      whereClauseExpense.expenseDate = Between(start, end);
-    }
+    const orderRange = this.dateBetween(startDate, endDate);
+    const saleRange = this.dateBetween(startDate, endDate);
+    const expenseRange = this.dateBetween(startDate, endDate);
+    if (orderRange) whereClausePurchase.orderDate = orderRange;
+    if (saleRange) whereClauseSale.saleDate = saleRange;
+    if (expenseRange) whereClauseExpense.expenseDate = expenseRange;
 
     const purchases = await this.purchaseRepository.find({ where: this.tenantWhere(whereClausePurchase) });
     const sales = await this.saleRepository.find({ where: this.tenantWhere(whereClauseSale) });
+    const godownSales = await this.godownSaleRepository.find({ where: this.tenantWhere(whereClauseSale) });
     const expenses = await this.expenseRepository.find({
       where: this.tenantWhere(whereClauseExpense),
       relations: ['expenseCategory']
     });
+    const godownExpenses = await this.godownExpenseRepository.find({
+      where: this.tenantWhere(whereClauseExpense),
+    });
+    const mortalityWhere: any = {};
+    const mortalityRange = this.dateBetween(startDate, endDate);
+    if (mortalityRange) mortalityWhere.purchaseDate = mortalityRange;
+    const mortalities = await this.mortalityRepository.find({ where: this.tenantWhere(mortalityWhere) });
 
-    const totalRevenue = sales.reduce((sum, s) => sum + parseFloat(s.netAmount as any), 0);
-    const totalCost = purchases.reduce((sum, p) => sum + parseFloat(p.netAmount as any), 0);
-    const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount as any), 0);
+    const poultryRevenue = sales.reduce((sum, s) => sum + parseFloat(s.netAmount as any), 0);
+    const godownRevenue = godownSales.reduce((sum, s) => sum + parseFloat((s.totalAmount || 0) as any), 0);
+    const totalRevenue = poultryRevenue + godownRevenue;
+    const totalPurchase = purchases.reduce((sum, p) => sum + parseFloat(p.netAmount as any), 0);
+    const totalCost = totalPurchase;
+    const mainExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount as any), 0);
+    const godownExpenseTotal = godownExpenses.reduce((sum, e) => sum + parseFloat(e.amount as any), 0);
+    const totalExpenses = mainExpenses + godownExpenseTotal;
+    const totalMortality = mortalities.reduce((sum, m) => {
+      const amount = parseFloat(m.amount as any) || 0;
+      if (amount > 0) return sum + amount;
+      const weight = parseFloat(m.weightOfDeadBirds as any) || 0;
+      const rate = parseFloat(m.ratePerKg as any) || 0;
+      return sum + (weight > 0 && rate > 0 ? weight * rate : 0);
+    }, 0);
 
-    const grossProfit = totalRevenue - totalCost;
-    const netProfit = grossProfit - totalExpenses;
+    const closingAsOn = endDate || this.todayYmd();
+    const inwardAsOnWhere: any = {};
+    const purchaseAsOnWhere: any = {};
+    const asOnRange = this.dateBetween('1970-01-01', closingAsOn);
+    if (asOnRange) {
+      inwardAsOnWhere.entryDate = asOnRange;
+      purchaseAsOnWhere.orderDate = asOnRange;
+    }
+    const [closing, godownSummary, inwardsAsOn, purchasesAsOn] = await Promise.all([
+      this.balanceSheetService.getInventoryValuation(closingAsOn),
+      this.godownService.getSummary(),
+      this.godownInwardRepository.find({ where: this.tenantWhere(inwardAsOnWhere) }),
+      this.purchaseRepository.find({ where: this.tenantWhere(purchaseAsOnWhere) }),
+    ]);
+
+    const inwardStats = this.weightedInwardRate(inwardsAsOn);
+    const summaryInwardKg = this.num(godownSummary.totalInwardWeight);
+    const summaryInwardBirds = this.num(godownSummary.totalInward);
+    const summaryInwardValue = this.num(godownSummary.totalInwardValue);
+    const inwardRate = inwardStats.rate
+      || (summaryInwardKg > 0 && summaryInwardValue > 0 ? summaryInwardValue / summaryInwardKg : 0)
+      || this.num(closing.godownRate);
+    const avgInwardKg = inwardStats.birds > 0 && inwardStats.kg > 0
+      ? inwardStats.kg / inwardStats.birds
+      : (summaryInwardBirds > 0 && summaryInwardKg > 0 ? summaryInwardKg / summaryInwardBirds : 0);
+    const purchaseRate = this.weightedPurchaseRate(purchasesAsOn) || this.num(closing.purchaseRate);
+
+    const godownStock = this.round2(
+      this.num(godownSummary.currentValue) > 0
+        ? this.num(godownSummary.currentValue)
+        : this.num(godownSummary.currentWeight) * inwardRate,
+    );
+    const vehicleStock = this.round2(closing.vehicleInventory || 0);
+    const availableStock = this.round2(godownStock + vehicleStock);
+
+    let openingStock = 0;
+    if (startDate) {
+      const openingLedger = await this.godownService.getStockLedger({ endDate: this.dayBefore(startDate) });
+      const openingGodown = this.round2(this.num(openingLedger?.closing?.weight) * inwardRate);
+      const openingValuation = await this.balanceSheetService.getInventoryValuation(this.dayBefore(startDate));
+      openingStock = this.round2(openingGodown + this.num(openingValuation.vehicleInventory));
+    }
+
+    const vehicleSoldKg = sales
+      .filter(s => s.saleMode !== 'from_godown')
+      .reduce((sum, s) => sum + this.num(s.quantity), 0);
+    const godownSoldBirds = godownSales.reduce((sum, s) => sum + this.num(s.numberOfBirds), 0);
+    const godownSoldStockKg = godownSoldBirds > 0 && avgInwardKg > 0
+      ? this.round2(godownSoldBirds * avgInwardKg)
+      : godownSales.reduce((sum, s) => sum + this.godownSoldKg(s), 0);
+    const vehicleCogs = this.round2(vehicleSoldKg * purchaseRate);
+    let godownCogs = this.round2(godownSoldStockKg * inwardRate);
+    const inwardCostCap = this.round2(inwardStats.kg > 0 ? inwardStats.kg * inwardRate : summaryInwardValue);
+    if (inwardCostCap > 0 && godownCogs > inwardCostCap) godownCogs = inwardCostCap;
+    const cogs = this.round2(vehicleCogs + godownCogs);
+    const grossProfit = this.round2(totalRevenue - cogs);
+    const netProfit = this.round2(grossProfit - totalExpenses);
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
     return {
       summary: {
         totalRevenue,
-        totalCost,
+        poultryRevenue,
+        godownRevenue,
+        openingStock,
+        availableStock,
+        godownStock,
+        vehicleStock,
+        godownBirds: this.num(godownSummary.currentStock),
+        godownWeightKg: this.round2(this.num(godownSummary.currentWeight)),
+        vehicleBirds: this.num(closing.vehicleBirds),
+        vehicleWeightKg: this.round2(this.num(closing.vehicleWeight)),
+        totalPurchase,
+        vehicleSoldKg: this.round2(vehicleSoldKg),
+        godownSoldKg: this.round2(godownSoldStockKg),
+        purchaseRate: this.round2(purchaseRate),
+        godownRate: this.round2(inwardRate),
+        vehicleCogs,
+        godownCogs,
+        cogs,
+        totalMortality,
+        totalCost: totalPurchase,
         grossProfit,
         totalExpenses,
         netProfit,
@@ -253,8 +421,10 @@ export class ReportsService {
           total: totalCost,
         },
         sales: {
-          count: sales.length,
+          count: sales.length + godownSales.length,
           total: totalRevenue,
+          poultry: { count: sales.length, total: poultryRevenue },
+          godown: { count: godownSales.length, total: godownRevenue },
         },
         expenses: {
           count: expenses.length,
@@ -283,9 +453,8 @@ export class ReportsService {
   async getGodownSalesReport(startDate?: string, endDate?: string) {
     const whereClause: any = {};
 
-    if (startDate && endDate) {
-      whereClause.saleDate = Between(new Date(startDate), new Date(endDate));
-    }
+    const saleRange = this.dateBetween(startDate, endDate);
+    if (saleRange) whereClause.saleDate = saleRange;
 
     const sales = await this.godownSaleRepository.find({
       where: this.tenantWhere(whereClause),
@@ -295,6 +464,7 @@ export class ReportsService {
 
     const summary = {
       totalSales: sales.length,
+      totalBirds: sales.reduce((sum, s) => sum + (parseInt(String(s.numberOfBirds || 0), 10) || 0), 0),
       totalAmount: sales.reduce((sum, s) => sum + parseFloat((s.totalAmount || 0) as any), 0),
       totalWeightLoss: sales.reduce((sum, s) => sum + parseFloat((s.weightLoss || 0) as any), 0),
       totalAmountReceived: sales.reduce((sum, s) => sum + parseFloat((s.amountReceived || 0) as any), 0),
@@ -313,9 +483,8 @@ export class ReportsService {
   async getGodownInwardReport(startDate?: string, endDate?: string) {
     const whereClause: any = {};
 
-    if (startDate && endDate) {
-      whereClause.entryDate = Between(new Date(startDate), new Date(endDate));
-    }
+    const entryRange = this.dateBetween(startDate, endDate);
+    if (entryRange) whereClause.entryDate = entryRange;
 
     const entries = await this.godownInwardRepository.find({
       where: this.tenantWhere(whereClause),
@@ -385,17 +554,18 @@ export class ReportsService {
     const whereClausePurchase: any = {};
     const whereClauseSale: any = {};
 
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      whereClausePurchase.orderDate = Between(start, end);
-      whereClauseSale.saleDate = Between(start, end);
-    }
+    const orderRange = this.dateBetween(startDate, endDate);
+    const saleRange = this.dateBetween(startDate, endDate);
+    if (orderRange) whereClausePurchase.orderDate = orderRange;
+    if (saleRange) whereClauseSale.saleDate = saleRange;
 
     const purchases = await this.purchaseRepository.find({ where: this.tenantWhere(whereClausePurchase) });
     const sales = await this.saleRepository.find({ where: this.tenantWhere(whereClauseSale) });
+    const godownSales = await this.godownSaleRepository.find({ where: this.tenantWhere(whereClauseSale) });
 
-    const totalRevenue = sales.reduce((sum, s) => sum + parseFloat(s.netAmount as any), 0);
+    const poultryRevenue = sales.reduce((sum, s) => sum + parseFloat(s.netAmount as any), 0);
+    const godownRevenue = godownSales.reduce((sum, s) => sum + parseFloat((s.totalAmount || 0) as any), 0);
+    const totalRevenue = poultryRevenue + godownRevenue;
     const totalCost = purchases.reduce((sum, p) => sum + parseFloat(p.netAmount as any), 0);
     const grossProfit = totalRevenue - totalCost;
     const grossProfitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
@@ -414,9 +584,8 @@ export class ReportsService {
   async getExpenseBreakdown(startDate?: string, endDate?: string) {
     const whereClause: any = {};
 
-    if (startDate && endDate) {
-      whereClause.expenseDate = Between(new Date(startDate), new Date(endDate));
-    }
+    const expenseRange = this.dateBetween(startDate, endDate);
+    if (expenseRange) whereClause.expenseDate = expenseRange;
 
     const expenses = await this.expenseRepository.find({
       where: this.tenantWhere(whereClause),
@@ -458,9 +627,8 @@ export class ReportsService {
   async getBatchWiseProfit(startDate?: string, endDate?: string) {
     const whereClause: any = {};
 
-    if (startDate && endDate) {
-      whereClause.orderDate = Between(new Date(startDate), new Date(endDate));
-    }
+    const orderRange = this.dateBetween(startDate, endDate);
+    if (orderRange) whereClause.orderDate = orderRange;
 
     const purchases = await this.purchaseRepository.find({
       where: this.tenantWhere(whereClause),
@@ -497,9 +665,8 @@ export class ReportsService {
   async getFarmWiseProfit(startDate?: string, endDate?: string) {
     const whereClause: any = {};
 
-    if (startDate && endDate) {
-      whereClause.orderDate = Between(new Date(startDate), new Date(endDate));
-    }
+    const orderRange = this.dateBetween(startDate, endDate);
+    if (orderRange) whereClause.orderDate = orderRange;
 
     const purchases = await this.purchaseRepository.find({ where: this.tenantWhere(whereClause) });
 
@@ -542,30 +709,44 @@ export class ReportsService {
   async getCustomerWiseSales(startDate?: string, endDate?: string) {
     const whereClause: any = {};
 
-    if (startDate && endDate) {
-      whereClause.saleDate = Between(new Date(startDate), new Date(endDate));
-    }
+    const saleRange = this.dateBetween(startDate, endDate);
+    if (saleRange) whereClause.saleDate = saleRange;
 
     const sales = await this.saleRepository.find({ where: this.tenantWhere(whereClause) });
+    const godownSales = await this.godownSaleRepository.find({ where: this.tenantWhere(whereClause) });
 
-    // Group by customer
+    // Group by customer (vehicle sales + godown sales)
     const customerData: Record<string, any> = {};
 
-    sales.forEach(sale => {
-      const customerKey = sale.customerName || 'Unknown';
-
+    const bumpCustomer = (customerName: string | undefined, revenue: number, quantity: number) => {
+      const customerKey = customerName || 'Unknown';
       if (!customerData[customerKey]) {
         customerData[customerKey] = {
-          customerName: sale.customerName,
+          customerName: customerName || 'Unknown',
           totalSales: 0,
           totalRevenue: 0,
           totalQuantity: 0,
         };
       }
-
       customerData[customerKey].totalSales += 1;
-      customerData[customerKey].totalRevenue += parseFloat(sale.netAmount as any);
-      customerData[customerKey].totalQuantity += parseFloat(sale.quantity as any || '0');
+      customerData[customerKey].totalRevenue += revenue;
+      customerData[customerKey].totalQuantity += quantity;
+    };
+
+    sales.forEach(sale => {
+      bumpCustomer(
+        sale.customerName,
+        parseFloat(sale.netAmount as any) || 0,
+        parseFloat(sale.quantity as any || '0') || 0,
+      );
+    });
+
+    godownSales.forEach(sale => {
+      bumpCustomer(
+        sale.customerName,
+        parseFloat((sale.totalAmount || 0) as any) || 0,
+        parseFloat((sale.totalWeight || 0) as any) || 0,
+      );
     });
 
     const customerWiseData = Object.values(customerData).sort((a: any, b: any) => b.totalRevenue - a.totalRevenue);
@@ -575,7 +756,7 @@ export class ReportsService {
       summary: {
         totalCustomers: customerWiseData.length,
         totalRevenue: customerWiseData.reduce((sum: number, c: any) => sum + c.totalRevenue, 0),
-        totalSales: sales.length,
+        totalSales: sales.length + godownSales.length,
       },
       dateRange: { startDate, endDate },
     };
@@ -800,13 +981,13 @@ export class ReportsService {
     const whereInward: any = {};
     const whereGodownSale: any = {};
 
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      whereSale.saleDate = Between(start, end);
-      whereInward.entryDate = Between(start, end);
-      whereGodownSale.saleDate = Between(start, end);
+    const saleRange = this.dateBetween(startDate, endDate);
+    const inwardRange = this.dateBetween(startDate, endDate);
+    if (saleRange) {
+      whereSale.saleDate = saleRange;
+      whereGodownSale.saleDate = saleRange;
     }
+    if (inwardRange) whereInward.entryDate = inwardRange;
 
     const [sales, inwards, godownSales] = await Promise.all([
       this.saleRepository.find({

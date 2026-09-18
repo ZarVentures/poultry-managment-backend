@@ -12,12 +12,16 @@ import { GodownInwardEntry } from '../godown/godown-inward.entity';
 import { SalePayment } from '../sales/sale-payment.entity';
 import { GodownSalePayment } from '../godown/entities/godown-sale-payment.entity';
 import { Cage } from '../cages/cage.entity';
+import { Mortality } from '../mortality/mortality.entity';
+import { GodownExpense } from '../godown/godown-expense.entity';
 import { PermissionsModule } from '../permissions/permissions.module';
+import { GodownModule } from '../godown/godown.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PurchaseOrder, Sale, Expense, Retailer, GodownSale, GodownInwardEntry, SalePayment, GodownSalePayment, Cage]),
+    TypeOrmModule.forFeature([PurchaseOrder, Sale, Expense, Retailer, GodownSale, GodownInwardEntry, SalePayment, GodownSalePayment, Cage, Mortality, GodownExpense]),
     PermissionsModule,
+    GodownModule,
   ],
   controllers: [ReportsController],
   providers: [ReportsService, BalanceSheetService],

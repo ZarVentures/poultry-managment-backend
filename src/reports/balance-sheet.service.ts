@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { TenantContextService } from '../tenants/tenant-context.service';
+import { GodownService } from '../godown/godown.service';
 
 type Line = { key: string; label: string; amount: number; note?: string };
 
@@ -9,6 +10,7 @@ export class BalanceSheetService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly tenantContext: TenantContextService,
+    private readonly godownService: GodownService,
   ) {}
 
   private n(value: any): number {
@@ -40,6 +42,72 @@ export class BalanceSheetService {
     return rows[0] || {};
   }
 
+  async getInventoryValuation(asOnDate?: string) {
+    const asOn =
+      asOnDate && /^\d{4}-\d{2}-\d{2}$/.test(asOnDate) ? asOnDate : this.today();
+
+    const [purchases, inward, godownSold, godownDead, transportDead, vehicleSold, ledger] = await Promise.all([
+      this.purchasePosition(asOn),
+      this.godownInward(asOn),
+      this.godownSoldTotals(asOn),
+      this.godownMortality(asOn),
+      this.transportMortality(asOn),
+      this.vehicleSold(asOn),
+      this.godownService.getStockLedger({ endDate: asOn }),
+    ]);
+
+    const inwardWeight = inward.weight;
+    const inwardValue = inward.value;
+    const inwardAvgKg = inward.birds > 0 && inwardWeight > 0 ? inwardWeight / inward.birds : 0;
+    const godownDeadKg = godownDead.weight + this.n(godownDead.birdsWithoutWeight) * inwardAvgKg;
+    const ledgerBirds = Math.max(0, this.n(ledger?.closing?.birds));
+    const ledgerWeight = Math.max(0, this.n(ledger?.closing?.weight));
+    const formulaBirds = Math.max(0, inward.birds - godownSold.birds - godownDead.birds);
+    const formulaWeight = Math.max(0, inwardWeight - godownSold.weight - godownDeadKg);
+    const remainingBirds = ledgerBirds > 0 || ledgerWeight > 0 ? ledgerBirds : formulaBirds;
+    let remainingWeight = ledgerWeight > 0 ? ledgerWeight : formulaWeight;
+    if (remainingWeight <= 0 && remainingBirds > 0 && inward.birds > 0 && inwardWeight > 0) {
+      remainingWeight = remainingBirds * (inwardWeight / inward.birds);
+    }
+    const purchaseRate = this.n(purchases.ratePerKg) > 0
+      ? this.n(purchases.ratePerKg)
+      : (purchases.weight > 0 ? purchases.net / purchases.weight : 0);
+    const godownRate = this.n(inward.ratePerKg) > 0
+      ? this.n(inward.ratePerKg)
+      : (inwardWeight > 0 && inwardValue > 0 ? inwardValue / inwardWeight : purchaseRate);
+    const godownInventory = this.round2(remainingWeight * godownRate);
+
+    const purchaseAvgKg = purchases.birds > 0 && purchases.weight > 0
+      ? purchases.weight / purchases.birds
+      : 0;
+    const transportDeadKg = this.round2(
+      transportDead.weight + this.n(transportDead.birdsWithoutWeight) * purchaseAvgKg,
+    );
+    const vehicleWeight = Math.max(
+      0,
+      purchases.weight - inward.weight - vehicleSold.weight - transportDeadKg,
+    );
+    const vehicleBirds = Math.max(
+      0,
+      purchases.birds - inward.birds - vehicleSold.birds - transportDead.birds,
+    );
+    const vehicleInventory = this.round2(vehicleWeight * purchaseRate);
+    const inventoryValue = this.round2(godownInventory + vehicleInventory);
+
+    return {
+      asOn,
+      godownInventory,
+      vehicleInventory,
+      inventoryValue,
+      remainingBirds,
+      remainingWeight: this.round2(remainingWeight),
+      vehicleBirds,
+      vehicleWeight: this.round2(vehicleWeight),
+      godownRate: this.round2(godownRate),
+      purchaseRate: this.round2(purchaseRate),
+    };
+  }
+
   async getBalanceSheet(asOnDate?: string, fromDate?: string) {
     const asOn =
       asOnDate && /^\d{4}-\d{2}-\d{2}$/.test(asOnDate) ? asOnDate : this.today();
@@ -53,12 +121,8 @@ export class BalanceSheetService {
       expenses,
       retailerOpening,
       farmerOpening,
-      inward,
-      godownSold,
-      godownDead,
-      transportDead,
+      inventory,
       vouchers,
-      vehicleSold,
     ] = await Promise.all([
       this.salesPosition('sales', 'sale_payments', 'sale_id', 'net_amount', asOn),
       this.salesPosition('godown_sales', 'godown_sale_payments', 'godown_sale_id', 'total_amount', asOn),
@@ -66,12 +130,8 @@ export class BalanceSheetService {
       this.expenseTotal(asOn),
       this.openingSplit('retailers', asOn),
       this.openingSplit('farmers', asOn),
-      this.godownInward(asOn),
-      this.godownSoldTotals(asOn),
-      this.godownMortality(asOn),
-      this.transportMortality(asOn),
+      this.getInventoryValuation(asOn),
       this.voucherTotals(asOn),
-      this.vehicleSold(asOn),
     ]);
 
     const tradeReceivable = vehicleSales.receivable + godownSales.receivable;
@@ -94,24 +154,13 @@ export class BalanceSheetService {
       purchases.payable + farmerOpening.positive + retailerOpening.negative,
     );
 
-    const inwardWeight = inward.weight;
-    const inwardValue = inward.value;
-    const remainingBirds = Math.max(0, inward.birds - godownSold.birds - godownDead.birds);
-    const remainingWeight = Math.max(0, inwardWeight - godownSold.weight - godownDead.weight);
-    const godownRate = inwardWeight > 0 ? inwardValue / inwardWeight : 0;
-    const godownInventory = this.round2(remainingWeight * godownRate);
-
-    const vehicleWeight = Math.max(
-      0,
-      purchases.weight - inward.weight - vehicleSold.weight - transportDead.weight,
-    );
-    const vehicleBirds = Math.max(
-      0,
-      purchases.birds - inward.birds - vehicleSold.birds - transportDead.birds,
-    );
-    const purchaseRate = purchases.weight > 0 ? purchases.net / purchases.weight : 0;
-    const vehicleInventory = this.round2(vehicleWeight * purchaseRate);
-    const inventoryValue = this.round2(godownInventory + vehicleInventory);
+    const remainingBirds = inventory.remainingBirds;
+    const remainingWeight = inventory.remainingWeight;
+    const godownInventory = inventory.godownInventory;
+    const vehicleBirds = inventory.vehicleBirds;
+    const vehicleWeight = inventory.vehicleWeight;
+    const vehicleInventory = inventory.vehicleInventory;
+    const inventoryValue = inventory.inventoryValue;
 
     const cashAsset = Math.max(0, cash);
     const bankOverdraft = Math.max(0, -cash);
@@ -178,7 +227,7 @@ export class BalanceSheetService {
     const totalEquity = this.round2(equityLines.reduce((s, l) => s + l.amount, 0));
     const liabilitiesAndEquity = this.round2(totalLiabilities + totalEquity);
 
-    const cogs = this.round2(Math.max(0, inwardValue + (purchases.net - inwardValue) - inventoryValue));
+    const cogs = this.round2(Math.max(0, purchases.net - inventoryValue));
     const grossProfit = this.round2(revenue - cogs);
     const netProfit = this.round2(grossProfit - operatingExpenses);
     const difference = this.round2(totalAssets - liabilitiesAndEquity);
@@ -340,6 +389,7 @@ export class BalanceSheetService {
         COALESCE(SUM(GREATEST(x.net - x.paid, 0)), 0) AS payable,
         COALESCE(SUM(GREATEST(x.paid - x.net, 0)), 0) AS prepaid,
         COALESCE(SUM(x.weight), 0) AS weight,
+        COALESCE(SUM(x.weight * x.rate), 0) AS rate_value,
         COALESCE(SUM(x.birds), 0) AS birds
       FROM (
         SELECT
@@ -349,6 +399,7 @@ export class BalanceSheetService {
             ELSE COALESCE(po.total_payment_made, 0)
           END::numeric AS paid,
           COALESCE(po.total_weight, 0)::numeric AS weight,
+          COALESCE(po.rate_per_kg, 0)::numeric AS rate,
           COALESCE((
             SELECT SUM(c.number_of_birds) FROM cages c WHERE c.purchase_order_id = po.id
           ), 0)::numeric AS birds
@@ -374,6 +425,7 @@ export class BalanceSheetService {
       prepaid: this.n(row.prepaid),
       weight: this.n(row.weight),
       birds: this.n(row.birds),
+      ratePerKg: this.n(row.weight) > 0 ? this.n(row.rate_value) / this.n(row.weight) : 0,
     };
   }
 
@@ -410,15 +462,31 @@ export class BalanceSheetService {
       `
       SELECT
         COALESCE(SUM(g.number_of_birds), 0) AS birds,
-        COALESCE(SUM(COALESCE(g.total_weight, g.actual_weight, 0)), 0) AS weight,
-        COALESCE(SUM(g.total_amount), 0) AS value
+        COALESCE(SUM(COALESCE(NULLIF(g.total_weight, 0), g.actual_weight, g.number_of_birds * COALESCE(g.average_weight, 0), 0)), 0) AS weight,
+        COALESCE(SUM(
+          COALESCE(
+            NULLIF(g.total_amount, 0),
+            COALESCE(NULLIF(g.total_weight, 0), g.actual_weight, 0) * COALESCE(g.rate_per_kg, 0)
+          )
+        ), 0) AS value,
+        COALESCE(SUM(
+          COALESCE(NULLIF(g.total_weight, 0), g.actual_weight, g.number_of_birds * COALESCE(g.average_weight, 0), 0)
+          * COALESCE(g.rate_per_kg, 0)
+        ), 0) AS rate_value
       FROM godown_inward_entries g
       WHERE g.entry_date <= $1
       ${tenant}
       `,
       params,
     );
-    return { birds: this.n(row.birds), weight: this.n(row.weight), value: this.n(row.value) };
+    return {
+      birds: this.n(row.birds),
+      weight: this.n(row.weight),
+      value: this.n(row.value),
+      ratePerKg: this.n(row.weight) > 0 && this.n(row.rate_value) > 0
+        ? this.n(row.rate_value) / this.n(row.weight)
+        : (this.n(row.weight) > 0 ? this.n(row.value) / this.n(row.weight) : 0),
+    };
   }
 
   private async godownSoldTotals(asOn: string) {
@@ -428,7 +496,7 @@ export class BalanceSheetService {
       `
       SELECT
         COALESCE(SUM(g.number_of_birds), 0) AS birds,
-        COALESCE(SUM(g.total_weight), 0) AS weight
+        COALESCE(SUM(COALESCE(NULLIF(g.total_weight, 0), g.number_of_birds * COALESCE(g.average_weight, 0), 0)), 0) AS weight
       FROM godown_sales g
       WHERE g.sale_date <= $1
       ${tenant}
@@ -445,14 +513,19 @@ export class BalanceSheetService {
       `
       SELECT
         COALESCE(SUM(m.number_of_birds_died), 0) AS birds,
-        COALESCE(SUM(m.weight_of_dead_birds), 0) AS weight
+        COALESCE(SUM(CASE WHEN COALESCE(m.weight_of_dead_birds, 0) > 0 THEN m.weight_of_dead_birds ELSE 0 END), 0) AS weight,
+        COALESCE(SUM(CASE WHEN COALESCE(m.weight_of_dead_birds, 0) <= 0 THEN m.number_of_birds_died ELSE 0 END), 0) AS birds_without_weight
       FROM godown_mortality m
       WHERE m.mortality_date <= $1
       ${tenant}
       `,
       params,
     );
-    return { birds: this.n(row.birds), weight: this.n(row.weight) };
+    return {
+      birds: this.n(row.birds),
+      weight: this.n(row.weight),
+      birdsWithoutWeight: this.n(row.birds_without_weight),
+    };
   }
 
   private async transportMortality(asOn: string) {
@@ -462,14 +535,20 @@ export class BalanceSheetService {
       `
       SELECT
         COALESCE(SUM(m.number_of_birds_died), 0) AS birds,
-        COALESCE(SUM(m.weight_of_dead_birds), 0) AS weight
+        COALESCE(SUM(CASE WHEN COALESCE(m.weight_of_dead_birds, 0) > 0 THEN m.weight_of_dead_birds ELSE 0 END), 0) AS weight,
+        COALESCE(SUM(CASE WHEN COALESCE(m.weight_of_dead_birds, 0) <= 0 THEN m.number_of_birds_died ELSE 0 END), 0) AS birds_without_weight
       FROM mortalities m
       WHERE COALESCE(m.purchase_date, m.created_at::date) <= $1
+        AND COALESCE(m.source, 'travel_sales') = 'travel_sales'
       ${tenant}
       `,
       params,
     );
-    return { birds: this.n(row.birds), weight: this.n(row.weight) };
+    return {
+      birds: this.n(row.birds),
+      weight: this.n(row.weight),
+      birdsWithoutWeight: this.n(row.birds_without_weight),
+    };
   }
 
   private async vehicleSold(asOn: string) {
