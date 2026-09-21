@@ -256,21 +256,23 @@ export class GodownService {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const prefix = `GDS-${year}-${month}-`;
 
-    // Find the last sale number with this prefix
     const qb = this.saleRepo
       .createQueryBuilder('sale')
-      .where('sale.saleNo LIKE :prefix', { prefix: `${prefix}%` })
-      .orderBy('sale.id', 'DESC')
-      .limit(1);
+      .select(['sale.id', 'sale.saleNo', 'sale.invoiceNumber'])
+      .where('(sale.saleNo LIKE :prefix OR sale.invoiceNumber LIKE :prefix)', { prefix: `${prefix}%` });
     this.applyTenant(qb, 'sale');
-    const lastSale = await qb.getOne();
+    const rows = await qb.getMany();
 
-    if (lastSale && lastSale.saleNo) {
-      const lastNumber = parseInt(lastSale.saleNo.split('-').pop() || '0');
-      return `${prefix}${String(lastNumber + 1).padStart(4, '0')}`;
+    let max = 0;
+    for (const row of rows) {
+      for (const value of [row.saleNo, row.invoiceNumber]) {
+        if (!value || !String(value).startsWith(prefix)) continue;
+        const n = parseInt(String(value).slice(prefix.length), 10);
+        if (Number.isFinite(n) && n > max) max = n;
+      }
     }
 
-    return `${prefix}0001`;
+    return `${prefix}${String(max + 1).padStart(4, '0')}`;
   }
 
   async generateNextSaleNumber(): Promise<string> {
@@ -348,26 +350,39 @@ export class GodownService {
 
     await this.assertGodownBirdsAvailable(saleData.numberOfBirds);
 
-    if (saleData.invoiceNumber) {
-      const existingInvoice = await this.saleRepo.findOne({
-        where: this.tenantWhere({ invoiceNumber: saleData.invoiceNumber }),
-      });
-      if (existingInvoice) {
-        throw new BadRequestException(`Sale ${saleData.invoiceNumber} already exists`);
+    const providedNumber = String(saleData.saleNo || saleData.invoiceNumber || '').trim();
+    let saleNumber = providedNumber;
+    if (!saleNumber) {
+      for (let i = 0; i < 5; i++) {
+        const candidate = await this.generateSaleNumber();
+        const clash = await this.saleRepo.findOne({
+          where: [
+            this.tenantWhere({ saleNo: candidate }),
+            this.tenantWhere({ invoiceNumber: candidate }),
+          ],
+        });
+        if (!clash) {
+          saleNumber = candidate;
+          break;
+        }
       }
     }
-
-    // Auto-generate sale number if not provided
-    if (!saleData.saleNo) {
-      saleData.saleNo = saleData.invoiceNumber || (await this.generateSaleNumber());
+    if (!saleNumber) {
+      throw new BadRequestException('Could not generate a sale number. Please try again.');
     }
 
-    const existingSaleNo = await this.saleRepo.findOne({
-      where: this.tenantWhere({ saleNo: saleData.saleNo }),
+    const existingNumber = await this.saleRepo.findOne({
+      where: [
+        this.tenantWhere({ saleNo: saleNumber }),
+        this.tenantWhere({ invoiceNumber: saleNumber }),
+      ],
     });
-    if (existingSaleNo) {
-      throw new BadRequestException(`Sale ${saleData.saleNo} already exists`);
+    if (existingNumber) {
+      throw new BadRequestException(`Sale ${saleNumber} already exists`);
     }
+
+    saleData.saleNo = saleNumber;
+    saleData.invoiceNumber = saleNumber;
 
     if (weightLoss) {
       saleData.weightLoss = parseFloat(weightLoss);
@@ -745,6 +760,7 @@ export class GodownService {
       amount?: number;
       notes?: string;
       affectsStock?: boolean;
+      billedKg?: number;
     };
 
     // Per-sale totals that were deducted when returns were processed
@@ -790,6 +806,7 @@ export class GodownService {
       const adj = returnAdjustBySale.get(String(s.id)) || { birds: 0, weight: 0 };
       const birdsOut = this.n(s.numberOfBirds) + adj.birds;
       const recordedKg = this.n(s.totalWeight) + adj.weight;
+      const billedKg = recordedKg;
       const weightOut = this.stockKgForBirds(birdsOut, avgKgPerBird, recordedKg);
       movements.push({
         date: String(s.saleDate).slice(0, 10),
@@ -810,6 +827,7 @@ export class GodownService {
         notes: adj.birds > 0
           ? `${s.notes || ''} | Includes ${adj.birds} birds later returned`.trim()
           : s.notes,
+        billedKg,
       });
     }
 
@@ -959,6 +977,9 @@ export class GodownService {
     let mortalityWeight = 0;
     let returnBirdsIn = 0;
     let returnWeightIn = 0;
+    let returnWeightOut = 0;
+    let inwardKg = 0;
+    let billedSaleWeight = 0;
 
     const entries = periodMovements.map((m) => {
       if (m.affectsStock !== false) {
@@ -973,15 +994,20 @@ export class GodownService {
         if (m.movementType === 'SALE') {
           soldBirds += m.birdsOut;
           soldWeight += m.weightOut;
+          billedSaleWeight += this.n(m.billedKg);
         }
         if (m.movementType === 'MORTALITY') {
           mortalityBirds += m.birdsOut;
           mortalityWeight += m.weightOut;
         }
+        if (m.movementType === 'INWARD') {
+          inwardKg += m.weightIn;
+        }
       }
       if (m.movementType === 'RETURN') {
         returnBirdsIn += m.birdsIn;
         returnWeightIn += m.weightIn;
+        returnWeightOut += m.weightOut;
       }
 
       return {
@@ -1005,14 +1031,26 @@ export class GodownService {
       };
     });
 
+    const openingWeightFinal = openingBirds > 0 && avgKgPerBird > 0
+      ? this.round2(openingBirds * avgKgPerBird)
+      : Number(openingWeight.toFixed(2));
+    const closingBirdsFinal = Math.max(0, runningBirds);
+    const closingWeightFinal = closingBirdsFinal > 0 && avgKgPerBird > 0
+      ? this.round2(closingBirdsFinal * avgKgPerBird)
+      : Math.max(0, Number(runningWeight.toFixed(2)));
+    const fromWeight = this.round2(openingWeightFinal + inwardKg + returnWeightIn);
+    const accountedWeight = this.round2(
+      billedSaleWeight + mortalityWeight + returnWeightOut + closingWeightFinal,
+    );
+    const weightLoss = Math.max(0, this.round2(fromWeight - accountedWeight));
+    const weightLossPercent = fromWeight > 0 ? this.round2((weightLoss / fromWeight) * 100) : 0;
+
     return {
       startDate: start || null,
       endDate: end || null,
       opening: {
         birds: openingBirds,
-        weight: openingBirds > 0 && avgKgPerBird > 0
-          ? this.round2(openingBirds * avgKgPerBird)
-          : Number(openingWeight.toFixed(2)),
+        weight: openingWeightFinal,
       },
       period: {
         birdsIn: periodInBirds,
@@ -1023,16 +1061,20 @@ export class GodownService {
         amountOut: Number(periodOutAmount.toFixed(2)),
         soldBirds,
         soldWeight: Number(soldWeight.toFixed(2)),
+        billedSaleWeight: this.round2(billedSaleWeight),
         mortalityBirds,
         mortalityWeight: Number(mortalityWeight.toFixed(2)),
         returnBirds: returnBirdsIn,
         returnWeight: Number(returnWeightIn.toFixed(2)),
+        inwardWeight: this.round2(inwardKg),
+        fromWeight,
+        accountedWeight,
+        weightLoss,
+        weightLossPercent,
       },
       closing: {
-        birds: Math.max(0, runningBirds),
-        weight: Math.max(0, runningBirds) > 0 && avgKgPerBird > 0
-          ? this.round2(Math.max(0, runningBirds) * avgKgPerBird)
-          : Math.max(0, Number(runningWeight.toFixed(2))),
+        birds: closingBirdsFinal,
+        weight: closingWeightFinal,
       },
       entries,
       totalEntries: entries.length,

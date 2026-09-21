@@ -72,6 +72,12 @@ export class ReportsService {
     return Number.isFinite(x) ? x : 0;
   }
 
+  /** Dummy formula lines must never appear as weight-loss documents. */
+  private isWeightLossFormulaText(...parts: any[]): boolean {
+    const text = parts.map((p) => String(p ?? '')).join(' ');
+    return /inward/i.test(text) && /available/i.test(text);
+  }
+
   /** Billed kg on a godown invoice (fallback only). */
   private godownSoldKg(s: { totalWeight?: number; numberOfBirds?: number; averageWeight?: number }): number {
     const weight = this.num(s.totalWeight);
@@ -1001,7 +1007,9 @@ export class ReportsService {
       this.godownSaleRepository.find({
         where: this.tenantWhere(whereGodownSale),
         order: { saleDate: 'DESC' },
-      }),
+      }).then((rows) => rows.filter((s) =>
+        !this.isWeightLossFormulaText(s.invoiceNumber, s.saleNo, s.customerName),
+      )),
     ]);
 
     const saleIds = sales.map(s => s.id);
@@ -1189,20 +1197,6 @@ export class ReportsService {
         : 0,
     };
 
-    const godownSalesFormulaRow = {
-      channel: 'godown_sales',
-      channelLabel: 'Godown Sales',
-      documentNo: 'Inward − Sale − Available',
-      date: startDate || '',
-      party: 'Total Inward − Total Sale − Available Birds Weight',
-      purchaseBillNo: '-',
-      birds: godownSalesBirds,
-      purchaseWeight: totalGodownInwardWeight,
-      recordedWeight: recordedGodownSalesWeight,
-      weightLoss: godownSalesLoss,
-      lossPercent: godownSalesChannel.lossPercent,
-    };
-
     const byChannel = [salesChannel, inwardChannel, godownSalesChannel];
     const totalLoss = this.round2(byChannel.reduce((s, c) => s + c.weightLoss, 0));
     const totalPurchaseWeight = this.round2(byChannel.reduce((s, c) => s + c.purchaseWeight, 0));
@@ -1221,7 +1215,9 @@ export class ReportsService {
         godownSalesLoss: godownSalesChannel.weightLoss,
       },
       byChannel,
-      details: [...salesRows, ...inwardRows, godownSalesFormulaRow, ...godownSalesRows],
+      details: [...salesRows, ...inwardRows, ...godownSalesRows].filter((row) =>
+        !this.isWeightLossFormulaText(row.documentNo, row.party),
+      ),
       dateRange: { startDate, endDate },
     };
   }
