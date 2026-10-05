@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Tenant } from './tenant.entity';
@@ -92,6 +93,7 @@ export class TenantsService {
     private readonly rolePermissionRepository: Repository<RolePermission>,
     private readonly usersService: UsersService,
     private readonly authService: AuthService,
+    private readonly config: ConfigService,
   ) {}
 
   async create(userId: string, data: CreateTenantData) {
@@ -102,6 +104,10 @@ export class TenantsService {
       );
     }
 
+    const trialDays = Number(this.config.get('SUBSCRIPTION_TRIAL_DAYS') ?? 14);
+    const safeTrialDays = Number.isFinite(trialDays) && trialDays > 0 ? trialDays : 14;
+    const trialEndsAt = new Date(Date.now() + safeTrialDays * 24 * 60 * 60 * 1000);
+
     const tenant = this.tenantRepository.create({
       name: data.name,
       type: data.type || 'poultry_trader',
@@ -110,6 +116,8 @@ export class TenantsService {
       address: data.address,
       currency: data.currency || 'INR',
       countryCode: data.countryCode || '+91',
+      subscriptionStatus: 'trial',
+      trialEndsAt,
     });
     const saved = await this.tenantRepository.save(tenant);
     const savedId: string = (saved as any).id ?? (saved as any)[0]?.id;

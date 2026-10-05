@@ -14,10 +14,12 @@ const NO_SHOP_ALLOWLIST = [
   '/api/v1/tenants',
   '/api/v1/tenants/me',
   '/api/v1/auth',
+  '/api/v1/subscriptions/webhook',
   '/api/health',
   '/api/tenants',
   '/api/tenants/me',
   '/api/auth',
+  '/api/subscriptions/webhook',
 ];
 
 @Injectable()
