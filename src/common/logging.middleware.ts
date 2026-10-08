@@ -22,6 +22,10 @@ export class LoggingMiddleware implements NestMiddleware {
       if (safeBody.password) safeBody.password = '***';
       if (safeBody.currentPassword) safeBody.currentPassword = '***';
       if (safeBody.newPassword) safeBody.newPassword = '***';
+      if (safeBody.otp) safeBody.otp = '***';
+      if (safeBody.totpCode) safeBody.totpCode = '***';
+      if (safeBody.recoveryToken) safeBody.recoveryToken = '***';
+      if (safeBody.code) safeBody.code = '***';
       this.logger.log(`  BODY: ${JSON.stringify(safeBody)}`);
     }
 

@@ -9,10 +9,13 @@ import { UsersModule } from '../users/users.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OtpSession } from './otp.entity';
 import { OtpService } from './otp.service';
+import { AuditLog } from '../audit/audit-log.entity';
+import { AuthRateLimitService } from './auth-rate-limit.service';
+import { AccountPurgeService } from './account-purge.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([OtpSession]),
+    TypeOrmModule.forFeature([OtpSession, AuditLog]),
     ConfigModule,
     UsersModule,
     PassportModule,
@@ -26,7 +29,7 @@ import { OtpService } from './otp.service';
       }),
     }),
   ],
-  providers: [AuthService, JwtStrategy, OtpService],
+  providers: [AuthService, JwtStrategy, OtpService, AuthRateLimitService, AccountPurgeService],
   controllers: [AuthController],
   exports: [AuthService, OtpService],
 })

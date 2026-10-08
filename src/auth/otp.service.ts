@@ -18,9 +18,9 @@ export class OtpService {
   /**
    * Generates a 6-digit OTP, stores its hash, and enforces a 60-second cooldown.
    */
-  async generateSecureOtp(phoneNumber: string): Promise<string> {
+  async generateSecureOtp(phoneNumber: string, purpose = 'login'): Promise<string> {
     const existingSession = await this.otpRepository.findOne({
-      where: { phoneNumber },
+      where: { phoneNumber, purpose },
       order: { createdAt: 'DESC' },
     });
 
@@ -49,6 +49,7 @@ export class OtpService {
     } else {
       const newSession = this.otpRepository.create({
         phoneNumber,
+        purpose,
         otpHash,
         expiresAt,
       });
@@ -97,9 +98,9 @@ export class OtpService {
   /**
    * Verifies the OTP, checks expiry, and increments attempts.
    */
-  async verifyOtp(phoneNumber: string, otp: string): Promise<boolean> {
+  async verifyOtp(phoneNumber: string, otp: string, purpose = 'login'): Promise<boolean> {
     const session = await this.otpRepository.findOne({
-      where: { phoneNumber },
+      where: { phoneNumber, purpose },
       order: { createdAt: 'DESC' },
     });
 

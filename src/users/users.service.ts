@@ -1,11 +1,13 @@
 import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { User } from './user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { TenantContextService } from '../tenants/tenant-context.service';
+import { shouldDeleteOrganization } from '../auth/account-deletion.policy';
 
 @Injectable()
 export class UsersService {
@@ -65,6 +67,7 @@ export class UsersService {
     return this.usersRepository
       .createQueryBuilder('user')
       .where('CAST(user.tenant_id AS TEXT) = :tid', { tid: String(tenantId) })
+      .andWhere('user.purged_at IS NULL')
       .orderBy('user.name', 'ASC')
       .getMany();
   }
@@ -277,6 +280,11 @@ export class UsersService {
 
   async activate(id: string): Promise<User> {
     const user = await this.findOne(id);
+    if (user.deletedAt) {
+      throw new ConflictException(
+        'This account is scheduled for deletion. The user must recover it with OTP.',
+      );
+    }
     user.status = 'active';
     return this.usersRepository.save(user);
   }
@@ -289,7 +297,7 @@ export class UsersService {
     managerUsers: number;
     staffUsers: number;
   }> {
-    const where = this.tenantWhere({});
+    const where = { ...this.tenantWhere({}), deletedAt: IsNull(), purgedAt: IsNull() };
     const [
       totalUsers,
       activeUsers,
@@ -377,5 +385,290 @@ export class UsersService {
   async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
     await this.usersRepository.remove(user);
+  }
+
+  async willDeleteOrganization(user: User): Promise<boolean> {
+    if (!user.tenantId) return false;
+    const rows = await this.usersRepository.query(
+      `SELECT COUNT(*) FILTER (
+         WHERE id <> $1
+           AND deleted_at IS NULL
+           AND purged_at IS NULL
+           AND status = 'active'
+           AND LOWER(COALESCE(role, '')) = 'admin'
+       )::int AS other_admins
+       FROM users
+       WHERE tenant_id = $2`,
+      [user.id, user.tenantId],
+    );
+    return shouldDeleteOrganization({
+      role: user.role,
+      otherActiveAdmins: Number(rows?.[0]?.other_admins ?? 0),
+    });
+  }
+
+  async closeOrganization(tenantId: string): Promise<void> {
+    await this.usersRepository.query(
+      `UPDATE tenants SET status = 'pending_deletion', updated_at = NOW() WHERE id = $1`,
+      [tenantId],
+    );
+    await this.usersRepository.query(
+      `UPDATE users SET session_token = NULL, updated_at = NOW() WHERE tenant_id = $1`,
+      [tenantId],
+    );
+  }
+
+  async reopenOrganization(tenantId: string): Promise<void> {
+    await this.usersRepository.query(
+      `UPDATE tenants SET status = 'active', updated_at = NOW() WHERE id = $1 AND status = 'pending_deletion'`,
+      [tenantId],
+    );
+  }
+
+  async isOrganizationPendingDeletion(tenantId: string): Promise<boolean> {
+    const rows = await this.usersRepository.query(
+      `SELECT status FROM tenants WHERE id = $1 LIMIT 1`,
+      [tenantId],
+    );
+    return rows?.[0]?.status === 'pending_deletion';
+  }
+
+  async markPendingDeletion(
+    user: User,
+    input: { reason?: string | null; recoveryExpiresAt: Date },
+  ): Promise<void> {
+    const rows = await this.usersRepository.query(
+      `UPDATE users
+       SET deletion_requested_at = NOW(),
+           deleted_at = NOW(),
+           deleted_by = $2,
+           deletion_reason = $3,
+           recovery_expires_at = $4,
+           status_before_deletion = status::text,
+           session_token = NULL,
+           recovery_nonce = NULL,
+           updated_at = NOW()
+       WHERE id = $1 AND deleted_at IS NULL AND purged_at IS NULL
+       RETURNING id`,
+      [user.id, user.id, input.reason ?? null, input.recoveryExpiresAt],
+    );
+    if (!Array.isArray(rows) || rows.length === 0) {
+      throw new ConflictException('This account is already scheduled for deletion.');
+    }
+  }
+
+  async setRecoveryNonce(id: string, nonce: string): Promise<boolean> {
+    const rows = await this.usersRepository.query(
+      `UPDATE users
+       SET recovery_nonce = $2, updated_at = NOW()
+       WHERE id = $1
+         AND deleted_at IS NOT NULL
+         AND purged_at IS NULL
+         AND recovery_expires_at > NOW()
+       RETURNING id`,
+      [id, nonce],
+    );
+    return Array.isArray(rows) && rows.length > 0;
+  }
+
+  async restorePendingDeletion(id: string, nonce: string): Promise<User | null> {
+    const rows = await this.usersRepository.query(
+      `UPDATE users
+       SET deleted_at = NULL,
+           deletion_requested_at = NULL,
+           recovery_expires_at = NULL,
+           deletion_reason = NULL,
+           deleted_by = NULL,
+           recovery_nonce = NULL,
+           status = CASE
+             WHEN status_before_deletion IN ('active', 'inactive') THEN status_before_deletion
+             ELSE status
+           END,
+           status_before_deletion = NULL,
+           updated_at = NOW()
+       WHERE id = $1
+         AND recovery_nonce = $2
+         AND deleted_at IS NOT NULL
+         AND purged_at IS NULL
+         AND recovery_expires_at > NOW()
+       RETURNING id`,
+      [id, nonce],
+    );
+    if (!Array.isArray(rows) || rows.length === 0) return null;
+    return this.usersRepository.findOne({ where: { id } });
+  }
+
+  async listExpiredDeletions(limit = 50): Promise<string[]> {
+    const rows = await this.usersRepository.query(
+      `SELECT id
+       FROM users
+       WHERE deleted_at IS NOT NULL
+         AND purged_at IS NULL
+         AND recovery_expires_at IS NOT NULL
+         AND recovery_expires_at < NOW()
+       ORDER BY recovery_expires_at ASC
+       LIMIT $1`,
+      [limit],
+    );
+    return (rows || []).map((row: { id: string }) => String(row.id));
+  }
+
+  async anonymizeExpiredUser(
+    id: string,
+  ): Promise<{ id: string; tenantId: string | null; organizationDeleted: boolean } | null> {
+    const existing = await this.usersRepository.findOne({ where: { id } });
+    if (!existing?.deletedAt || existing.purgedAt) return null;
+    if (!existing.recoveryExpiresAt || existing.recoveryExpiresAt.getTime() > Date.now()) return null;
+
+    const role = (existing.role || '').trim().toLowerCase();
+    if (role === 'admin' && existing.tenantId && (await this.isOrganizationPendingDeletion(existing.tenantId))) {
+      const tenantId = existing.tenantId;
+      await this.deleteOrganizationData(tenantId);
+      return { id: String(existing.id), tenantId, organizationDeleted: true };
+    }
+
+    const phoneHash = existing.phone
+      ? crypto.createHash('sha256').update(String(existing.phone)).digest('hex')
+      : null;
+    const emailHash = existing.email
+      ? crypto.createHash('sha256').update(String(existing.email).toLowerCase()).digest('hex')
+      : null;
+
+    const rows = await this.usersRepository.query(
+      `UPDATE users
+       SET purged_at = NOW(),
+           name = 'Deleted user',
+           notes = NULL,
+           password_hash = NULL,
+           session_token = NULL,
+           two_factor_secret = NULL,
+           is_two_factor_enabled = false,
+           two_factor_backup_codes = NULL,
+           purged_phone_hash = $2,
+           purged_email_hash = $3,
+           phone = NULL,
+           email = NULL,
+           recovery_nonce = NULL,
+           updated_at = NOW()
+       WHERE id = $1
+         AND deleted_at IS NOT NULL
+         AND purged_at IS NULL
+         AND recovery_expires_at < NOW()
+       RETURNING id, tenant_id AS "tenantId"`,
+      [id, phoneHash, emailHash],
+    );
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row) return null;
+    await this.usersRepository.query(`DELETE FROM user_permissions WHERE user_id = $1`, [id]);
+    return {
+      id: String(row.id),
+      tenantId: row.tenantId != null ? String(row.tenantId) : null,
+      organizationDeleted: false,
+    };
+  }
+
+  private async deleteOrganizationData(tenantId: string): Promise<void> {
+    const members: Array<{ id: string; phone: string | null; email: string | null }> =
+      await this.usersRepository.query(
+        `SELECT id, phone, email FROM users WHERE tenant_id = $1`,
+        [tenantId],
+      );
+
+    const childDeletes = [
+      `DELETE FROM mortality_records WHERE purchase_order_id IN (SELECT id FROM purchase_orders WHERE tenant_id = $1) OR vehicle_id IN (SELECT id FROM vehicles WHERE tenant_id = $1)`,
+      `DELETE FROM billing_sales WHERE party_id IN (SELECT id FROM billing_parties WHERE tenant_id = $1)`,
+      `DELETE FROM sale_customers WHERE sale_id IN (SELECT id FROM sales WHERE tenant_id = $1)`,
+      `DELETE FROM purchase_order_cages WHERE purchase_order_id IN (SELECT id FROM purchase_orders WHERE tenant_id = $1)`,
+    ];
+
+    const tenantTables = [
+      'sale_payments',
+      'vehicle_bird_returns',
+      'bird_returns',
+      'godown_sale_payments',
+      'godown_sales',
+      'godown_expenses',
+      'godown_inward_entries',
+      'godown_mortality',
+      'cages',
+      'purchase_order_items',
+      'purchase_order_payments',
+      'mortalities',
+      'sales',
+      'purchase_orders',
+      'expenses',
+      'expense_categories',
+      'payment_vouchers',
+      'billing_ledger',
+      'billing_payments',
+      'billing_parties',
+      'farmers',
+      'retailers',
+      'vehicles',
+      'products',
+      'inventory_items',
+      'godowns',
+      'communication_logs',
+      'failed_accounting_jobs',
+      'subscription_payments',
+      'audit_logs',
+      'user_permissions',
+      'role_permissions',
+      'settings',
+    ];
+
+    const runner = this.usersRepository.manager.connection.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    try {
+      for (const sql of childDeletes) {
+        const table = sql.match(/DELETE FROM ([a-z_]+)/)?.[1];
+        if (!table) continue;
+        const exists = await runner.query(`SELECT to_regclass($1) AS rel`, [`public.${table}`]);
+        if (!exists?.[0]?.rel) continue;
+        await runner.query(sql, [tenantId]);
+      }
+      for (const table of tenantTables) {
+        const exists = await runner.query(`SELECT to_regclass($1) AS rel`, [`public.${table}`]);
+        if (!exists?.[0]?.rel) continue;
+        await runner.query(`DELETE FROM ${table} WHERE tenant_id = $1`, [tenantId]);
+      }
+      for (const member of members) {
+        const phoneHash = member.phone
+          ? crypto.createHash('sha256').update(String(member.phone)).digest('hex')
+          : null;
+        const emailHash = member.email
+          ? crypto.createHash('sha256').update(String(member.email).toLowerCase()).digest('hex')
+          : null;
+        await runner.query(
+          `UPDATE users
+           SET purged_at = NOW(),
+               name = 'Deleted user',
+               notes = NULL,
+               password_hash = NULL,
+               session_token = NULL,
+               two_factor_secret = NULL,
+               is_two_factor_enabled = false,
+               two_factor_backup_codes = NULL,
+               purged_phone_hash = $2,
+               purged_email_hash = $3,
+               phone = NULL,
+               email = NULL,
+               recovery_nonce = NULL,
+               tenant_id = NULL,
+               deleted_at = COALESCE(deleted_at, NOW()),
+               updated_at = NOW()
+           WHERE id = $1 AND purged_at IS NULL`,
+          [member.id, phoneHash, emailHash],
+        );
+      }
+      await runner.query(`DELETE FROM tenants WHERE id = $1`, [tenantId]);
+      await runner.commitTransaction();
+    } catch (error) {
+      await runner.rollbackTransaction();
+      throw error;
+    } finally {
+      await runner.release();
+    }
   }
 }

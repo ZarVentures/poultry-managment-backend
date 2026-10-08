@@ -10,6 +10,7 @@ import {
   EmailSendOtpDto,
   EmailVerifyOtpDto,
 } from './dto/otp.dto';
+import { DeleteAccountDto, RecoverSendOtpDto, RecoverVerifyOtpDto, RestoreAccountDto } from './dto/account.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -52,6 +53,45 @@ export class AuthController {
   @Post('register/verify-otp')
   async registerVerifyOtp(@Body() body: RegisterVerifyOtpDto) {
     return this.authService.registerVerifyOtp(body.name, body.phoneNumber, body.otp);
+  }
+
+  private clientIp(req: any): string | undefined {
+    const forwarded = req.headers?.['x-forwarded-for'];
+    if (typeof forwarded === 'string' && forwarded.length > 0) return forwarded.split(',')[0].trim();
+    return req.ip;
+  }
+
+  @Post('account/delete/send-otp')
+  @UseGuards(JwtAuthGuard)
+  async sendDeleteOtp(@Request() req: any) {
+    return this.authService.sendDeleteOtp(req.user.userId, this.clientIp(req));
+  }
+
+  @Post('account/delete')
+  @UseGuards(JwtAuthGuard)
+  async deleteAccount(@Request() req: any, @Body() body: DeleteAccountDto) {
+    return this.authService.deleteAccount(req.user.userId, body, {
+      ip: this.clientIp(req),
+      userAgent: req.headers?.['user-agent'],
+    });
+  }
+
+  @Post('account/recover/send-otp')
+  async recoverSendOtp(@Request() req: any, @Body() body: RecoverSendOtpDto) {
+    return this.authService.recoverSendOtp(body, this.clientIp(req));
+  }
+
+  @Post('account/recover/verify-otp')
+  async recoverVerifyOtp(@Request() req: any, @Body() body: RecoverVerifyOtpDto) {
+    return this.authService.recoverVerifyOtp(body, this.clientIp(req));
+  }
+
+  @Post('account/recover/restore')
+  async restoreAccount(@Request() req: any, @Body() body: RestoreAccountDto) {
+    return this.authService.restoreAccount(body, {
+      ip: this.clientIp(req),
+      userAgent: req.headers?.['user-agent'],
+    });
   }
 
   // ── Profile ───────────────────────────────────────────────────────────────
