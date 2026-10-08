@@ -5,8 +5,11 @@ export class OtpSession {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'varchar', length: 20 })
+  @Column({ type: 'varchar', length: 255 })
   phoneNumber!: string;
+
+  @Column({ type: 'varchar', length: 32, default: 'login' })
+  purpose!: string;
 
   @Column({ name: 'otp_hash', type: 'text' })
   otpHash!: string;

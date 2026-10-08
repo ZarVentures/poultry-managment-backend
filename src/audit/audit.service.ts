@@ -15,6 +15,7 @@ export interface CreateAuditLogDto {
   ipAddress?: string;
   userAgent?: string;
   description?: string;
+  tenantId?: string;
 }
 
 @Injectable()
@@ -37,7 +38,7 @@ export class AuditService {
   async createLog(dto: CreateAuditLogDto): Promise<AuditLog> {
     const log = this.auditLogRepository.create({
       ...dto,
-      tenantId: this.getTenantId() ?? undefined,
+      tenantId: dto.tenantId ?? this.getTenantId() ?? undefined,
     });
     return this.auditLogRepository.save(log);
   }
