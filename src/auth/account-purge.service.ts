@@ -19,10 +19,12 @@ export class AccountPurgeService implements OnApplicationBootstrap, OnApplicatio
   ) {}
 
   onApplicationBootstrap() {
-    const sixHours = 6 * 60 * 60 * 1000;
+    const configured = Number(this.config.get('ACCOUNT_PURGE_INTERVAL_MS'));
+    const interval = Number.isFinite(configured) && configured >= 5000 ? configured : 6 * 60 * 60 * 1000;
+    this.logger.log(`Account purge check every ${Math.round(interval / 1000)}s.`);
     this.timer = setInterval(() => {
       this.purgeExpired().catch((err) => this.logger.error(err?.message || err));
-    }, sixHours);
+    }, interval);
     setTimeout(() => {
       this.purgeExpired().catch((err) => this.logger.error(err?.message || err));
     }, 15000);
