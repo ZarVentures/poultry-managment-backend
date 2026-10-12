@@ -211,9 +211,12 @@ export class AuthService {
     }
   }
 
-  private recoveryDays(): number {
+  private recoveryWindowMs(): number {
+    const minutes = Number(this.config.get('ACCOUNT_RECOVERY_MINUTES'));
+    if (Number.isFinite(minutes) && minutes > 0) return minutes * 60 * 1000;
     const days = Number(this.config.get('ACCOUNT_RECOVERY_DAYS') || 30);
-    return Number.isFinite(days) && days > 0 ? days : 30;
+    const safeDays = Number.isFinite(days) && days > 0 ? days : 30;
+    return safeDays * 24 * 60 * 60 * 1000;
   }
 
   private devOtpField(otp: string): { devOtp?: string } {
@@ -335,7 +338,7 @@ export class AuthService {
     const target = this.deleteOtpTarget(user);
     await this.otpService.verifyOtp(target.key, dto.otp, 'delete');
 
-    const recoveryExpiresAt = new Date(Date.now() + this.recoveryDays() * 24 * 60 * 60 * 1000);
+    const recoveryExpiresAt = new Date(Date.now() + this.recoveryWindowMs());
     const deletesOrganization = await this.usersService.willDeleteOrganization(user);
     await this.usersService.markPendingDeletion(user, {
       reason: dto.reason?.trim() || null,
