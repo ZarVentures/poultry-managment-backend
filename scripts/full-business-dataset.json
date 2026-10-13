@@ -93,9 +93,10 @@
   },
   "expected": {
     "formulaNotes": {
-      "godownRemainingKg": "(inwardBirds - godownSoldBirds - godownDeadBirds) × (inwardKg / inwardBirds)",
-      "vehicleRemainingKg": "purchaseKg - inwardKg - vehicleSoldKg - transportDeadKg",
-      "cogs": "vehicleSoldKg × purchase.ratePerKg + godownSoldBirds × inwardAvgKg × inward.ratePerKg",
+      "godownRemainingKg": "(inwardBirds - godownSoldBirds - godownDeadBirds) × averageWeight",
+      "vehicleRemainingKg": "purchaseKg - recorded inward kg - vehicleSoldKg - transportDeadKg",
+      "cogs": "vehicleSoldKg × purchase.ratePerKg + godownSoldBirds × averageWeight × averageRate",
+      "godownWeightLoss": "opening + inward − billed sold − mortality stock kg − closing; negative difference is not weight loss",
       "netProfit": "revenue - cogs - expenses"
     },
     "purchaseBirds": 200,
@@ -127,6 +128,7 @@
     "openingStock": 0,
     "vehicleCogs": 7500,
     "godownCogs": 6000,
+    "godownWeightLoss": 0,
     "cogs": 13500,
     "totalExpenses": 250,
     "netProfit": 4850,

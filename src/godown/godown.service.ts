@@ -57,20 +57,295 @@ export class GodownService {
     return Math.round((v + Number.EPSILON) * 100) / 100;
   }
 
-  /** Inward stock kg on an entry (not sale billed kg). */
-  private inwardKg(e: GodownInwardEntry): number {
-    const recorded = this.n(e.totalWeight) || this.n(e.actualWeight);
-    if (recorded > 0) return recorded;
-    const birds = this.n(e.numberOfBirds);
-    const avg = this.n(e.averageWeight);
-    return birds > 0 && avg > 0 ? this.round2(birds * avg) : 0;
+  private ymd(value?: string | Date | null): string {
+    if (!value) return '';
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      const y = value.getFullYear();
+      const m = String(value.getMonth() + 1).padStart(2, '0');
+      const d = String(value.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : '';
   }
 
-  /** Leftover / movement stock kg = birds × inward avg kg/bird. */
-  private stockKgForBirds(birds: number, avgKgPerBird: number, recordedKg = 0): number {
+  /** A weighed kg is present only when the value is a real number, including zero. */
+  measuredKg(value: unknown): number | null {
+    if (value === null || value === undefined || value === '') return null;
+    const x = parseFloat(String(value));
+    if (!Number.isFinite(x) || x < 0) return null;
+    return x;
+  }
+
+  /** Expected inward kg = birds × that row's average weight. Recorded kg is only a fallback. */
+  private inwardExpectedKg(e: {
+    numberOfBirds?: number;
+    averageWeight?: number;
+    totalWeight?: number;
+    actualWeight?: number;
+  }): number {
+    const birds = this.n(e.numberOfBirds);
+    if (birds <= 0) return 0;
+    const avg = this.n(e.averageWeight);
+    if (avg > 0) return birds * avg;
+    const recorded = this.measuredKg(e.totalWeight) ?? this.measuredKg(e.actualWeight);
+    return recorded != null && recorded > 0 ? recorded : 0;
+  }
+
+  /** Kg actually weighed at inward. Missing scale weight stays missing. */
+  private inwardWeighedKg(e: {
+    actualWeight?: number | null;
+    totalWeight?: number | null;
+  }): number | null {
+    const actual = this.measuredKg(e.actualWeight);
+    if (actual != null) return actual;
+    return this.measuredKg(e.totalWeight);
+  }
+
+  private inwardLineRate(e: { ratePerKg?: number; totalAmount?: number }, expectedKg: number): number | null {
+    const rate = this.measuredKg(e.ratePerKg);
+    if (rate != null && rate > 0) return rate;
+    const amount = this.measuredKg(e.totalAmount);
+    if (amount != null && amount > 0 && expectedKg > 0) return amount / expectedKg;
+    return null;
+  }
+
+  /**
+   * Bird-weighted average weight and expected-kg-weighted average inward rate.
+   * Rows after asOnDate are ignored.
+   */
+  inwardAverages(
+    entries: Array<{
+      entryDate?: string | Date;
+      numberOfBirds?: number;
+      averageWeight?: number;
+      totalWeight?: number;
+      actualWeight?: number;
+      ratePerKg?: number;
+      totalAmount?: number;
+    }>,
+    asOnDate?: string,
+  ) {
+    const end = asOnDate ? this.ymd(asOnDate) : '';
+    let birds = 0;
+    let expectedKg = 0;
+    let rateKg = 0;
+    let rateValue = 0;
+    for (const e of entries) {
+      const rowDate = this.ymd(e.entryDate);
+      if (end && (!rowDate || rowDate > end)) continue;
+      const rowBirds = this.n(e.numberOfBirds);
+      if (rowBirds <= 0) continue;
+      const kg = this.inwardExpectedKg(e);
+      const rate = this.inwardLineRate(e, kg);
+      birds += rowBirds;
+      expectedKg += kg;
+      if (rate != null && rate > 0 && kg > 0) {
+        rateKg += kg;
+        rateValue += kg * rate;
+      }
+    }
+    return {
+      birds,
+      expectedKg: this.round2(expectedKg),
+      avgWeight: birds > 0 && expectedKg > 0 ? expectedKg / birds : 0,
+      avgRate: rateKg > 0 ? rateValue / rateKg : 0,
+      value: this.round2(rateValue),
+    };
+  }
+
+  async getInwardAverages(asOnDate?: string) {
+    const where: any = {};
+    const tenantId = this.getTenantId();
+    if (tenantId) where.tenantId = tenantId;
+    const entries = await this.inwardRepo.find({ where });
+    return this.inwardAverages(entries, asOnDate);
+  }
+
+  /**
+   * Birds sold in the period. Processed returns already reduce sale.numberOfBirds.
+   * A return outside the window is added back so that period does not drop birds
+   * that were still sold, and a return inside the window is not counted twice.
+   */
+  async countGodownSoldBirds(startDate?: string, endDate?: string): Promise<number> {
+    const tenantId = this.getTenantId();
+    const where: any = {};
+    if (tenantId) where.tenantId = tenantId;
+    const [sales, returns] = await Promise.all([
+      this.saleRepo.find({ where }),
+      this.birdReturnRepo.find({ where: tenantId ? { tenantId, status: 'processed' } : { status: 'processed' } }),
+    ]);
+    const start = startDate ? this.ymd(startDate) : '';
+    const end = endDate ? this.ymd(endDate) : '';
+    let birds = 0;
+    for (const sale of sales) {
+      const saleDate = this.ymd(sale.saleDate);
+      if (!saleDate) continue;
+      if (start && saleDate < start) continue;
+      if (end && saleDate > end) continue;
+      let count = this.n(sale.numberOfBirds);
+      for (const ret of returns) {
+        if (String(ret.saleId) !== String(sale.id)) continue;
+        const returnDate = this.ymd(ret.returnDate);
+        if (!returnDate) continue;
+        const outside = (end && returnDate > end) || (start && returnDate < start);
+        if (outside) count += this.n(ret.numberOfBirdsReturned);
+      }
+      birds += count;
+    }
+    return birds;
+  }
+
+  /** Stock kg = birds × shared inward average weight. */
+  private stockKg(birds: number, avgKgPerBird: number): number {
     const b = this.n(birds);
     if (b > 0 && avgKgPerBird > 0) return this.round2(b * avgKgPerBird);
-    return Math.max(0, this.n(recordedKg));
+    return 0;
+  }
+
+  /**
+   * Shrinkage against a real scale weight. Missing weight is null, not a verified 0 kg loss.
+   * A recorded 0 kg is a real measurement.
+   */
+  shrinkageKg(stockKg: number, weighedKg: number | null): number | null {
+    if (weighedKg == null || !Number.isFinite(weighedKg)) return null;
+    return Math.max(0, this.round2(this.n(stockKg) - weighedKg));
+  }
+
+  /**
+   * Period weighted average of opening inventory plus new inward stock.
+   * Returns 0 when there is no weight, so callers can fall back to the pool rate.
+   */
+  weightedAverageRate(
+    openingWeight: number,
+    openingValue: number,
+    inwardWeight: number,
+    inwardValue: number,
+  ): number {
+    const weight = this.n(openingWeight) + this.n(inwardWeight);
+    const value = this.n(openingValue) + this.n(inwardValue);
+    if (weight <= 0) return 0;
+    return value / weight;
+  }
+
+  /**
+   * Godown weight loss for a date range, from stock movement — not from each inward bill.
+   *
+   * Opening + Inward + returns in − sold − mortality − returns out − closing.
+   * Mortality and returns are known movements, so they are not called weight loss.
+   * A negative result is a discrepancy, not weight loss.
+   * Sold kg is the billed sale weight; a sale with no weight uses its stock kg and is flagged.
+   */
+  reconcileGodownWeight(input: {
+    openingWeight: number;
+    inwardWeight: number;
+    returnWeightIn?: number;
+    soldWeight: number;
+    mortalityWeight?: number;
+    returnWeightOut?: number;
+    closingWeight: number;
+    rate?: number;
+    unmeasuredSaleCount?: number;
+    negativeStock?: boolean;
+  }) {
+    const openingWeight = this.round2(this.n(input.openingWeight));
+    const inwardWeight = this.round2(this.n(input.inwardWeight));
+    const returnWeightIn = this.round2(this.n(input.returnWeightIn));
+    const soldWeight = this.round2(this.n(input.soldWeight));
+    const mortalityWeight = this.round2(this.n(input.mortalityWeight));
+    const returnWeightOut = this.round2(this.n(input.returnWeightOut));
+    const closingWeight = this.round2(this.n(input.closingWeight));
+    const availableWeight = this.round2(openingWeight + inwardWeight);
+    const literalDifference = this.round2(availableWeight - soldWeight - closingWeight);
+    const raw = this.round2(
+      openingWeight + inwardWeight + returnWeightIn - soldWeight - mortalityWeight - returnWeightOut - closingWeight,
+    );
+    const weightLoss = raw > 0 ? raw : 0;
+    const discrepancyKg = raw < 0 ? raw : 0;
+    const unmeasuredSaleCount = this.n(input.unmeasuredSaleCount);
+    const negativeStock = !!input.negativeStock;
+    const flagged = discrepancyKg < 0 || unmeasuredSaleCount > 0 || negativeStock;
+    const notes: string[] = [];
+    if (discrepancyKg < 0) {
+      notes.push('Sold, mortality, returns, or closing exceed available stock. The negative difference is not weight loss.');
+    }
+    if (unmeasuredSaleCount > 0) {
+      notes.push(`${unmeasuredSaleCount} sale(s) have no billed kg, so their stock kg was used and that gap is not treated as a measured loss.`);
+    }
+    if (negativeStock) {
+      notes.push('A movement drove bird stock below zero. Check sales against available birds.');
+    }
+    if (!notes.length) {
+      notes.push('Weight loss = opening + inward + returns in − sold − mortality − returns out − closing.');
+    }
+    const rate = this.round2(this.n(input.rate));
+    const weightLossPercent = availableWeight > 0 ? this.round2((weightLoss / availableWeight) * 100) : 0;
+    return {
+      openingWeight,
+      inwardWeight,
+      returnWeightIn,
+      soldWeight,
+      mortalityWeight,
+      returnWeightOut,
+      closingWeight,
+      availableWeight,
+      literalDifference,
+      rawDifference: raw,
+      weightLoss,
+      discrepancyKg,
+      weightLossPercent,
+      averageRate: rate,
+      weightLossCost: this.round2(weightLoss * rate),
+      unmeasuredSaleCount,
+      negativeStock,
+      flagged,
+      note: notes.join(' '),
+    };
+  }
+
+  private dayBeforeYmd(ymd: string): string {
+    const [y, m, d] = ymd.split('-').map(Number);
+    const dt = new Date(y, (m || 1) - 1, d || 1);
+    dt.setDate(dt.getDate() - 1);
+    const yy = dt.getFullYear();
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    return `${yy}-${mm}-${dd}`;
+  }
+
+  /** Line average kg/bird. Document average wins; otherwise the shared inward average. */
+  private movementAvgWeight(
+    m: { averageWeight?: number | null; birdsIn: number; birdsOut: number },
+    sharedAvg: number,
+  ): number | null {
+    const own = this.measuredKg(m.averageWeight);
+    if (own != null && own > 0) return this.round2(own);
+    const birds = m.birdsIn || m.birdsOut;
+    if (birds > 0 && sharedAvg > 0) return this.round2(sharedAvg);
+    return null;
+  }
+
+  private movementWeighedKg(m: {
+    movementType: string;
+    weighedKg?: number | null;
+    billedKg?: number | null;
+  }): number | null {
+    if (m.movementType === 'SALE') return m.billedKg ?? null;
+    if (m.movementType === 'INWARD' || m.movementType === 'MORTALITY') return m.weighedKg ?? null;
+    return null;
+  }
+
+  private movementWeightLoss(m: {
+    movementType: string;
+    weightIn: number;
+    weightOut: number;
+    weighedKg?: number | null;
+    billedKg?: number | null;
+  }): number | null {
+    if (m.movementType === 'INWARD') return this.shrinkageKg(m.weightIn, m.weighedKg ?? null);
+    if (m.movementType === 'SALE') return this.shrinkageKg(m.weightOut, m.billedKg ?? null);
+    if (m.movementType === 'MORTALITY') return this.shrinkageKg(m.weightOut, m.weighedKg ?? null);
+    return null;
   }
 
   // ─── Inward Entries ───────────────────────────────────────────────────────
@@ -610,7 +885,6 @@ export class GodownService {
         'SUM(entry.numberOfBirds) AS birds',
         'SUM(COALESCE(entry.totalWeight, entry.actualWeight, COALESCE(entry.numberOfBirds, 0) * COALESCE(entry.averageWeight, 0))) AS weight',
         'SUM(COALESCE(NULLIF(entry.totalAmount, 0), COALESCE(entry.totalWeight, entry.actualWeight, 0) * COALESCE(entry.ratePerKg, 0))) AS value',
-        'AVG(NULLIF(entry.ratePerKg, 0)) AS avgrate',
       ]);
     this.applyTenant(inwardQuery, 'entry');
     const inward = await inwardQuery.getRawOne();
@@ -637,12 +911,9 @@ export class GodownService {
     const totalInwardBirds = parseFloat(inward.birds) || 0;
     const totalInwardWeight = parseFloat(inward.weight) || 0;
     const totalInwardValue = parseFloat(inward.value) || 0;
-    const avgInwardRate = parseFloat(inward.avgrate) || 0;
     const totalSoldBirds = parseFloat(sold.birds) || 0;
-    const totalSoldWeight = parseFloat(sold.weight) || 0;
     const totalSoldValue = parseFloat(sold.value) || 0;
     const totalMortalityBirds = parseFloat(mortality.birds) || 0;
-    const totalMortalityWeight = parseFloat(mortality.weight) || 0;
 
     const returnsQuery = this.birdReturnRepo
       .createQueryBuilder('ret')
@@ -655,23 +926,27 @@ export class GodownService {
     const returns = await returnsQuery.getRawOne();
 
     const totalReturnBirds = parseFloat(returns?.birds) || 0;
-    const totalReturnWeight = parseFloat(returns?.weight) || 0;
 
     // Live availability must match stock ledger closing (inward − sales + returns − mortality).
-    const ledger = await this.getStockLedger();
+    const [ledger, averages] = await Promise.all([
+      this.getStockLedger(),
+      this.getInwardAverages(),
+    ]);
     const currentStock = Math.max(0, Number(ledger?.closing?.birds) || 0);
-    const avgKgPerBird = totalInwardBirds > 0 && totalInwardWeight > 0
-      ? totalInwardWeight / totalInwardBirds
-      : 0;
-    // Leftover kg follows leftover birds at inward avg weight — not billed sale kg.
+    const avgKgPerBird = averages.avgWeight > 0
+      ? averages.avgWeight
+      : (totalInwardBirds > 0 && totalInwardWeight > 0 ? totalInwardWeight / totalInwardBirds : 0);
+    const inwardRate = averages.avgRate > 0
+      ? averages.avgRate
+      : (averages.expectedKg > 0 && averages.value > 0 ? averages.value / averages.expectedKg : 0);
+    const stockInwardWeight = averages.expectedKg > 0 ? averages.expectedKg : totalInwardWeight;
+    const stockInwardValue = averages.value > 0 ? averages.value : totalInwardValue;
+    // Leftover kg = leftover birds × average weight. Value = that kg × average rate.
     const currentWeight = currentStock <= 0
       ? 0
       : avgKgPerBird > 0
         ? Math.round(currentStock * avgKgPerBird * 100) / 100
         : Math.max(0, Number(ledger?.closing?.weight) || 0);
-    const inwardRate = totalInwardWeight > 0 && totalInwardValue > 0
-      ? totalInwardValue / totalInwardWeight
-      : avgInwardRate;
     const currentValue = Math.max(0, Math.round(currentWeight * inwardRate * 100) / 100);
 
     return {
@@ -680,14 +955,16 @@ export class GodownService {
       totalMortality: totalMortalityBirds,
       totalReturns: totalReturnBirds,
       currentStock,
-      totalInwardWeight,
-      totalSoldWeight,
-      totalMortalityWeight,
-      totalReturnWeight,
+      totalInwardWeight: stockInwardWeight,
+      totalSoldWeight: this.round2(this.n(ledger?.period?.soldWeight)),
+      totalMortalityWeight: this.round2(this.n(ledger?.period?.mortalityWeight)),
+      totalReturnWeight: this.round2(this.n(ledger?.period?.returnWeight)),
       currentWeight,
-      totalInwardValue,
+      totalInwardValue: stockInwardValue,
       totalSoldValue,
       currentValue,
+      avgWeight: this.round2(avgKgPerBird),
+      avgRate: this.round2(inwardRate),
     };
   }
 
@@ -760,7 +1037,11 @@ export class GodownService {
       amount?: number;
       notes?: string;
       affectsStock?: boolean;
-      billedKg?: number;
+      billedKg?: number | null;
+      weighedKg?: number | null;
+      averageWeight?: number | null;
+      costKg?: number;
+      costValue?: number;
     };
 
     // Per-sale totals that were deducted when returns were processed
@@ -774,15 +1055,19 @@ export class GodownService {
       returnAdjustBySale.set(saleId, prev);
     }
 
-    const inwardBirdsTotal = inwards.reduce((sum, e) => sum + this.n(e.numberOfBirds), 0);
-    const inwardKgTotal = inwards.reduce((sum, e) => sum + this.inwardKg(e), 0);
-    const avgKgPerBird = inwardBirdsTotal > 0 ? inwardKgTotal / inwardBirdsTotal : 0;
+    const endLimit = endDate ? (this.ymd(endDate) || undefined) : undefined;
+    const averages = this.inwardAverages(inwards, endLimit);
+    const avgKgPerBird = averages.avgWeight;
+    const avgRate = averages.avgRate;
 
     const movements: Movement[] = [];
 
     for (const e of inwards) {
+      const expectedKg = this.inwardExpectedKg(e);
+      const lineRate = this.inwardLineRate(e, expectedKg);
+      const costValue = lineRate != null && expectedKg > 0 ? expectedKg * lineRate : this.n(e.totalAmount);
       movements.push({
-        date: String(e.entryDate).slice(0, 10),
+        date: this.ymd(e.entryDate),
         createdAt: e.createdAt,
         sortId: `I-${e.id}`,
         movementType: 'INWARD',
@@ -794,10 +1079,14 @@ export class GodownService {
         vehicleId: e.vehicleId,
         birdsIn: this.n(e.numberOfBirds),
         birdsOut: 0,
-        weightIn: this.inwardKg(e),
+        weightIn: this.stockKg(this.n(e.numberOfBirds), avgKgPerBird),
         weightOut: 0,
+        weighedKg: this.inwardWeighedKg(e),
+        averageWeight: this.measuredKg(e.averageWeight),
         ratePerKg: e.ratePerKg != null ? Number(e.ratePerKg) : undefined,
         amount: e.totalAmount != null ? Number(e.totalAmount) : undefined,
+        costKg: expectedKg,
+        costValue,
         notes: e.notes,
       });
     }
@@ -805,11 +1094,10 @@ export class GodownService {
     for (const s of sales) {
       const adj = returnAdjustBySale.get(String(s.id)) || { birds: 0, weight: 0 };
       const birdsOut = this.n(s.numberOfBirds) + adj.birds;
-      const recordedKg = this.n(s.totalWeight) + adj.weight;
-      const billedKg = recordedKg;
-      const weightOut = this.stockKgForBirds(birdsOut, avgKgPerBird, recordedKg);
+      const billedKg = this.measuredKg(s.totalWeight);
+      const weightOut = this.stockKg(birdsOut, avgKgPerBird);
       movements.push({
-        date: String(s.saleDate).slice(0, 10),
+        date: this.ymd(s.saleDate),
         createdAt: s.createdAt,
         sortId: `S-${s.id}`,
         movementType: 'SALE',
@@ -823,6 +1111,7 @@ export class GodownService {
         weightIn: 0,
         weightOut,
         ratePerKg: s.ratePerKg != null ? Number(s.ratePerKg) : undefined,
+        averageWeight: this.measuredKg(s.averageWeight),
         amount: s.totalAmount != null ? Number(s.totalAmount) : undefined,
         notes: adj.birds > 0
           ? `${s.notes || ''} | Includes ${adj.birds} birds later returned`.trim()
@@ -833,8 +1122,7 @@ export class GodownService {
 
     for (const r of birdReturns) {
       const birds = this.n(r.numberOfBirdsReturned);
-      const recordedKg = this.n(r.weightReturned);
-      const weight = this.stockKgForBirds(birds, avgKgPerBird, recordedKg);
+      const weight = this.stockKg(birds, avgKgPerBird);
       const isDead = r.returnReason === 'dead';
       const toStock = !!r.returnedToInventory;
       const processed = r.status === 'processed';
@@ -850,7 +1138,7 @@ export class GodownService {
       ].filter(Boolean);
 
       movements.push({
-        date: String(r.returnDate).slice(0, 10),
+        date: this.ymd(r.returnDate),
         createdAt: r.createdAt || r.processedAt || new Date(),
         sortId: `R-${r.id}`,
         movementType: 'RETURN',
@@ -872,9 +1160,9 @@ export class GodownService {
 
     for (const m of mortalities) {
       const birdsOut = this.n(m.numberOfBirdsDied);
-      const recordedKg = this.n(m.weightOfDeadBirds);
+      const recordedKg = this.measuredKg(m.weightOfDeadBirds);
       movements.push({
-        date: String(m.mortalityDate).slice(0, 10),
+        date: this.ymd(m.mortalityDate),
         createdAt: m.createdAt,
         sortId: `M-${m.id}`,
         movementType: 'MORTALITY',
@@ -887,7 +1175,8 @@ export class GodownService {
         birdsIn: 0,
         birdsOut,
         weightIn: 0,
-        weightOut: recordedKg > 0 ? recordedKg : this.stockKgForBirds(birdsOut, avgKgPerBird, 0),
+        weightOut: this.stockKg(birdsOut, avgKgPerBird),
+        weighedKg: recordedKg ?? undefined,
         notes: m.notes || m.reason,
       });
     }
@@ -895,9 +1184,9 @@ export class GodownService {
     for (const m of farmMortalities) {
       if (m.godownMortalityId && processedGodownMortalityIds.has(String(m.godownMortalityId))) continue;
       const birdsOut = this.n(m.numberOfBirdsDied);
-      const recordedKg = this.n(m.weightOfDeadBirds);
+      const recordedKg = this.measuredKg(m.weightOfDeadBirds);
       movements.push({
-        date: String(m.purchaseDate || m.createdAt).slice(0, 10),
+        date: this.ymd(m.purchaseDate || m.createdAt),
         createdAt: m.createdAt,
         sortId: `FM-${m.id}`,
         movementType: 'MORTALITY',
@@ -908,7 +1197,8 @@ export class GodownService {
         birdsIn: 0,
         birdsOut,
         weightIn: 0,
-        weightOut: recordedKg > 0 ? recordedKg : this.stockKgForBirds(birdsOut, avgKgPerBird, 0),
+        weightOut: this.stockKg(birdsOut, avgKgPerBird),
+        weighedKg: recordedKg ?? undefined,
         notes: m.notes || m.cause,
       });
     }
@@ -921,8 +1211,8 @@ export class GodownService {
       return a.sortId.localeCompare(b.sortId);
     });
 
-    const start = startDate ? String(startDate).slice(0, 10) : undefined;
-    const end = endDate ? String(endDate).slice(0, 10) : undefined;
+    const start = startDate ? (this.ymd(startDate) || undefined) : undefined;
+    const end = endDate ? (this.ymd(endDate) || undefined) : undefined;
 
     let openingBirds = 0;
     let openingWeight = 0;
@@ -994,7 +1284,7 @@ export class GodownService {
         if (m.movementType === 'SALE') {
           soldBirds += m.birdsOut;
           soldWeight += m.weightOut;
-          billedSaleWeight += this.n(m.billedKg);
+          if (m.billedKg != null) billedSaleWeight += m.billedKg;
         }
         if (m.movementType === 'MORTALITY') {
           mortalityBirds += m.birdsOut;
@@ -1025,6 +1315,9 @@ export class GodownService {
         weightOut: Number(m.weightOut.toFixed(2)),
         ratePerKg: m.ratePerKg ?? null,
         amount: m.amount ?? null,
+        averageWeight: this.movementAvgWeight(m, avgKgPerBird),
+        weighedKg: this.movementWeighedKg(m),
+        weightLoss: this.movementWeightLoss(m),
         notes: m.notes || null,
         runningBirds,
         runningWeight: Number(runningWeight.toFixed(2)),
@@ -1040,10 +1333,77 @@ export class GodownService {
       : Math.max(0, Number(runningWeight.toFixed(2)));
     const fromWeight = this.round2(openingWeightFinal + inwardKg + returnWeightIn);
     const accountedWeight = this.round2(
-      billedSaleWeight + mortalityWeight + returnWeightOut + closingWeightFinal,
+      soldWeight + mortalityWeight + returnWeightOut + closingWeightFinal,
     );
-    const weightLoss = Math.max(0, this.round2(fromWeight - accountedWeight));
-    const weightLossPercent = fromWeight > 0 ? this.round2((weightLoss / fromWeight) * 100) : 0;
+
+    let reconInwardKg = 0;
+    let reconInwardCostKg = 0;
+    let reconInwardValue = 0;
+    let reconBilledKg = 0;
+    let reconUnmeasuredSaleKg = 0;
+    let reconUnmeasuredSales = 0;
+    let reconMortalityKg = 0;
+    let reconReturnIn = 0;
+    let reconReturnOut = 0;
+    let unmeasuredLossCount = 0;
+    let scanBirds = 0;
+    let birdsThroughEnd = 0;
+    let negativeStock = false;
+    for (const m of movements) {
+      if (m.affectsStock === false) continue;
+      scanBirds += m.birdsIn - m.birdsOut;
+      if (scanBirds < -0.001) negativeStock = true;
+      if (end && m.date > end) continue;
+      birdsThroughEnd = scanBirds;
+      if (start && m.date < start) continue;
+      if (m.movementType === 'INWARD') {
+        reconInwardKg += m.weightIn;
+        reconInwardCostKg += this.n(m.costKg);
+        reconInwardValue += this.n(m.costValue);
+        if (m.weighedKg == null) unmeasuredLossCount += 1;
+      } else if (m.movementType === 'SALE') {
+        if (m.billedKg != null) reconBilledKg += m.billedKg;
+        else {
+          reconUnmeasuredSaleKg += m.weightOut;
+          reconUnmeasuredSales += 1;
+          unmeasuredLossCount += 1;
+        }
+      } else if (m.movementType === 'MORTALITY') {
+        reconMortalityKg += m.weightOut;
+        if (m.weighedKg == null) unmeasuredLossCount += 1;
+      } else if (m.movementType === 'RETURN') {
+        reconReturnIn += m.weightIn;
+        reconReturnOut += m.weightOut;
+      }
+    }
+
+    const prior = start ? this.inwardAverages(inwards, this.dayBeforeYmd(start)) : null;
+    const openingValue = this.round2(openingWeightFinal * (prior && prior.avgRate > 0 ? prior.avgRate : avgRate));
+    const periodRate = this.weightedAverageRate(
+      openingWeightFinal,
+      openingValue,
+      reconInwardCostKg,
+      reconInwardValue,
+    );
+    const applicableRate = periodRate > 0 ? periodRate : avgRate;
+    const reconClosingBirds = Math.max(0, birdsThroughEnd);
+    const reconClosingWeight = reconClosingBirds > 0 && avgKgPerBird > 0
+      ? this.round2(reconClosingBirds * avgKgPerBird)
+      : 0;
+    const reconciliation = this.reconcileGodownWeight({
+      openingWeight: openingWeightFinal,
+      inwardWeight: reconInwardKg,
+      returnWeightIn: reconReturnIn,
+      soldWeight: reconBilledKg + reconUnmeasuredSaleKg,
+      mortalityWeight: reconMortalityKg,
+      returnWeightOut: reconReturnOut,
+      closingWeight: reconClosingWeight,
+      rate: applicableRate,
+      unmeasuredSaleCount: reconUnmeasuredSales,
+      negativeStock,
+    });
+    const weightLoss = reconciliation.weightLoss;
+    const weightLossPercent = reconciliation.weightLossPercent;
 
     return {
       startDate: start || null,
@@ -1067,11 +1427,24 @@ export class GodownService {
         returnBirds: returnBirdsIn,
         returnWeight: Number(returnWeightIn.toFixed(2)),
         inwardWeight: this.round2(inwardKg),
+        inwardValue: this.round2(reconInwardValue),
+        openingValue,
         fromWeight,
         accountedWeight,
+        soldBilledWeight: this.round2(reconBilledKg + reconUnmeasuredSaleKg),
         weightLoss,
+        weightLossValue: reconciliation.weightLossCost,
+        weightLossCost: reconciliation.weightLossCost,
+        unmeasuredLossCount,
         weightLossPercent,
+        discrepancyKg: reconciliation.discrepancyKg,
+        reconciliationFlagged: reconciliation.flagged,
+        reconciliationNote: reconciliation.note,
+        reconciliation,
       },
+      avgWeight: this.round2(avgKgPerBird),
+      avgRate: this.round2(avgRate),
+      periodAverageRate: this.round2(applicableRate),
       closing: {
         birds: closingBirdsFinal,
         weight: closingWeightFinal,
