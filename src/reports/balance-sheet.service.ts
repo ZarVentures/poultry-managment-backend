@@ -46,7 +46,7 @@ export class BalanceSheetService {
     const asOn =
       asOnDate && /^\d{4}-\d{2}-\d{2}$/.test(asOnDate) ? asOnDate : this.today();
 
-    const [purchases, inward, godownSold, godownDead, transportDead, vehicleSold, ledger] = await Promise.all([
+    const [purchases, inward, godownSold, godownDead, transportDead, vehicleSold, ledger, averages] = await Promise.all([
       this.purchasePosition(asOn),
       this.godownInward(asOn),
       this.godownSoldTotals(asOn),
@@ -54,27 +54,31 @@ export class BalanceSheetService {
       this.transportMortality(asOn),
       this.vehicleSold(asOn),
       this.godownService.getStockLedger({ endDate: asOn }),
+      this.godownService.getInwardAverages(asOn),
     ]);
 
     const inwardWeight = inward.weight;
-    const inwardValue = inward.value;
-    const inwardAvgKg = inward.birds > 0 && inwardWeight > 0 ? inwardWeight / inward.birds : 0;
-    const godownDeadKg = godownDead.weight + this.n(godownDead.birdsWithoutWeight) * inwardAvgKg;
+    const avgWeight = averages.avgWeight > 0
+      ? averages.avgWeight
+      : (inward.birds > 0 && inwardWeight > 0 ? inwardWeight / inward.birds : 0);
+    const godownDeadKg = godownDead.weight + this.n(godownDead.birdsWithoutWeight) * avgWeight;
     const ledgerBirds = Math.max(0, this.n(ledger?.closing?.birds));
     const ledgerWeight = Math.max(0, this.n(ledger?.closing?.weight));
     const formulaBirds = Math.max(0, inward.birds - godownSold.birds - godownDead.birds);
-    const formulaWeight = Math.max(0, inwardWeight - godownSold.weight - godownDeadKg);
+    const formulaWeight = Math.max(0, formulaBirds * avgWeight);
     const remainingBirds = ledgerBirds > 0 || ledgerWeight > 0 ? ledgerBirds : formulaBirds;
     let remainingWeight = ledgerWeight > 0 ? ledgerWeight : formulaWeight;
-    if (remainingWeight <= 0 && remainingBirds > 0 && inward.birds > 0 && inwardWeight > 0) {
-      remainingWeight = remainingBirds * (inwardWeight / inward.birds);
+    if (remainingWeight <= 0 && remainingBirds > 0 && avgWeight > 0) {
+      remainingWeight = remainingBirds * avgWeight;
     }
     const purchaseRate = this.n(purchases.ratePerKg) > 0
       ? this.n(purchases.ratePerKg)
       : (purchases.weight > 0 ? purchases.net / purchases.weight : 0);
-    const godownRate = this.n(inward.ratePerKg) > 0
-      ? this.n(inward.ratePerKg)
-      : (inwardWeight > 0 && inwardValue > 0 ? inwardValue / inwardWeight : purchaseRate);
+    const godownRate = averages.avgRate > 0
+      ? averages.avgRate
+      : (this.n(inward.ratePerKg) > 0
+        ? this.n(inward.ratePerKg)
+        : (inwardWeight > 0 && inward.value > 0 ? inward.value / inwardWeight : purchaseRate));
     const godownInventory = this.round2(remainingWeight * godownRate);
 
     const purchaseAvgKg = purchases.birds > 0 && purchases.weight > 0

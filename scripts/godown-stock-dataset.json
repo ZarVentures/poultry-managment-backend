@@ -1,7 +1,7 @@
 {
   "name": "leftover-godown-stock-weight",
   "marker": "VERIFY_GODOWN_STOCK_DATASET",
-  "purpose": "Prove leftover kg = remaining birds × inward avg kg/bird, NOT inward kg − billed sale kg.",
+  "purpose": "Leftover kg = remaining birds × bird-weighted average weight. Weight loss = opening + inward + returns − sold − mortality − closing. A negative difference is a discrepancy, not weight loss.",
   "inwards": [
     {
       "entryDate": "2026-09-01",
@@ -70,7 +70,9 @@
     "inwardValue": 21000,
     "inwardRatePerKg": 100,
     "remainingValue": 11200,
+    "weightLoss": 0,
+    "weightLossValue": 0,
     "wrongIfSubtractBilledKg": 115,
-    "formula": "remainingKg = (inwardBirds - soldBirds - deadBirds) × (inwardKg / inwardBirds)"
+    "formula": "remainingKg = remaining birds × average weight. Weight loss = opening + inward − sold − mortality − closing. Negative difference is not weight loss."
   }
 }

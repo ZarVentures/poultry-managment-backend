@@ -38,10 +38,15 @@ function computeExpected(d) {
   const purchaseRate = n(p.ratePerKg) > 0 ? n(p.ratePerKg) : (purchaseKg > 0 ? purchaseNet / purchaseKg : 0);
 
   const inwardBirds = n(inward.numberOfBirds);
-  const inwardKg = n(inward.totalWeight) || n(inward.actualWeight);
+  const inwardRecordedKg = n(inward.totalWeight) || n(inward.actualWeight);
+  const inwardKg = inwardBirds > 0 && n(inward.averageWeight) > 0
+    ? inwardBirds * n(inward.averageWeight)
+    : inwardRecordedKg;
   const inwardValue = n(inward.totalAmount);
   const godownAvg = inwardBirds > 0 ? inwardKg / inwardBirds : 0;
-  const godownRate = n(inward.ratePerKg) > 0 ? n(inward.ratePerKg) : (inwardKg > 0 ? inwardValue / inwardKg : 0);
+  const godownRate = n(inward.ratePerKg) > 0
+    ? n(inward.ratePerKg)
+    : (inwardKg > 0 ? inwardValue / inwardKg : 0);
 
   const godownSoldBirds = n(gs.numberOfBirds);
   const godownBilledKg = n(gs.totalWeight);
@@ -54,7 +59,7 @@ function computeExpected(d) {
   const vehicleSoldBirds = n(vs.numberOfBirds);
   const transportDeadKg = n(tm.weightOfDeadBirds);
   const transportDeadBirds = n(tm.numberOfBirdsDied);
-  const vehicleRemainingKg = Math.max(0, round2(purchaseKg - inwardKg - vehicleSoldKg - transportDeadKg));
+  const vehicleRemainingKg = Math.max(0, round2(purchaseKg - inwardRecordedKg - vehicleSoldKg - transportDeadKg));
   const vehicleRemainingBirds = Math.max(0, purchaseBirds - inwardBirds - vehicleSoldBirds - transportDeadBirds);
   const vehicleStockValue = round2(vehicleRemainingKg * purchaseRate);
 
@@ -64,6 +69,8 @@ function computeExpected(d) {
   const vehicleCogs = round2(vehicleSoldKg * purchaseRate);
   const godownSoldStockKg = godownSoldBirds > 0 && godownAvg > 0 ? round2(godownSoldBirds * godownAvg) : godownBilledKg;
   const godownCogs = round2(godownSoldStockKg * godownRate);
+  const godownRawLoss = round2(inwardKg - godownBilledKg - round2(godownDeadBirds * godownAvg) - godownRemainingKg);
+  const godownWeightLoss = godownRawLoss > 0 ? godownRawLoss : 0;
   const cogs = round2(vehicleCogs + godownCogs);
   const totalExpenses = round2(n(d.expense.amount) + n(d.godownExpense.amount));
   const netProfit = round2(totalRevenue - cogs - totalExpenses);
@@ -78,6 +85,7 @@ function computeExpected(d) {
     inwardKg,
     inwardValue,
     godownAvgKgPerBird: godownAvg,
+    godownRate,
     godownSoldBirds,
     godownBilledKg,
     godownDeadBirds,
@@ -99,6 +107,7 @@ function computeExpected(d) {
     openingStock: 0,
     vehicleCogs,
     godownCogs,
+    godownWeightLoss,
     cogs,
     totalExpenses,
     netProfit,
@@ -302,12 +311,15 @@ async function runLive(tenantId) {
       const reports = app.get(ReportsService);
       const balance = app.get(BalanceSheetService);
       const { startDate, endDate } = dataset.period;
-      const [summary, pnl, valuation] = await Promise.all([
+      const [summary, pnl, valuation, ledger, opening, weightLoss] = await Promise.all([
         godown.getSummary(),
         reports.getProfitLossReport(startDate, endDate),
         balance.getInventoryValuation(endDate),
+        godown.getStockLedger({ startDate, endDate }),
+        godown.getStockLedger({ endDate: '2026-08-31' }),
+        reports.getWeightLossReport(startDate, endDate),
       ]);
-      return { summary, pnl: pnl.summary, valuation };
+      return { summary, pnl: pnl.summary, valuation, ledger, opening, weightLoss };
     });
   } finally {
     await app.close();
@@ -328,7 +340,7 @@ async function main() {
   for (const key of [
     'purchaseNet', 'inwardKg', 'godownRemainingBirds', 'godownRemainingKg', 'godownStockValue',
     'vehicleRemainingKg', 'vehicleStockValue', 'availableStock', 'totalRevenue',
-    'vehicleCogs', 'godownCogs', 'cogs', 'totalExpenses', 'netProfit',
+    'vehicleCogs', 'godownCogs', 'godownWeightLoss', 'cogs', 'totalExpenses', 'netProfit',
   ]) {
     allOk = assertClose(key, recomputed[key], expected[key]) && allOk;
   }
@@ -387,6 +399,18 @@ async function main() {
     allOk = assertClose('pnl.availableStock', live.pnl.availableStock, expected.availableStock) && allOk;
     allOk = assertClose('pnl.vehicleCogs', live.pnl.vehicleCogs, expected.vehicleCogs) && allOk;
     allOk = assertClose('pnl.godownCogs', live.pnl.godownCogs, expected.godownCogs) && allOk;
+    allOk = assertClose('ledger.weightLoss', live.ledger?.period?.weightLoss, expected.godownWeightLoss) && allOk;
+    allOk = assertClose('opening birds before the period', live.opening?.closing?.birds, 0) && allOk;
+    allOk = assertClose('closing birds', live.ledger?.closing?.birds, expected.godownRemainingBirds) && allOk;
+    for (const key of ['godown_sales', 'godown_inward', 'godown_mortality']) {
+      const lines = (live.weightLoss?.details || []).filter((row) => row.channel === key);
+      const lineSum = round2(lines.reduce((sum, row) => sum + (row.weightLoss == null ? 0 : Number(row.weightLoss)), 0));
+      const channel = (live.weightLoss?.byChannel || []).find((row) => row.key === key);
+      allOk = assertClose(`${key} loss equals its lines`, channel?.weightLoss, lineSum) && allOk;
+    }
+    allOk = assertClose('vehicle COGS stays purchase kg x purchase rate', live.pnl.vehicleCogs, expected.vehicleCogs) && allOk;
+    allOk = assertClose('ledger.avgWeight', live.ledger?.avgWeight, expected.godownAvgKgPerBird) && allOk;
+    allOk = assertClose('valuation.godownRate', live.valuation.godownRate, recomputed.godownRate) && allOk;
     allOk = assertClose('pnl.cogs', live.pnl.cogs, expected.cogs) && allOk;
     allOk = assertClose('pnl.totalExpenses', live.pnl.totalExpenses, expected.totalExpenses) && allOk;
     allOk = assertClose('pnl.netProfit', live.pnl.netProfit, expected.netProfit) && allOk;
