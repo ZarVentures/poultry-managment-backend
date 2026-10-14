@@ -57,7 +57,8 @@
     "totalAmount": 9000,
     "grossAmount": 9000,
     "netAmount": 9000,
-    "paymentStatus": "pending"
+    "paymentStatus": "pending",
+    "purchaseBillNo": "VERIFY-FULL-PO-001"
   },
   "godownSale": {
     "saleDate": "2026-09-10",
@@ -95,7 +96,7 @@
     "formulaNotes": {
       "godownRemainingKg": "(inwardBirds - godownSoldBirds - godownDeadBirds) × averageWeight",
       "vehicleRemainingKg": "purchaseKg - recorded inward kg - vehicleSoldKg - transportDeadKg",
-      "cogs": "vehicleSoldKg × purchase.ratePerKg + godownSoldBirds × averageWeight × averageRate",
+      "cogs": "vehicle sold kg × that sale's attached purchase bill ratePerKg + godownSoldBirds × averageWeight × averageRate",
       "godownWeightLoss": "opening + inward − billed sold − mortality stock kg − closing; negative difference is not weight loss",
       "netProfit": "revenue - cogs - expenses"
     },

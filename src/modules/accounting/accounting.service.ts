@@ -30,40 +30,11 @@ export class AccountingService {
   }
 
   /**
-   * Validates and attempts to send a transaction to the Accounting Service.
-   * If the API is offline or fails, saves to failed_accounting_jobs for background retry.
+   * Accounting sync is off. Poultry records stay in this app and are not posted
+   * to the external accounting API.
    */
-  async syncTransaction(payload: any): Promise<boolean> {
-    const dto = plainToInstance(AccountingTransactionDTO, payload);
-    const errors = await validate(dto);
-
-    if (errors.length > 0) {
-      const errorMessages = errors.map(err => Object.values(err.constraints || {}).join(', '));
-      this.logger.logValidationError(payload.transactionId || 'UNKNOWN', errorMessages);
-      
-      // Save validation failure to DB so it can be fixed/inspected by admins
-      await this.saveFailedJob(payload, `Validation Error: ${errorMessages.join('; ')}`, 'failed');
-      return false;
-    }
-
-    try {
-      this.logger.logTransaction(dto.transactionType, dto.transactionId, dto.amount, dto.partyName);
-      
-      const client = this.accountingClient.getAxiosInstance();
-      await client.post('/transactions', dto);
-      
-      return true;
-    } catch (error: any) {
-      const errorMsg = error.response
-        ? `API Error (Status ${error.response.status}): ${JSON.stringify(error.response.data)}`
-        : `Network Error: ${error.message}`;
-
-      this.logger.logFailedRequest(dto.transactionId, errorMsg, true);
-      
-      // Save as PENDING for retry scheduler
-      await this.saveFailedJob(dto, errorMsg, 'pending');
-      return false;
-    }
+  async syncTransaction(_payload: any): Promise<boolean> {
+    return true;
   }
 
   private async saveFailedJob(payload: any, errorMessage: string, status: 'pending' | 'failed'): Promise<FailedAccountingJob> {

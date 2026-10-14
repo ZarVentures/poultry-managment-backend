@@ -243,12 +243,12 @@ async function importDataset(client) {
   const vs = dataset.vehicleSale;
   await client.query(
     `INSERT INTO sales
-      (invoice_number, sale_no, sale_date, customer_name, sale_mode, product_type,
+      (invoice_number, sale_no, purchase_bill_no, sale_date, customer_name, sale_mode, product_type,
        number_of_birds, quantity, unit, unit_price, total_amount, gross_amount, net_amount,
        payment_status, amount_received, notes, tenant_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,0,$15,$16)`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,0,$16,$17)`,
     [
-      vs.invoiceNumber, vs.saleNo, vs.saleDate, vs.customerName, vs.saleMode, vs.productType,
+      vs.invoiceNumber, vs.saleNo, vs.purchaseBillNo || p.orderNumber, vs.saleDate, vs.customerName, vs.saleMode, vs.productType,
       vs.numberOfBirds, vs.quantity, vs.unit, vs.unitPrice, vs.totalAmount, vs.grossAmount, vs.netAmount,
       vs.paymentStatus, dataset.marker, tenantId,
     ],

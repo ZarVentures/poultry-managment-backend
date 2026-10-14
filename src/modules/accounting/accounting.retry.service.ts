@@ -19,16 +19,7 @@ export class AccountingRetryService implements OnApplicationBootstrap, OnApplica
     private readonly logger: AccountingLogger,
   ) {}
 
-  onApplicationBootstrap() {
-    const intervalSec = Number(this.configService.get<number>('ACCOUNTING_RETRY_INTERVAL_SEC') || 60);
-    this.logger.log(`[Scheduler] Starting background retry loop running every ${intervalSec} seconds.`);
-    
-    this.timer = setInterval(() => {
-      this.processFailedJobs().catch((err) => {
-        this.logger.error(`Error in retry scheduler loop: ${err.message}`);
-      });
-    }, intervalSec * 1000);
-  }
+  onApplicationBootstrap() {}
 
   onApplicationShutdown() {
     if (this.timer) {
@@ -38,6 +29,7 @@ export class AccountingRetryService implements OnApplicationBootstrap, OnApplica
   }
 
   async processFailedJobs(): Promise<void> {
+    return;
     if (this.isProcessing) {
       this.logger.warn('[Scheduler] Previous retry cycle is still active. Skipping this cycle.');
       return;
