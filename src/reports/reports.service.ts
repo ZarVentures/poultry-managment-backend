@@ -351,14 +351,27 @@ export class ReportsService {
       openingStock = this.round2(openingGodown + this.num(openingValuation.vehicleInventory));
     }
 
-    const vehicleSoldKg = sales
-      .filter(s => s.saleMode !== 'from_godown')
-      .reduce((sum, s) => sum + this.num(s.quantity), 0);
+    const purchaseByBill = new Map<string, PurchaseOrder>();
+    for (const p of purchasesAsOn) {
+      const billNo = String(p.orderNumber || '').trim();
+      if (billNo) purchaseByBill.set(billNo, p);
+    }
+    let vehicleSoldKg = 0;
+    let vehicleCogsRaw = 0;
+    for (const s of sales) {
+      if (s.saleMode === 'from_godown') continue;
+      const soldKg = this.num(s.quantity);
+      vehicleSoldKg += soldKg;
+      const billNo = String(s.purchaseBillNo || '').trim();
+      const bill = billNo ? purchaseByBill.get(billNo) : undefined;
+      const rate = bill && String(bill.status) !== 'cancelled' ? this.num(bill.ratePerKg) : 0;
+      vehicleCogsRaw += soldKg * rate;
+    }
     const godownSoldBirds = await this.godownService.countGodownSoldBirds(startDate, endDate);
     const godownSoldStockKg = godownSoldBirds > 0 && avgInwardKg > 0
       ? this.round2(godownSoldBirds * avgInwardKg)
       : godownSales.reduce((sum, s) => sum + this.godownSoldKg(s), 0);
-    const vehicleCogs = this.round2(vehicleSoldKg * purchaseRate);
+    const vehicleCogs = this.round2(vehicleCogsRaw);
     // Godown COGS stays sold stock kg × the pool inward rate. Weight-loss cost is not added again.
     const godownCogs = this.round2(godownSoldStockKg * inwardRate);
     const cogs = this.round2(vehicleCogs + godownCogs);
