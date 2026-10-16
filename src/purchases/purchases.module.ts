@@ -7,12 +7,14 @@ import { PurchaseOrderItem } from './entities/purchase-order-item.entity';
 import { PurchaseOrderPayment } from './entities/purchase-order-payment.entity';
 import { CagesModule } from '../cages/cages.module';
 import { AccountingModule } from '../modules/accounting/accounting.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment]),
     CagesModule,
     AccountingModule,
+    PermissionsModule,
   ],
   controllers: [PurchasesController],
   providers: [PurchasesService],

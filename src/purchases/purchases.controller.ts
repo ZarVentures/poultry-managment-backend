@@ -20,9 +20,11 @@ import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 import { AccountingService } from '../modules/accounting/accounting.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { Permissions } from '../auth/decorators/permissions.decorator';
 
 @Controller('purchases')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class PurchasesController {
   constructor(
     private readonly purchasesService: PurchasesService,
@@ -55,6 +57,7 @@ export class PurchasesController {
   }
 
   @Post()
+  @Permissions('purchases', 'create')
   create(@Body() createPurchaseOrderDto: CreatePurchaseOrderDto) {
     return this.purchasesService.create(createPurchaseOrderDto);
   }
