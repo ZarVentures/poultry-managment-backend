@@ -56,21 +56,20 @@ export class PurchasesService {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const prefix = `PO-${year}-${month}-`;
 
-    // Find the last order number with this prefix
     const qb = this.purchaseOrderRepository
       .createQueryBuilder('po')
-      .where('po.orderNumber LIKE :prefix', { prefix: `${prefix}%` })
-      .orderBy('po.id', 'DESC')
-      .limit(1);
+      .select(['po.id', 'po.orderNumber'])
+      .where('po.orderNumber LIKE :prefix', { prefix: `${prefix}%` });
     this.applyTenant(qb);
-    const lastOrder = await qb.getOne();
+    const rows = await qb.getMany();
 
-    if (lastOrder && lastOrder.orderNumber) {
-      const lastNumber = parseInt(lastOrder.orderNumber.split('-').pop() || '0');
-      return `${prefix}${String(lastNumber + 1).padStart(4, '0')}`;
+    let max = 0;
+    for (const row of rows) {
+      const suffix = parseInt(String(row.orderNumber || '').slice(prefix.length), 10);
+      if (Number.isFinite(suffix) && suffix > max) max = suffix;
     }
 
-    return `${prefix}0001`;
+    return `${prefix}${String(max + 1).padStart(4, '0')}`;
   }
 
   async generateNextOrderNumber(): Promise<string> {
@@ -78,8 +77,25 @@ export class PurchasesService {
   }
 
   async create(dto: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
-    // Auto-generate order number if not provided
-    const orderNumber = dto.orderNumber || await this.generateOrderNumber();
+    const providedNumber = (dto.orderNumber || '').trim();
+    const orderNumber = !providedNumber || providedNumber === 'PO' || providedNumber === 'PO-'
+      ? await this.generateOrderNumber()
+      : providedNumber;
+
+    if (!dto.supplierName?.trim() || !dto.farmerId) {
+      throw new BadRequestException('Farmer name is required');
+    }
+    if (!dto.orderDate) {
+      throw new BadRequestException('Purchase date is required');
+    }
+    const cages = (dto.cages || []).filter((c) => Number(c.numberOfBirds) > 0 && Number(c.cageWeight) > 0);
+    if (!cages.length) {
+      throw new BadRequestException('Add at least one cage with birds and weight');
+    }
+    if (!(parseFloat(dto.ratePerKg || '0') > 0)) {
+      throw new BadRequestException('Rate per kg is required');
+    }
+    dto.cages = cages;
 
     const existing = await this.purchaseOrderRepository.findOne({ where: this.tenantWhere({ orderNumber }) });
     if (existing) throw new BadRequestException(`Purchase order ${orderNumber} already exists`);
