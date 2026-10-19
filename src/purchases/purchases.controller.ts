@@ -15,6 +15,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage, FileFilterCallback } from 'multer';
 import { extname, join } from 'path';
+import { mkdirSync } from 'fs';
 import { PurchasesService } from './purchases.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
@@ -133,25 +134,33 @@ export class PurchasesController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: join(process.cwd(), 'uploads', 'invoices'),
+        destination: (_req, _file, cb) => {
+          const dir = join(process.cwd(), 'uploads', 'invoices');
+          mkdirSync(dir, { recursive: true });
+          cb(null, dir);
+        },
         filename: (_req: Express.Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
           const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, `invoice-${unique}${extname(file.originalname)}`);
+          const ext = extname(file.originalname || '').toLowerCase() || '.bin';
+          cb(null, `invoice-${unique}${ext}`);
         },
       }),
       fileFilter: (_req: Express.Request, file: Express.Multer.File, cb: FileFilterCallback) => {
-        const allowed = ['.pdf', '.jpg', '.jpeg', '.png'];
-        if (allowed.includes(extname(file.originalname).toLowerCase())) {
+        const allowedExt = ['.pdf', '.jpg', '.jpeg', '.png'];
+        const allowedMime = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/pjpeg'];
+        const ext = extname(file.originalname || '').toLowerCase();
+        const mime = String(file.mimetype || '').toLowerCase();
+        if (allowedExt.includes(ext) || allowedMime.includes(mime)) {
           cb(null, true);
         } else {
-          cb(new BadRequestException('Only PDF, JPG, PNG files are allowed'));
+          cb(null, false);
         }
       },
       limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
     }),
   )
   async uploadInvoice(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
-    if (!file) throw new BadRequestException('No file uploaded');
+    if (!file) throw new BadRequestException('Only PDF, JPG, and PNG files up to 10 MB can be attached');
     const fileUrl = `/uploads/invoices/${file.filename}`;
     return this.purchasesService.updateInvoiceAttachment(id, fileUrl);
   }

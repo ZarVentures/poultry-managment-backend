@@ -203,6 +203,33 @@ export class GodownService {
     return 0;
   }
 
+  /** Kg written on the inward. Expected kg is only used when nothing was weighed. */
+  private inwardDocumentKg(e: {
+    numberOfBirds?: number;
+    averageWeight?: number;
+    totalWeight?: number;
+    actualWeight?: number;
+  }): number {
+    const recorded = this.measuredKg(e.totalWeight) ?? this.measuredKg(e.actualWeight);
+    if (recorded != null && recorded > 0) return this.round2(recorded);
+    return this.round2(this.inwardExpectedKg(e));
+  }
+
+  /**
+   * Same kg the Godown Sale screen shows: Number(sale.totalWeight).
+   * Do not replace it with birds × average.
+   */
+  private saleDocumentKg(sale: { totalWeight?: number | null }): number {
+    return this.round2(this.n(sale.totalWeight));
+  }
+
+  /** Kg written on the return. A missing return kg falls back to stock kg. */
+  private returnDocumentKg(weightReturned: unknown, birds: number, avgKgPerBird: number): number {
+    const recorded = this.measuredKg(weightReturned);
+    if (recorded != null && recorded > 0) return this.round2(recorded);
+    return this.stockKg(birds, avgKgPerBird);
+  }
+
   /**
    * Shrinkage against a real scale weight. Missing weight is null, not a verified 0 kg loss.
    * A recorded 0 kg is a real measurement.
@@ -1033,6 +1060,8 @@ export class GodownService {
       birdsOut: number;
       weightIn: number;
       weightOut: number;
+      stockWeightIn: number;
+      stockWeightOut: number;
       ratePerKg?: number;
       amount?: number;
       notes?: string;
@@ -1079,8 +1108,10 @@ export class GodownService {
         vehicleId: e.vehicleId,
         birdsIn: this.n(e.numberOfBirds),
         birdsOut: 0,
-        weightIn: this.stockKg(this.n(e.numberOfBirds), avgKgPerBird),
+        weightIn: this.inwardDocumentKg(e),
         weightOut: 0,
+        stockWeightIn: this.stockKg(this.n(e.numberOfBirds), avgKgPerBird),
+        stockWeightOut: 0,
         weighedKg: this.inwardWeighedKg(e),
         averageWeight: this.measuredKg(e.averageWeight),
         ratePerKg: e.ratePerKg != null ? Number(e.ratePerKg) : undefined,
@@ -1095,7 +1126,7 @@ export class GodownService {
       const adj = returnAdjustBySale.get(String(s.id)) || { birds: 0, weight: 0 };
       const birdsOut = this.n(s.numberOfBirds) + adj.birds;
       const billedKg = this.measuredKg(s.totalWeight);
-      const weightOut = this.stockKg(birdsOut, avgKgPerBird);
+      const weightOut = this.saleDocumentKg(s);
       movements.push({
         date: this.ymd(s.saleDate),
         createdAt: s.createdAt,
@@ -1110,8 +1141,12 @@ export class GodownService {
         birdsOut,
         weightIn: 0,
         weightOut,
+        stockWeightIn: 0,
+        stockWeightOut: this.stockKg(birdsOut, avgKgPerBird),
         ratePerKg: s.ratePerKg != null ? Number(s.ratePerKg) : undefined,
-        averageWeight: this.measuredKg(s.averageWeight),
+        averageWeight: weightOut > 0 && birdsOut > 0
+          ? this.round2(weightOut / birdsOut)
+          : this.measuredKg(s.averageWeight),
         amount: s.totalAmount != null ? Number(s.totalAmount) : undefined,
         notes: adj.birds > 0
           ? `${s.notes || ''} | Includes ${adj.birds} birds later returned`.trim()
@@ -1122,7 +1157,8 @@ export class GodownService {
 
     for (const r of birdReturns) {
       const birds = this.n(r.numberOfBirdsReturned);
-      const weight = this.stockKg(birds, avgKgPerBird);
+      const stockWeight = this.stockKg(birds, avgKgPerBird);
+      const weight = this.returnDocumentKg(r.weightReturned, birds, avgKgPerBird);
       const isDead = r.returnReason === 'dead';
       const toStock = !!r.returnedToInventory;
       const processed = r.status === 'processed';
@@ -1150,6 +1186,8 @@ export class GodownService {
         birdsOut,
         weightIn: weight,
         weightOut,
+        stockWeightIn: stockWeight,
+        stockWeightOut: birdsOut > 0 ? stockWeight : 0,
         amount: r.refundAmount != null ? Number(r.refundAmount) : undefined,
         notes: noteParts.join(' | '),
         affectsStock: processed,
@@ -1176,6 +1214,8 @@ export class GodownService {
         birdsOut,
         weightIn: 0,
         weightOut: this.stockKg(birdsOut, avgKgPerBird),
+        stockWeightIn: 0,
+        stockWeightOut: this.stockKg(birdsOut, avgKgPerBird),
         weighedKg: recordedKg ?? undefined,
         notes: m.notes || m.reason,
       });
@@ -1198,6 +1238,8 @@ export class GodownService {
         birdsOut,
         weightIn: 0,
         weightOut: this.stockKg(birdsOut, avgKgPerBird),
+        stockWeightIn: 0,
+        stockWeightOut: this.stockKg(birdsOut, avgKgPerBird),
         weighedKg: recordedKg ?? undefined,
         notes: m.notes || m.cause,
       });
@@ -1220,7 +1262,7 @@ export class GodownService {
       if (m.affectsStock === false) continue;
       if (start && m.date < start) {
         openingBirds += m.birdsIn - m.birdsOut;
-        openingWeight += m.weightIn - m.weightOut;
+        openingWeight += m.stockWeightIn - m.stockWeightOut;
       }
     }
 
@@ -1263,18 +1305,23 @@ export class GodownService {
     let periodOutAmount = 0;
     let soldBirds = 0;
     let soldWeight = 0;
+    let soldStockWeight = 0;
     let mortalityBirds = 0;
     let mortalityWeight = 0;
     let returnBirdsIn = 0;
     let returnWeightIn = 0;
     let returnWeightOut = 0;
+    let returnStockIn = 0;
+    let returnStockOut = 0;
+    let inwardBirds = 0;
     let inwardKg = 0;
+    let inwardStockKg = 0;
     let billedSaleWeight = 0;
 
     const entries = periodMovements.map((m) => {
       if (m.affectsStock !== false) {
         runningBirds += m.birdsIn - m.birdsOut;
-        runningWeight += m.weightIn - m.weightOut;
+        runningWeight += m.stockWeightIn - m.stockWeightOut;
         periodInBirds += m.birdsIn;
         periodOutBirds += m.birdsOut;
         periodInWeight += m.weightIn;
@@ -1284,20 +1331,27 @@ export class GodownService {
         if (m.movementType === 'SALE') {
           soldBirds += m.birdsOut;
           soldWeight += m.weightOut;
+          soldStockWeight += m.stockWeightOut;
           if (m.billedKg != null) billedSaleWeight += m.billedKg;
         }
         if (m.movementType === 'MORTALITY') {
           mortalityBirds += m.birdsOut;
-          mortalityWeight += m.weightOut;
+          mortalityWeight += m.stockWeightOut;
         }
         if (m.movementType === 'INWARD') {
+          inwardBirds += m.birdsIn;
           inwardKg += m.weightIn;
+          inwardStockKg += m.stockWeightIn;
         }
       }
       if (m.movementType === 'RETURN') {
         returnBirdsIn += m.birdsIn;
         returnWeightIn += m.weightIn;
         returnWeightOut += m.weightOut;
+        if (m.affectsStock !== false) {
+          returnStockIn += m.stockWeightIn;
+          returnStockOut += m.stockWeightOut;
+        }
       }
 
       return {
@@ -1317,7 +1371,13 @@ export class GodownService {
         amount: m.amount ?? null,
         averageWeight: this.movementAvgWeight(m, avgKgPerBird),
         weighedKg: this.movementWeighedKg(m),
-        weightLoss: this.movementWeightLoss(m),
+        weightLoss: this.movementWeightLoss({
+          movementType: m.movementType,
+          weightIn: m.stockWeightIn,
+          weightOut: m.stockWeightOut,
+          weighedKg: m.weighedKg,
+          billedKg: m.billedKg,
+        }),
         notes: m.notes || null,
         runningBirds,
         runningWeight: Number(runningWeight.toFixed(2)),
@@ -1331,9 +1391,9 @@ export class GodownService {
     const closingWeightFinal = closingBirdsFinal > 0 && avgKgPerBird > 0
       ? this.round2(closingBirdsFinal * avgKgPerBird)
       : Math.max(0, Number(runningWeight.toFixed(2)));
-    const fromWeight = this.round2(openingWeightFinal + inwardKg + returnWeightIn);
+    const fromWeight = this.round2(openingWeightFinal + inwardStockKg + returnStockIn);
     const accountedWeight = this.round2(
-      soldWeight + mortalityWeight + returnWeightOut + closingWeightFinal,
+      soldStockWeight + mortalityWeight + returnStockOut + closingWeightFinal,
     );
 
     let reconInwardKg = 0;
@@ -1357,23 +1417,23 @@ export class GodownService {
       birdsThroughEnd = scanBirds;
       if (start && m.date < start) continue;
       if (m.movementType === 'INWARD') {
-        reconInwardKg += m.weightIn;
+        reconInwardKg += m.stockWeightIn;
         reconInwardCostKg += this.n(m.costKg);
         reconInwardValue += this.n(m.costValue);
         if (m.weighedKg == null) unmeasuredLossCount += 1;
       } else if (m.movementType === 'SALE') {
         if (m.billedKg != null) reconBilledKg += m.billedKg;
         else {
-          reconUnmeasuredSaleKg += m.weightOut;
+          reconUnmeasuredSaleKg += m.stockWeightOut;
           reconUnmeasuredSales += 1;
           unmeasuredLossCount += 1;
         }
       } else if (m.movementType === 'MORTALITY') {
-        reconMortalityKg += m.weightOut;
+        reconMortalityKg += m.stockWeightOut;
         if (m.weighedKg == null) unmeasuredLossCount += 1;
       } else if (m.movementType === 'RETURN') {
-        reconReturnIn += m.weightIn;
-        reconReturnOut += m.weightOut;
+        reconReturnIn += m.stockWeightIn;
+        reconReturnOut += m.stockWeightOut;
       }
     }
 
@@ -1426,6 +1486,7 @@ export class GodownService {
         mortalityWeight: Number(mortalityWeight.toFixed(2)),
         returnBirds: returnBirdsIn,
         returnWeight: Number(returnWeightIn.toFixed(2)),
+        inwardBirds,
         inwardWeight: this.round2(inwardKg),
         inwardValue: this.round2(reconInwardValue),
         openingValue,
