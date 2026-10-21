@@ -51,7 +51,7 @@ export class SalesService {
     const mortalityDeduction = parseFloat(dto.mortalityDeduction || '0');
     const otherDeduction = parseFloat(dto.otherDeduction || '0');
     const grossAmount = totalAmount + transportCharges + loadingCharges + commission + otherCharges;
-    const netAmount = grossAmount - weightShortage - mortalityDeduction - otherDeduction;
+    const netAmount = grossAmount - mortalityDeduction - otherDeduction;
     return { totalAmount, transportCharges, loadingCharges, commission, otherCharges, weightShortage, mortalityDeduction, otherDeduction, grossAmount, netAmount };
   }
 
@@ -64,18 +64,18 @@ export class SalesService {
     // Find the last invoice number with this prefix
     const qb = this.saleRepository
       .createQueryBuilder('sale')
-      .where('sale.invoiceNumber LIKE :prefix', { prefix: `${prefix}%` })
-      .orderBy('sale.id', 'DESC')
-      .limit(1);
+      .select(['sale.id', 'sale.invoiceNumber'])
+      .where('sale.invoiceNumber LIKE :prefix', { prefix: `${prefix}%` });
     this.applyTenant(qb);
-    const lastSale = await qb.getOne();
+    const rows = await qb.getMany();
 
-    if (lastSale && lastSale.invoiceNumber) {
-      const lastNumber = parseInt(lastSale.invoiceNumber.split('-').pop() || '0');
-      return `${prefix}${String(lastNumber + 1).padStart(4, '0')}`;
+    let max = 0;
+    for (const row of rows) {
+      const suffix = parseInt(String(row.invoiceNumber || '').slice(prefix.length), 10);
+      if (Number.isFinite(suffix) && suffix > max) max = suffix;
     }
 
-    return `${prefix}0001`;
+    return `${prefix}${String(max + 1).padStart(4, '0')}`;
   }
 
   async generateNextInvoiceNumber(): Promise<string> {
@@ -83,8 +83,30 @@ export class SalesService {
   }
 
   async create(dto: CreateSaleDto): Promise<Sale> {
-    // Auto-generate invoice number if not provided
-    const invoiceNumber = dto.invoiceNumber || await this.generateInvoiceNumber();
+    const providedNumber = (dto.invoiceNumber || '').trim();
+    const invoiceNumber = !providedNumber || providedNumber === 'SL' || providedNumber === 'SL-'
+      ? await this.generateInvoiceNumber()
+      : providedNumber;
+
+    if (!dto.customerName?.trim() || !dto.retailerId) {
+      throw new BadRequestException('Retailer name is required');
+    }
+    if (!dto.saleDate) {
+      throw new BadRequestException('Sale date is required');
+    }
+    if (!(parseFloat(dto.quantity || '0') > 0)) {
+      throw new BadRequestException('Total weight is required');
+    }
+    if (!(parseFloat(dto.unitPrice || '0') > 0)) {
+      throw new BadRequestException('Rate per kg is required');
+    }
+    if (dto.purchaseBillNo) {
+      const cages = (dto.cages || []).filter((c) => Number(c.soldBirds) > 0 && Number(c.soldWeight) > 0);
+      if (!cages.length) {
+        throw new BadRequestException('Select at least one cage with birds and weight');
+      }
+      dto.cages = cages;
+    }
 
     const existing = await this.saleRepository.findOne({ where: this.tenantWhere({ invoiceNumber }) });
     if (existing) throw new BadRequestException(`Sale ${invoiceNumber} already exists`);
@@ -94,7 +116,7 @@ export class SalesService {
 
     const sale = this.saleRepository.create({
       invoiceNumber,
-      saleNo: dto.saleNo,
+      saleNo: dto.saleNo?.trim() || invoiceNumber,
       purchaseBillNo: dto.purchaseBillNo,
       cageNo: dto.cageNo,
       numberOfBirds: Number(dto.numberOfBirds ?? dto.totalBirds ?? 0) || 0,
@@ -204,12 +226,18 @@ export class SalesService {
       if (retailerId) summaryQuery.andWhere('sale.retailerId = :retailerId', { retailerId });
 
       const allFiltered = await summaryQuery.getMany();
+      const billAmount = (x: Sale) => {
+        const gross = Number(x.grossAmount || 0);
+        const other = Number(x.mortalityDeduction || 0) + Number(x.otherDeduction || 0);
+        if (gross > 0) return Math.max(0, gross - other);
+        return Math.max(0, Number(x.netAmount || 0) + Number(x.weightShortage || 0) || Number(x.totalAmount || 0));
+      };
       const summary = {
         totalBirds: allFiltered.reduce((s, x) => s + this.getBirdsCount(x), 0),
         totalWeight: allFiltered.reduce((s, x) => s + Number(x.quantity || 0), 0),
-        totalRevenue: allFiltered.reduce((s, x) => s + Number(x.netAmount || x.totalAmount || 0), 0),
+        totalRevenue: allFiltered.reduce((s, x) => s + billAmount(x), 0),
         totalReceived: allFiltered.reduce((s, x) => s + Number(x.amountReceived || 0), 0),
-        totalPending: allFiltered.reduce((s, x) => s + Math.max(0, Number(x.netAmount || x.totalAmount || 0) - Number(x.amountReceived || 0)), 0),
+        totalPending: allFiltered.reduce((s, x) => s + Math.max(0, billAmount(x) - Number(x.amountReceived || 0)), 0),
       };
 
       return { data, total, page, limit, summary };
