@@ -106,6 +106,22 @@ export class BillingService {
     return partyType === 'Farm' ? c - d : d - c;
   }
 
+  /** Retailer owes the sale after mortality and other deductions. High weight loss is not deducted. */
+  private saleAmountDue(sale: {
+    grossAmount?: number;
+    totalAmount?: number;
+    netAmount?: number;
+    weightShortage?: number;
+    mortalityDeduction?: number;
+    otherDeduction?: number;
+  }): number {
+    const gross = Number(sale.grossAmount || 0);
+    const other = Number(sale.mortalityDeduction || 0) + Number(sale.otherDeduction || 0);
+    const shortage = Number(sale.weightShortage || 0);
+    if (gross > 0) return Math.max(0, Math.round((gross - other) * 100) / 100);
+    return Math.max(0, Number(sale.netAmount || 0) + shortage || Number(sale.totalAmount || 0));
+  }
+
   private returnImpactAmount(r: { refundAmount?: number; adjustmentAmount?: number }) {
     return Number(r.refundAmount || 0) || Number(r.adjustmentAmount || 0);
   }
@@ -453,7 +469,7 @@ export class BillingService {
       const sales = await saleQuery.getMany();
 
       for (const sale of sales) {
-        const restored = Number(sale.netAmount || sale.totalAmount || 0) + (vehicleReturnImpact[String(sale.id)] || 0);
+        const restored = this.saleAmountDue(sale) + (vehicleReturnImpact[String(sale.id)] || 0);
         dynamicEntries.push({
           id: `sale-${sale.id}`,
           partyId,

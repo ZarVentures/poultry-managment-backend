@@ -28,9 +28,10 @@ export class CreateSaleCageDto {
 }
 
 export class CreateSaleDto {
+  @IsOptional()
   @IsString()
   @MaxLength(50)
-  invoiceNumber!: string;
+  invoiceNumber?: string;
 
   @IsOptional()
   @IsString()
