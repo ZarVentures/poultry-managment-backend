@@ -643,7 +643,28 @@ export class GodownService {
     throw new BadRequestException(message);
   }
 
+  private assertRequiredSaleFields(data: any) {
+    const missing: string[] = [];
+    if (!data?.saleDate) missing.push('sale date');
+    if (!String(data?.customerName ?? '').trim()) missing.push('customer name');
+    if (!(Number(data?.numberOfBirds) > 0)) missing.push('number of birds');
+    if (!(Number(data?.totalWeight) > 0)) missing.push('total weight');
+    if (!(Number(data?.ratePerKg) > 0)) missing.push('rate per kg');
+    const amount = Number(data?.totalAmount);
+    const computed = Number(data?.totalWeight) * Number(data?.ratePerKg);
+    if (!(amount > 0) && !(computed > 0)) missing.push('total amount');
+    if (!['paid', 'partial', 'pending'].includes(String(data?.paymentStatus || ''))) {
+      missing.push('payment status');
+    }
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Please fill all required fields: ${missing.join(', ')}`,
+      );
+    }
+  }
+
   async createSale(data: any) {
+    this.assertRequiredSaleFields(data);
     const { payments, weightLoss, ...rest } = data;
     const saleData = this.pickSaleColumns(rest);
     if (saleData.saleDate) {
@@ -753,6 +774,7 @@ export class GodownService {
   }
 
   async updateSale(id: string, data: any) {
+    this.assertRequiredSaleFields(data);
     const { payments, weightLoss, ...rest } = data;
     const validData = this.pickSaleColumns(rest);
     if (validData.saleDate) {
@@ -976,6 +998,19 @@ export class GodownService {
         : Math.max(0, Number(ledger?.closing?.weight) || 0);
     const currentValue = Math.max(0, Math.round(currentWeight * inwardRate * 100) / 100);
 
+    const ledgerEntries = Array.isArray(ledger?.entries) ? ledger.entries : [];
+    // Dead kg on the overview is the weight written on each mortality record.
+    const recordedMortalityWeight = ledgerEntries
+      .filter((entry) => entry.movementType === 'MORTALITY')
+      .reduce((sum, entry) => {
+        const recorded = this.measuredKg(entry.weighedKg);
+        return sum + (recorded != null ? recorded : this.n(entry.weightOut));
+      }, 0);
+    // Returned kg follows the same stock average as birds still in the godown.
+    const returnedStockWeight = ledgerEntries
+      .filter((entry) => entry.movementType === 'RETURN')
+      .reduce((sum, entry) => sum + this.n(entry.stockWeightIn), 0);
+
     return {
       totalInward: totalInwardBirds,
       totalSold: totalSoldBirds,
@@ -984,8 +1019,8 @@ export class GodownService {
       currentStock,
       totalInwardWeight: stockInwardWeight,
       totalSoldWeight: this.round2(this.n(ledger?.period?.soldWeight)),
-      totalMortalityWeight: this.round2(this.n(ledger?.period?.mortalityWeight)),
-      totalReturnWeight: this.round2(this.n(ledger?.period?.returnWeight)),
+      totalMortalityWeight: this.round2(recordedMortalityWeight),
+      totalReturnWeight: this.round2(returnedStockWeight),
       currentWeight,
       totalInwardValue: stockInwardValue,
       totalSoldValue,
@@ -1367,6 +1402,8 @@ export class GodownService {
         birdsOut: m.birdsOut,
         weightIn: Number(m.weightIn.toFixed(2)),
         weightOut: Number(m.weightOut.toFixed(2)),
+        stockWeightIn: Number(m.stockWeightIn.toFixed(2)),
+        stockWeightOut: Number(m.stockWeightOut.toFixed(2)),
         ratePerKg: m.ratePerKg ?? null,
         amount: m.amount ?? null,
         averageWeight: this.movementAvgWeight(m, avgKgPerBird),
