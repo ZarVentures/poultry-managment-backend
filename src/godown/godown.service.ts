@@ -1006,10 +1006,10 @@ export class GodownService {
         const recorded = this.measuredKg(entry.weighedKg);
         return sum + (recorded != null ? recorded : this.n(entry.weightOut));
       }, 0);
-    // Returned kg follows the same stock average as birds still in the godown.
-    const returnedStockWeight = ledgerEntries
+    // Returned kg is the weight written on each return, same figure as the movement row.
+    const returnedDocumentWeight = ledgerEntries
       .filter((entry) => entry.movementType === 'RETURN')
-      .reduce((sum, entry) => sum + this.n(entry.stockWeightIn), 0);
+      .reduce((sum, entry) => sum + this.n(entry.weightIn), 0);
 
     return {
       totalInward: totalInwardBirds,
@@ -1020,7 +1020,7 @@ export class GodownService {
       totalInwardWeight: stockInwardWeight,
       totalSoldWeight: this.round2(this.n(ledger?.period?.soldWeight)),
       totalMortalityWeight: this.round2(recordedMortalityWeight),
-      totalReturnWeight: this.round2(returnedStockWeight),
+      totalReturnWeight: this.round2(returnedDocumentWeight),
       currentWeight,
       totalInwardValue: stockInwardValue,
       totalSoldValue,
