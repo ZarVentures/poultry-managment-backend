@@ -43,11 +43,29 @@ export class AuthService {
   private assertStaffEmailLogin(user: User) {
     const role = this.roleOf(user);
     if (role === 'admin' || role === '') {
-      throw new UnauthorizedException('Admins sign in with mobile OTP, not email.');
+      throw new UnauthorizedException('Admins sign in with mobile OTP or password, not email OTP.');
     }
     if (role !== 'staff' && role !== 'manager') {
       throw new UnauthorizedException('This account cannot sign in with email.');
     }
+  }
+
+  private assertCanResetByEmail(user: User) {
+    const role = this.roleOf(user);
+    if (role === 'staff' || role === 'manager' || role === 'admin' || role === '') return;
+    throw new UnauthorizedException('This account cannot reset a password by email.');
+  }
+
+  private assertEmailPasswordLogin(user: User) {
+    const role = this.roleOf(user);
+    if (role === 'staff' || role === 'manager') return;
+    if (role === 'admin' || role === '') {
+      if (!user.passwordHash) {
+        throw new UnauthorizedException('Set a password in Security, or sign in with mobile OTP.');
+      }
+      return;
+    }
+    throw new UnauthorizedException('This account cannot sign in with email.');
   }
 
   private emailOtpKey(email: string): string {
@@ -59,7 +77,7 @@ export class AuthService {
     const user = await this.usersService.findByEmail(email.toLowerCase());
     if (!user || user.purgedAt) throw new UnauthorizedException('Invalid credentials');
 
-    this.assertStaffEmailLogin(user);
+    this.assertEmailPasswordLogin(user);
 
     if (!user.passwordHash) {
       throw new UnauthorizedException('Set a password with your admin, or sign in with email OTP.');
@@ -71,6 +89,91 @@ export class AuthService {
     this.assertAccountAccess(user, 'Invalid credentials', 'User is inactive');
 
     return user;
+  }
+
+  // ── Phone + password: Admin login ─────────────────────────────────────────
+  async validatePhonePassword(phoneNumber: string, pass: string): Promise<User> {
+    const user = await this.usersService.findByPhone(phoneNumber);
+    if (!user || user.purgedAt) throw new UnauthorizedException('Invalid credentials');
+
+    this.assertAdminMobileLogin(user);
+
+    if (!user.passwordHash) {
+      throw new UnauthorizedException(
+        'No password is set for this account. Use Forgot password to choose one.',
+      );
+    }
+
+    const matches = await bcrypt.compare(pass, user.passwordHash);
+    if (!matches) throw new UnauthorizedException('Invalid credentials');
+
+    this.assertAccountAccess(user, 'Invalid credentials', 'User is inactive');
+    return user;
+  }
+
+  async getPasswordStatus(userId: string): Promise<{ hasPassword: boolean }> {
+    return { hasPassword: await this.usersService.hasPassword(userId) };
+  }
+
+  async setPassword(userId: string, password: string, currentPassword?: string) {
+    await this.usersService.setOwnPassword(userId, password, currentPassword);
+    return { message: 'Password saved', hasPassword: true };
+  }
+
+  // ── Forgot / reset password ───────────────────────────────────────────────
+  async forgotPasswordPhone(phoneNumber: string): Promise<{ message: string; devOtp?: string }> {
+    this.rateLimit.hit(`reset-send:${phoneNumber}`, 5, 60 * 60 * 1000);
+    const user = await this.usersService.findByPhone(phoneNumber);
+    if (!user || user.purgedAt) throw new UnauthorizedException('No account found with this phone number.');
+    this.assertAdminMobileLogin(user);
+    this.assertAccountAccess(user, 'No account found with this phone number.', 'User account is inactive.');
+
+    const otp = await this.otpService.generateSecureOtp(phoneNumber, 'password-reset');
+    await this.otpService.sendOtpSms(phoneNumber, otp);
+    return { message: 'OTP sent successfully', devOtp: otp };
+  }
+
+  async resetPasswordPhone(phoneNumber: string, otp: string, password: string) {
+    this.rateLimit.hit(`reset-verify:${phoneNumber}`, 10, 60 * 60 * 1000);
+    const user = await this.usersService.findByPhone(phoneNumber);
+    if (!user || user.purgedAt) throw new UnauthorizedException('User not found.');
+    this.assertAdminMobileLogin(user);
+    this.assertAccountAccess(user, 'User not found.', 'User account is inactive.');
+
+    await this.otpService.verifyOtp(phoneNumber, otp, 'password-reset');
+    await this.usersService.replacePassword(user.id, password);
+    const fresh = await this.usersService.findByIdUnscoped(user.id);
+    if (!fresh) throw new UnauthorizedException('User not found.');
+    return this.login(fresh);
+  }
+
+  async forgotPasswordEmail(email: string): Promise<{ message: string; devOtp?: string }> {
+    const normalized = email.trim().toLowerCase();
+    this.rateLimit.hit(`reset-send:${normalized}`, 5, 60 * 60 * 1000);
+    const user = await this.usersService.findByEmail(normalized);
+    if (!user || user.purgedAt) throw new UnauthorizedException('No account found with this email.');
+    this.assertCanResetByEmail(user);
+    this.assertAccountAccess(user, 'No account found with this email.', 'User account is inactive.');
+
+    const key = this.emailOtpKey(normalized);
+    const otp = await this.otpService.generateSecureOtp(key, 'password-reset');
+    await this.otpService.sendOtpEmail(normalized, otp);
+    return { message: 'OTP sent successfully', devOtp: otp };
+  }
+
+  async resetPasswordEmail(email: string, otp: string, password: string) {
+    const normalized = email.trim().toLowerCase();
+    this.rateLimit.hit(`reset-verify:${normalized}`, 10, 60 * 60 * 1000);
+    const user = await this.usersService.findByEmail(normalized);
+    if (!user || user.purgedAt) throw new UnauthorizedException('User not found.');
+    this.assertCanResetByEmail(user);
+    this.assertAccountAccess(user, 'User not found.', 'User account is inactive.');
+
+    await this.otpService.verifyOtp(this.emailOtpKey(normalized), otp, 'password-reset');
+    await this.usersService.replacePassword(user.id, password);
+    const fresh = await this.usersService.findByIdUnscoped(user.id);
+    if (!fresh) throw new UnauthorizedException('User not found.');
+    return this.login(fresh);
   }
 
   // ── Phone + OTP: Admin login ──────────────────────────────────────────────
@@ -133,14 +236,14 @@ export class AuthService {
     return { message: 'OTP sent. Please verify your phone number.', devOtp: otp };
   }
 
-  async registerVerifyOtp(name: string, phoneNumber: string, otp: string) {
+  async registerVerifyOtp(name: string, phoneNumber: string, otp: string, password: string) {
     await this.otpService.verifyOtp(phoneNumber, otp);
 
     // Check again in case someone registered in between
     const existing = await this.usersService.findByPhone(phoneNumber);
     if (existing) throw new ConflictException('An account with this phone number already exists.');
 
-    const user = await this.usersService.createPhoneUser({ name, phone: phoneNumber });
+    const user = await this.usersService.createPhoneUser({ name, phone: phoneNumber, password });
     return this.login(user);
   }
 
