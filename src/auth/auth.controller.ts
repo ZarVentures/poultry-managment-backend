@@ -1,6 +1,13 @@
 import { Body, Controller, Get, Post, Request, UseGuards, Param, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
+import { LoginDto, PhonePasswordLoginDto } from './dto/login.dto';
+import { SetPasswordDto } from './dto/set-password.dto';
+import {
+  ForgotEmailPasswordDto,
+  ForgotPhonePasswordDto,
+  ResetEmailPasswordDto,
+  ResetPhonePasswordDto,
+} from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import {
   SendOtpDto,
@@ -21,6 +28,44 @@ export class AuthController {
   async login(@Body() body: LoginDto) {
     const user = await this.authService.validateUser(body.email, body.password);
     return this.authService.login(user);
+  }
+
+  @Post('login/phone-password')
+  async loginPhonePassword(@Body() body: PhonePasswordLoginDto) {
+    const user = await this.authService.validatePhonePassword(body.phoneNumber, body.password);
+    return this.authService.login(user);
+  }
+
+  @Get('password')
+  @UseGuards(JwtAuthGuard)
+  async passwordStatus(@Request() req: any) {
+    return this.authService.getPasswordStatus(req.user.userId);
+  }
+
+  @Post('password')
+  @UseGuards(JwtAuthGuard)
+  async setPassword(@Request() req: any, @Body() body: SetPasswordDto) {
+    return this.authService.setPassword(req.user.userId, body.password, body.currentPassword);
+  }
+
+  @Post('password/forgot/phone')
+  async forgotPasswordPhone(@Body() body: ForgotPhonePasswordDto) {
+    return this.authService.forgotPasswordPhone(body.phoneNumber);
+  }
+
+  @Post('password/reset/phone')
+  async resetPasswordPhone(@Body() body: ResetPhonePasswordDto) {
+    return this.authService.resetPasswordPhone(body.phoneNumber, body.otp, body.password);
+  }
+
+  @Post('password/forgot/email')
+  async forgotPasswordEmail(@Body() body: ForgotEmailPasswordDto) {
+    return this.authService.forgotPasswordEmail(body.email);
+  }
+
+  @Post('password/reset/email')
+  async resetPasswordEmail(@Body() body: ResetEmailPasswordDto) {
+    return this.authService.resetPasswordEmail(body.email, body.otp, body.password);
   }
 
   // ── Phone + OTP: Login ────────────────────────────────────────────────────
@@ -52,7 +97,7 @@ export class AuthController {
 
   @Post('register/verify-otp')
   async registerVerifyOtp(@Body() body: RegisterVerifyOtpDto) {
-    return this.authService.registerVerifyOtp(body.name, body.phoneNumber, body.otp);
+    return this.authService.registerVerifyOtp(body.name, body.phoneNumber, body.otp, body.password);
   }
 
   private clientIp(req: any): string | undefined {

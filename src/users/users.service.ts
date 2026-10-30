@@ -127,14 +127,16 @@ export class UsersService {
     });
   }
 
-  async createPhoneUser(data: { name: string; phone: string }): Promise<User> {
+  async createPhoneUser(data: { name: string; phone: string; password: string }): Promise<User> {
     const existing = await this.findByPhone(data.phone);
     if (existing) {
       throw new ConflictException(`User with phone ${data.phone} already exists`);
     }
+    const passwordHash = await bcrypt.hash(data.password, 10);
     const user = this.usersRepository.create({
       name: data.name,
       phone: data.phone,
+      passwordHash,
       role: 'admin',
       status: 'active',
     });
@@ -345,6 +347,44 @@ export class UsersService {
       sessionToken,
       lastLogin: new Date(),
     });
+  }
+
+  async hasPassword(id: string): Promise<boolean> {
+    const user = await this.findByIdUnscoped(id);
+    return Boolean(user?.passwordHash);
+  }
+
+  async setOwnPassword(id: string, password: string, currentPassword?: string): Promise<void> {
+    const user = await this.findByIdUnscoped(id);
+    if (!user || user.purgedAt || user.deletedAt) {
+      throw new UnauthorizedException('User not found');
+    }
+    if (user.status !== 'active') {
+      throw new UnauthorizedException('User is inactive');
+    }
+    if (user.passwordHash) {
+      if (!currentPassword?.trim()) {
+        throw new BadRequestException('Current password is required');
+      }
+      const matches = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!matches) {
+        throw new UnauthorizedException('Current password is incorrect');
+      }
+    }
+    const passwordHash = await bcrypt.hash(password, 10);
+    await this.usersRepository.update(id, { passwordHash });
+  }
+
+  async replacePassword(id: string, password: string): Promise<void> {
+    const user = await this.findByIdUnscoped(id);
+    if (!user || user.purgedAt || user.deletedAt) {
+      throw new UnauthorizedException('User not found');
+    }
+    if (user.status !== 'active') {
+      throw new UnauthorizedException('User is inactive');
+    }
+    const passwordHash = await bcrypt.hash(password, 10);
+    await this.usersRepository.update(id, { passwordHash, sessionToken: null });
   }
 
   async setTwoFactorSecret(id: string, secret: string | null): Promise<void> {
