@@ -11,6 +11,7 @@ import { Mortality } from '../mortality/mortality.entity';
 import { CagesService } from '../cages/cages.service';
 import { TenantContextService } from '../tenants/tenant-context.service';
 import { normalizeToIST } from '../common/date-utils';
+import { derivePaymentStatus } from '../common/payment-status.util';
 
 @Injectable()
 export class GodownService {
@@ -230,6 +231,13 @@ export class GodownService {
     return this.stockKg(birds, avgKgPerBird);
   }
 
+  /** Kg written on the mortality record. Missing weight falls back to birds × average. */
+  private mortalityDocumentKg(weightOfDeadBirds: unknown, birds: number, avgKgPerBird: number): number {
+    const recorded = this.measuredKg(weightOfDeadBirds);
+    if (recorded != null) return this.round2(recorded);
+    return this.stockKg(birds, avgKgPerBird);
+  }
+
   /**
    * Shrinkage against a real scale weight. Missing weight is null, not a verified 0 kg loss.
    * A recorded 0 kg is a real measurement.
@@ -371,7 +379,8 @@ export class GodownService {
   }): number | null {
     if (m.movementType === 'INWARD') return this.shrinkageKg(m.weightIn, m.weighedKg ?? null);
     if (m.movementType === 'SALE') return this.shrinkageKg(m.weightOut, m.billedKg ?? null);
-    if (m.movementType === 'MORTALITY') return this.shrinkageKg(m.weightOut, m.weighedKg ?? null);
+    // Dead kg is the weight written on the mortality record. It is not shrinkage.
+    if (m.movementType === 'MORTALITY') return null;
     return null;
   }
 
@@ -664,8 +673,17 @@ export class GodownService {
   }
 
   async createSale(data: any) {
-    this.assertRequiredSaleFields(data);
     const { payments, weightLoss, ...rest } = data;
+    const totalPaymentMadeEarly = (payments || []).reduce(
+      (sum: number, p: any) => sum + parseFloat(p.amount || '0'),
+      0,
+    );
+    const dueEarly =
+      Number(rest?.totalAmount) ||
+      Number(rest?.totalWeight) * Number(rest?.ratePerKg) ||
+      0;
+    rest.paymentStatus = derivePaymentStatus(dueEarly, totalPaymentMadeEarly);
+    this.assertRequiredSaleFields({ ...rest, payments });
     const saleData = this.pickSaleColumns(rest);
     if (saleData.saleDate) {
       saleData.saleDate = normalizeToIST(String(saleData.saleDate));
@@ -714,6 +732,11 @@ export class GodownService {
     // Calculate total payment made from payments array
     const totalPaymentMade = (payments || []).reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
     saleData.amountReceived = totalPaymentMade;
+    const dueAmount =
+      Number(saleData.totalAmount) ||
+      Number(saleData.totalWeight) * Number(saleData.ratePerKg) ||
+      0;
+    saleData.paymentStatus = derivePaymentStatus(dueAmount, totalPaymentMade);
 
     try {
       const insertPayload = {
@@ -774,8 +797,17 @@ export class GodownService {
   }
 
   async updateSale(id: string, data: any) {
-    this.assertRequiredSaleFields(data);
     const { payments, weightLoss, ...rest } = data;
+    const existing = await this.findOneSale(id);
+    const totalPaymentMadeEarly = payments !== undefined
+      ? payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0)
+      : Number(existing?.amountReceived || 0);
+    const dueEarly =
+      Number(rest?.totalAmount ?? existing?.totalAmount) ||
+      Number(rest?.totalWeight ?? existing?.totalWeight) * Number(rest?.ratePerKg ?? existing?.ratePerKg) ||
+      0;
+    rest.paymentStatus = derivePaymentStatus(dueEarly, totalPaymentMadeEarly);
+    this.assertRequiredSaleFields({ ...rest, payments });
     const validData = this.pickSaleColumns(rest);
     if (validData.saleDate) {
       validData.saleDate = normalizeToIST(String(validData.saleDate));
@@ -787,7 +819,7 @@ export class GodownService {
     const requestedBirds =
       validData.numberOfBirds !== undefined
         ? validData.numberOfBirds
-        : (await this.findOneSale(id))?.numberOfBirds;
+        : existing?.numberOfBirds;
     await this.assertGodownBirdsAvailable(requestedBirds, id);
 
     try {
@@ -814,6 +846,17 @@ export class GodownService {
         const totalPaymentMade = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
         validData.amountReceived = totalPaymentMade;
       }
+
+      const dueAmount =
+        Number(validData.totalAmount ?? existing?.totalAmount) ||
+        Number(validData.totalWeight ?? existing?.totalWeight) *
+          Number(validData.ratePerKg ?? existing?.ratePerKg) ||
+        0;
+      const paidAmount =
+        validData.amountReceived !== undefined
+          ? Number(validData.amountReceived)
+          : Number(existing?.amountReceived || 0);
+      validData.paymentStatus = derivePaymentStatus(dueAmount, paidAmount);
 
       if (Object.keys(validData).length > 0) {
         await this.saleRepo
@@ -1230,10 +1273,19 @@ export class GodownService {
     }
 
     const processedGodownMortalityIds = new Set(mortalities.map((m) => String(m.id)));
+    const farmByGodownMortalityId = new Map(
+      farmMortalities
+        .filter((m) => m.godownMortalityId)
+        .map((m) => [String(m.godownMortalityId), m] as const),
+    );
 
     for (const m of mortalities) {
       const birdsOut = this.n(m.numberOfBirdsDied);
       const recordedKg = this.measuredKg(m.weightOfDeadBirds);
+      const documentKg = this.mortalityDocumentKg(m.weightOfDeadBirds, birdsOut, avgKgPerBird);
+      const linked = farmByGodownMortalityId.get(String(m.id));
+      const rate = linked?.ratePerKg != null ? Number(linked.ratePerKg) : undefined;
+      const amount = linked?.amount != null ? Number(linked.amount) : undefined;
       movements.push({
         date: this.ymd(m.mortalityDate),
         createdAt: m.createdAt,
@@ -1241,18 +1293,22 @@ export class GodownService {
         movementType: 'MORTALITY',
         referenceType: 'Godown Mortality',
         referenceId: String(m.id),
-        referenceNo: m.godownInward?.inwardNo
-          ? `MOR-${m.id} (${m.godownInward.inwardNo})`
-          : `MOR-${m.id}`,
-        party: m.reason || 'Mortality',
+        referenceNo: linked?.recordNumber
+          || (m.godownInward?.inwardNo ? `MOR-${m.id} (${m.godownInward.inwardNo})` : `MOR-${m.id}`),
+        party: linked?.cause || m.reason || 'Mortality',
         birdsIn: 0,
         birdsOut,
         weightIn: 0,
-        weightOut: this.stockKg(birdsOut, avgKgPerBird),
+        weightOut: documentKg,
         stockWeightIn: 0,
         stockWeightOut: this.stockKg(birdsOut, avgKgPerBird),
         weighedKg: recordedKg ?? undefined,
-        notes: m.notes || m.reason,
+        averageWeight: birdsOut > 0 && recordedKg != null && recordedKg > 0
+          ? this.round2(recordedKg / birdsOut)
+          : undefined,
+        ratePerKg: rate != null && Number.isFinite(rate) ? rate : undefined,
+        amount: amount != null && Number.isFinite(amount) ? amount : undefined,
+        notes: linked?.notes || m.notes || m.reason,
       });
     }
 
@@ -1260,6 +1316,7 @@ export class GodownService {
       if (m.godownMortalityId && processedGodownMortalityIds.has(String(m.godownMortalityId))) continue;
       const birdsOut = this.n(m.numberOfBirdsDied);
       const recordedKg = this.measuredKg(m.weightOfDeadBirds);
+      const documentKg = this.mortalityDocumentKg(m.weightOfDeadBirds, birdsOut, avgKgPerBird);
       movements.push({
         date: this.ymd(m.purchaseDate || m.createdAt),
         createdAt: m.createdAt,
@@ -1272,10 +1329,15 @@ export class GodownService {
         birdsIn: 0,
         birdsOut,
         weightIn: 0,
-        weightOut: this.stockKg(birdsOut, avgKgPerBird),
+        weightOut: documentKg,
         stockWeightIn: 0,
         stockWeightOut: this.stockKg(birdsOut, avgKgPerBird),
         weighedKg: recordedKg ?? undefined,
+        averageWeight: birdsOut > 0 && recordedKg != null && recordedKg > 0
+          ? this.round2(recordedKg / birdsOut)
+          : undefined,
+        ratePerKg: m.ratePerKg != null ? Number(m.ratePerKg) : undefined,
+        amount: m.amount != null ? Number(m.amount) : undefined,
         notes: m.notes || m.cause,
       });
     }
@@ -1343,6 +1405,7 @@ export class GodownService {
     let soldStockWeight = 0;
     let mortalityBirds = 0;
     let mortalityWeight = 0;
+    let mortalityStockWeight = 0;
     let returnBirdsIn = 0;
     let returnWeightIn = 0;
     let returnWeightOut = 0;
@@ -1371,7 +1434,8 @@ export class GodownService {
         }
         if (m.movementType === 'MORTALITY') {
           mortalityBirds += m.birdsOut;
-          mortalityWeight += m.stockWeightOut;
+          mortalityWeight += m.weightOut;
+          mortalityStockWeight += m.stockWeightOut;
         }
         if (m.movementType === 'INWARD') {
           inwardBirds += m.birdsIn;
@@ -1430,7 +1494,7 @@ export class GodownService {
       : Math.max(0, Number(runningWeight.toFixed(2)));
     const fromWeight = this.round2(openingWeightFinal + inwardStockKg + returnStockIn);
     const accountedWeight = this.round2(
-      soldStockWeight + mortalityWeight + returnStockOut + closingWeightFinal,
+      soldStockWeight + mortalityStockWeight + returnStockOut + closingWeightFinal,
     );
 
     let reconInwardKg = 0;

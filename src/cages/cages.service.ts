@@ -295,36 +295,49 @@ export class CagesService {
       .execute();
   }
 
-  // Handle partial vehicle sale by splitting the record
+  private round2(value: number): number {
+    return Math.round((Number(value) || 0) * 100) / 100;
+  }
+
+  // Handle partial vehicle sale by splitting the record.
+  // Stock kg always follows birds (avg purchase kg × birds sold). Client weight-loss
+  // must not be added on top, or a bad loss (full purchase − sold kg) wipes the cage.
   async partialVehicleSale(
     cageId: string,
     saleId: string,
     soldBirds: number,
     soldWeight: number,
-    weightLoss: number = 0
+    _weightLoss: number = 0
   ): Promise<void> {
     const cage = await this.cageRepo.findOne({ where: this.tenantWhere({ id: cageId }) });
     if (!cage) throw new NotFoundException(`Cage ${cageId} not found`);
 
-    if (soldBirds >= cage.numberOfBirds) {
-      // Full sale
-      await this.markSold([cageId], saleId, soldWeight);
+    const originalWeight = Number(cage.purchaseWeight || 0);
+    const originalBirds = Number(cage.numberOfBirds) || 0;
+    const birdsSold = Math.min(Math.max(0, Number(soldBirds) || 0), originalBirds);
+    const sellingAll = originalBirds > 0 && birdsSold >= originalBirds;
+    const proportionalPurchase = originalBirds > 0
+      ? this.round2((originalWeight / originalBirds) * birdsSold)
+      : 0;
+    const weightOfSoldPortion = sellingAll ? this.round2(originalWeight) : proportionalPurchase;
+
+    if (sellingAll) {
+      cage.status = 'sold';
+      cage.saleId = saleId;
+      cage.saleWeight = soldWeight;
+      cage.purchaseWeight = weightOfSoldPortion > 0 ? weightOfSoldPortion : originalWeight;
+      cage.updatedAt = new Date();
+      await this.cageRepo.save(cage);
       return;
     }
 
-    // Partial sale: Split the record
-    const remainingBirds = cage.numberOfBirds - soldBirds;
-    const originalWeight = Number(cage.purchaseWeight || 0);
+    const remainingBirds = originalBirds - birdsSold;
+    const remainingWeight = this.round2(Math.max(0, originalWeight - weightOfSoldPortion));
 
-    // The portion we are selling originally weighed (soldWeight + weightLoss)
-    const weightOfSoldPortion = Number(soldWeight) + Number(weightLoss);
-    const remainingWeight = Math.max(0, originalWeight - weightOfSoldPortion);
-
-    // 1. Create a new record for the SOLD portion
     const soldCage = this.cageRepo.create({
       ...cage,
-      id: undefined, // Let DB generate new ID
-      numberOfBirds: soldBirds,
+      id: undefined,
+      numberOfBirds: birdsSold,
       purchaseWeight: weightOfSoldPortion,
       saleWeight: soldWeight,
       status: 'sold',
@@ -332,7 +345,6 @@ export class CagesService {
       updatedAt: new Date(),
     });
 
-    // 2. Update the existing record with the REMAINING portion
     cage.numberOfBirds = remainingBirds;
     cage.purchaseWeight = remainingWeight;
     cage.updatedAt = new Date();
@@ -365,7 +377,12 @@ export class CagesService {
     return query.getOne();
   }
 
-  async deductTravelMortalityBirds(purchaseOrderId: string, cageLabel: string, birds: number): Promise<void> {
+  async deductTravelMortalityBirds(
+    purchaseOrderId: string,
+    cageLabel: string,
+    birds: number,
+    deadWeight?: number,
+  ): Promise<void> {
     const qty = Math.floor(Number(birds) || 0);
     if (qty <= 0) return;
     const cage = await this.requireTravelMortalityCage(purchaseOrderId, cageLabel);
@@ -374,17 +391,42 @@ export class CagesService {
         `Cannot deduct ${qty} birds from cage ${cageLabel}. Only ${cage.numberOfBirds} birds remaining.`,
       );
     }
+    const beforeBirds = Number(cage.numberOfBirds) || 0;
+    const beforeWt = Number(cage.purchaseWeight) || 0;
+    const measuredDead = Number(deadWeight);
+    const weightToRemove =
+      Number.isFinite(measuredDead) && measuredDead > 0
+        ? measuredDead
+        : beforeBirds > 0
+          ? (beforeWt / beforeBirds) * qty
+          : 0;
     cage.numberOfBirds -= qty;
+    cage.purchaseWeight = Math.max(0, beforeWt - weightToRemove);
     cage.updatedAt = new Date();
     await this.cageRepo.save(cage);
   }
 
-  async restoreTravelMortalityBirds(purchaseOrderId: string, cageLabel: string, birds: number): Promise<void> {
+  async restoreTravelMortalityBirds(
+    purchaseOrderId: string,
+    cageLabel: string,
+    birds: number,
+    deadWeight?: number,
+  ): Promise<void> {
     const qty = Math.floor(Number(birds) || 0);
     if (qty <= 0) return;
     const cage = await this.findTravelMortalityCage(purchaseOrderId, cageLabel);
     if (!cage) return;
+    const beforeBirds = Number(cage.numberOfBirds) || 0;
+    const beforeWt = Number(cage.purchaseWeight) || 0;
+    const measuredDead = Number(deadWeight);
+    const weightToRestore =
+      Number.isFinite(measuredDead) && measuredDead > 0
+        ? measuredDead
+        : beforeBirds > 0
+          ? (beforeWt / beforeBirds) * qty
+          : 0;
     cage.numberOfBirds += qty;
+    cage.purchaseWeight = beforeWt + weightToRestore;
     cage.updatedAt = new Date();
     await this.cageRepo.save(cage);
   }

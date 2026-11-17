@@ -9,6 +9,7 @@ import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
 import { AccountingService } from '../modules/accounting/accounting.service';
 import { TenantContextService } from '../tenants/tenant-context.service';
+import { derivePaymentStatus } from '../common/payment-status.util';
 
 @Injectable()
 export class PurchasesService {
@@ -109,7 +110,9 @@ export class PurchasesService {
 
     const amounts = this.calcAmounts({ ...dto, totalWeight: String(totalWeight) });
     const totalPaymentMade = (dto.payments || []).reduce((s, p) => s + parseFloat(p.amount || '0'), 0);
-    const balanceAmount = amounts.netAmount - totalPaymentMade;
+    // Exact = paid, less = partial, none = pending. Overpay stays paid; extra is farmer advance.
+    const purchasePaymentStatus = derivePaymentStatus(amounts.netAmount, totalPaymentMade);
+    const balanceAmount = Math.max(0, amounts.netAmount - totalPaymentMade);
 
     const order = this.purchaseOrderRepository.create({
       orderNumber,
@@ -123,7 +126,7 @@ export class PurchasesService {
       farmLocation: dto.farmLocation,
       vehicleId: dto.vehicleId,
       ...amounts,
-      purchasePaymentStatus: dto.purchasePaymentStatus || 'pending',
+      purchasePaymentStatus,
       totalPaymentMade,
       balanceAmount,
       notes: dto.notes,
@@ -312,7 +315,8 @@ export class PurchasesService {
     // Recalculate total payment from payments table
     const allPayments = dto.payments !== undefined ? dto.payments : (order.payments || []).map(p => ({ amount: String(p.amount) }));
     const totalPaymentMade = allPayments.reduce((s, p) => s + parseFloat((p as any).amount || '0'), 0);
-    const balanceAmount = netAmount - totalPaymentMade;
+    const purchasePaymentStatus = derivePaymentStatus(netAmount, totalPaymentMade);
+    const balanceAmount = Math.max(0, netAmount - totalPaymentMade);
 
     Object.assign(order, {
       orderNumber: dto.orderNumber ?? order.orderNumber,
@@ -326,7 +330,7 @@ export class PurchasesService {
       farmLocation: dto.farmLocation ?? order.farmLocation,
       vehicleId: dto.vehicleId ?? order.vehicleId,
       totalWeight, ratePerKg, totalAmount, transportCharges, otherCharges, grossAmount, netAmount,
-      purchasePaymentStatus: dto.purchasePaymentStatus ?? order.purchasePaymentStatus,
+      purchasePaymentStatus,
       totalPaymentMade, balanceAmount,
       notes: dto.notes ?? order.notes,
       updatedAt: new Date(),
