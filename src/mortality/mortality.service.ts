@@ -99,6 +99,7 @@ export class MortalityService {
         saved.purchaseOrderId!,
         saved.cageIdNumber!,
         died,
+        Number(saved.weightOfDeadBirds) || 0,
       );
     }
     return this.findOne(saved.id);
@@ -132,6 +133,7 @@ export class MortalityService {
     const mortality = await this.findOne(id);
     const previousSource = mortality.source;
     const previousBirds = Number(mortality.numberOfBirdsDied) || 0;
+    const previousDeadWeight = Number(mortality.weightOfDeadBirds) || 0;
     const previousCage = mortality.cageIdNumber;
     const previousPurchaseOrderId = mortality.purchaseOrderId;
 
@@ -182,13 +184,19 @@ export class MortalityService {
       await this.removeLinkedGodownMortality(saved);
     }
     if (previousSource === 'travel_sales' && previousPurchaseOrderId && previousCage) {
-      await this.cagesService.restoreTravelMortalityBirds(previousPurchaseOrderId, previousCage, previousBirds);
+      await this.cagesService.restoreTravelMortalityBirds(
+        previousPurchaseOrderId,
+        previousCage,
+        previousBirds,
+        previousDeadWeight,
+      );
     }
     if (saved.source === 'travel_sales' && saved.purchaseOrderId && saved.cageIdNumber) {
       await this.cagesService.deductTravelMortalityBirds(
         saved.purchaseOrderId,
         saved.cageIdNumber,
         Number(saved.numberOfBirdsDied) || 0,
+        Number(saved.weightOfDeadBirds) || 0,
       );
     }
     return this.findOne(saved.id);
@@ -202,6 +210,7 @@ export class MortalityService {
         mortality.purchaseOrderId,
         mortality.cageIdNumber,
         Number(mortality.numberOfBirdsDied) || 0,
+        Number(mortality.weightOfDeadBirds) || 0,
       );
     }
     await this.mortalityRepository.remove(mortality);

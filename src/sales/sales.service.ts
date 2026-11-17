@@ -8,6 +8,7 @@ import { UpdateSaleDto } from './dto/update-sale.dto';
 import { AccountingService } from '../modules/accounting/accounting.service';
 import { TenantContextService } from '../tenants/tenant-context.service';
 import { CagesService } from '../cages/cages.service';
+import { derivePaymentStatus } from '../common/payment-status.util';
 
 @Injectable()
 export class SalesService {
@@ -112,7 +113,10 @@ export class SalesService {
     if (existing) throw new BadRequestException(`Sale ${invoiceNumber} already exists`);
 
     const amounts = this.calcAmounts(dto);
-    const totalPaymentMade = (dto.payments || []).reduce((s, p) => s + parseFloat(p.amount || '0'), 0);
+    const totalPaymentMade = (dto.payments || []).reduce((s, p) => s + parseFloat(p.amount || '0'), 0)
+      || parseFloat(dto.amountReceived || '0');
+    // Exact = paid, less = partial, none = pending. Overpay stays paid and excess is retailer advance in ledger.
+    const paymentStatus = derivePaymentStatus(amounts.netAmount, totalPaymentMade);
 
     const sale = this.saleRepository.create({
       invoiceNumber,
@@ -128,8 +132,8 @@ export class SalesService {
       unit: dto.unit,
       unitPrice: parseFloat(dto.unitPrice || '0'),
       ...amounts,
-      paymentStatus: dto.paymentStatus || 'pending',
-      amountReceived: totalPaymentMade || parseFloat(dto.amountReceived || '0'),
+      paymentStatus,
+      amountReceived: totalPaymentMade,
       notes: dto.notes,
       retailerId: dto.retailerId,
       tenantId: this.getTenantId() ?? undefined,
@@ -296,6 +300,7 @@ export class SalesService {
     const totalPaymentMade = dto.payments !== undefined
       ? dto.payments.reduce((s, p) => s + parseFloat(p.amount || '0'), 0)
       : sale.amountReceived;
+    const paymentStatus = derivePaymentStatus(amounts.netAmount, Number(totalPaymentMade) || 0);
 
     Object.assign(sale, {
       invoiceNumber: dto.invoiceNumber ?? sale.invoiceNumber,
@@ -312,7 +317,7 @@ export class SalesService {
       productType: dto.productType ?? sale.productType,
       quantity, unitPrice, ...amounts,
       unit: dto.unit ?? sale.unit,
-      paymentStatus: dto.paymentStatus ?? sale.paymentStatus,
+      paymentStatus,
       amountReceived: totalPaymentMade,
       notes: dto.notes ?? sale.notes,
       retailerId: dto.retailerId ?? sale.retailerId,
